@@ -12,10 +12,11 @@ import "./Token.sol";
  *      In return for this recommendation, the lead investor will receive a carry on the proceeds of the investment.
  *      The contract holds the tokens until the investment is sold, at which point the proceeds are distributed between
  *      the coinvestor and the lead investors.
- *      Lead investor = beneficiary = carry receiver
+ *      Lead   investor = beneficiary = carry receiver
  */
-
 contract Coinvestor is Ownable2StepUpgradeable {
+    // TODO: Optimize storage by using struct { address beneficiary; uint64 percentage; }[]
+    // This would pack into 32 bytes per entry instead of current 64 bytes (50% savings)
     address[] public beneficiaries; // [0] is the coinvestor, the others are the carry receivers (=lead investors)
     uint64[] public percentage; // divided by uint64max
     uint public baseprice; // currency: EUR
