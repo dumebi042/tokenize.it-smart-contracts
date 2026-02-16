@@ -8,9 +8,11 @@ import "./TokenSwapBase.sol";
 struct TokenSwapCoinvestorInitializerArguments {
     /// Owner of the contract
     address owner;
-    /// beneficiaries[0] is the coinvestor, the rest are carry receivers (lead investors)
-    address[] beneficiaries;
-    /// carry percentages for each beneficiary, divided by uint64.max
+    /// coinvestor address: receives base price payout and carry dust
+    address receiver;
+    /// lead investors who receive carry
+    address[] leadInvestors;
+    /// carry percentages for each lead investor, divided by uint64.max
     uint64[] percentage;
     /// base price per token in currency bits (amount coinvestor is entitled to per token before carry)
     uint256 basePrice;
@@ -26,19 +28,19 @@ struct TokenSwapCoinvestorInitializerArguments {
  * @title TokenSwapCoinvestor
  * @author malteish, cjentzsch
  * @notice This contract holds tokens and sells them at a preset price, distributing proceeds
- *      between a coinvestor and carry receivers (lead investors).
- *      The coinvestor (beneficiaries[0]) receives basePrice per token sold.
- *      Any remaining proceeds after fees and coinvestor payout are split among all beneficiaries
- *      according to their carry percentages.
+ *      between a coinvestor (receiver) and lead investors.
+ *      The coinvestor (receiver) receives basePrice per token sold.
+ *      Any remaining proceeds after fees and coinvestor payout are split among lead investors
+ *      according to their carry percentages, with dust going to the coinvestor.
  *      If the sale price minus fees is less than the base price, all proceeds go to the coinvestor.
  * @dev Uses clone/proxy pattern. Constructor disables initializers, separate initialize().
  */
 contract TokenSwapCoinvestor is TokenSwapBase {
     using SafeERC20 for IERC20;
 
-    /// beneficiaries[0] is the coinvestor, the rest are carry receivers
-    address[] public beneficiaries;
-    /// carry percentages for each beneficiary, divided by uint64.max
+    /// lead investors who receive carry
+    address[] public leadInvestors;
+    /// carry percentages for each lead investor, divided by uint64.max
     uint64[] public percentage;
     /// base price per token in currency bits
     uint256 public basePrice;
@@ -55,18 +57,17 @@ contract TokenSwapCoinvestor is TokenSwapBase {
      * @param _arguments Struct containing all arguments for the initializer
      */
     function initialize(TokenSwapCoinvestorInitializerArguments memory _arguments) external initializer {
-        _initializeBase(_arguments.owner, _arguments.tokenPrice, _arguments.currency, _arguments.token);
+        _initializeBase(_arguments.owner, _arguments.tokenPrice, _arguments.currency, _arguments.token, _arguments.receiver);
 
         require(
-            _arguments.beneficiaries.length == _arguments.percentage.length,
-            "beneficiaries and percentage arrays must have same length"
+            _arguments.leadInvestors.length == _arguments.percentage.length,
+            "leadInvestors and percentage arrays must have same length"
         );
-        require(_arguments.beneficiaries.length > 0, "must have at least one beneficiary");
-        for (uint256 i = 0; i < _arguments.beneficiaries.length; i++) {
-            require(_arguments.beneficiaries[i] != address(0), "beneficiary can not be zero address");
+        for (uint256 i = 0; i < _arguments.leadInvestors.length; i++) {
+            require(_arguments.leadInvestors[i] != address(0), "lead investor can not be zero address");
         }
 
-        beneficiaries = _arguments.beneficiaries;
+        leadInvestors = _arguments.leadInvestors;
         percentage = _arguments.percentage;
         basePrice = _arguments.basePrice;
 
@@ -102,24 +103,24 @@ contract TokenSwapCoinvestor is TokenSwapBase {
 
         if (payoutCoinvestor >= remaining) {
             // sale price minus fees doesn't cover base price: all goes to coinvestor
-            currency.safeTransferFrom(_msgSender(), beneficiaries[0], remaining);
+            currency.safeTransferFrom(_msgSender(), receiver, remaining);
         } else {
             // pay base price to coinvestor
-            currency.safeTransferFrom(_msgSender(), beneficiaries[0], payoutCoinvestor);
+            currency.safeTransferFrom(_msgSender(), receiver, payoutCoinvestor);
 
-            // split carry among all beneficiaries
+            // split carry among lead investors
             uint256 carry = remaining - payoutCoinvestor;
             uint256 distributed = 0;
-            for (uint256 i = 0; i < beneficiaries.length; i++) {
+            for (uint256 i = 0; i < leadInvestors.length; i++) {
                 uint256 share = (uint256(percentage[i]) * carry) / type(uint64).max;
                 if (share != 0) {
-                    currency.safeTransferFrom(_msgSender(), beneficiaries[i], share);
+                    currency.safeTransferFrom(_msgSender(), leadInvestors[i], share);
                     distributed += share;
                 }
             }
             // send any rounding dust to the coinvestor
             if (distributed < carry) {
-                currency.safeTransferFrom(_msgSender(), beneficiaries[0], carry - distributed);
+                currency.safeTransferFrom(_msgSender(), receiver, carry - distributed);
             }
         }
 

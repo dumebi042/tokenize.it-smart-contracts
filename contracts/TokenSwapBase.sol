@@ -33,6 +33,12 @@ abstract contract TokenSwapBase is
     IERC20 public currency;
     /// token to be transferred
     Token public token;
+    /// address that receives the currency/tokens when tokens are bought/sold
+    address public receiver;
+
+    /// @notice receiver has been changed to `newReceiver`
+    /// @param newReceiver address that receives the payment (in currency/tokens) when tokens are bought/sold
+    event ReceiverChanged(address indexed newReceiver);
 
     /// @notice Price changed.
     /// @param newTokenPrice new price of a token, expressed as amount of bits of currency per main unit token (e.g.: 2 USDC (6 decimals) per TOK (18 decimals) => price = 2*10^6 ).
@@ -61,8 +67,9 @@ abstract contract TokenSwapBase is
      * @param _tokenPrice price of a token in currency bits per main unit token
      * @param _currency currency used for payment
      * @param _token token being swapped
+     * @param _receiver address that receives payment
      */
-    function _initializeBase(address _owner, uint256 _tokenPrice, IERC20 _currency, Token _token) internal onlyInitializing {
+    function _initializeBase(address _owner, uint256 _tokenPrice, IERC20 _currency, Token _token, address _receiver) internal onlyInitializing {
         require(_owner != address(0), "owner can not be zero address");
         __Ownable_init();
         _transferOwnership(_owner);
@@ -73,9 +80,21 @@ abstract contract TokenSwapBase is
             _token.allowList().map(address(_currency)) == TRUSTED_CURRENCY,
             "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
         );
+        require(_receiver != address(0), "receiver can not be zero address");
         tokenPrice = _tokenPrice;
         currency = _currency;
         token = _token;
+        receiver = _receiver;
+    }
+
+    /**
+     * @notice change the receiver to `_receiver`
+     * @param _receiver new receiver
+     */
+    function setReceiver(address _receiver) external onlyOwner {
+        require(_receiver != address(0), "receiver can not be zero address");
+        receiver = _receiver;
+        emit ReceiverChanged(_receiver);
     }
 
     /**

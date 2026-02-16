@@ -41,14 +41,8 @@ struct TokenSwapInitializerArguments {
 contract TokenSwap is TokenSwapBase {
     using SafeERC20 for IERC20;
 
-    /// address that receives the currency/tokens when tokens are bought/sold
-    address public receiver;
     /// holder. Tokens/currency will be transferred from this address.
     address public holder;
-
-    /// @notice receiver has been changed to `newReceiver`
-    /// @param newReceiver address that receives the payment (in currency/tokens) when tokens are bought/sold
-    event ReceiverChanged(address indexed newReceiver);
 
     /**
      * @notice `seller` sold `tokenAmount` tokens for `currencyAmount` currency.
@@ -70,11 +64,9 @@ contract TokenSwap is TokenSwapBase {
      * @param _arguments Struct containing all arguments for the initializer
      */
     function initialize(TokenSwapInitializerArguments memory _arguments) external initializer {
-        _initializeBase(_arguments.owner, _arguments.tokenPrice, _arguments.currency, _arguments.token);
+        _initializeBase(_arguments.owner, _arguments.tokenPrice, _arguments.currency, _arguments.token, _arguments.receiver);
 
-        require(_arguments.receiver != address(0), "receiver can not be zero address");
         require(_arguments.holder != address(0), "holder can not be zero address");
-        receiver = _arguments.receiver;
         holder = _arguments.holder;
     }
 
@@ -136,13 +128,4 @@ contract TokenSwap is TokenSwapBase {
         emit TokensSold(_msgSender(), _tokenAmount, currencyAmount);
     }
 
-    /**
-     * @notice change the receiver to `_receiver`
-     * @param _receiver new receiver
-     */
-    function setReceiver(address _receiver) external onlyOwner {
-        require(_receiver != address(0), "receiver can not be zero address");
-        receiver = _receiver;
-        emit ReceiverChanged(_receiver);
-    }
 }
