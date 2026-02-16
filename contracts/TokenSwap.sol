@@ -1,15 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.23;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
-import "./Token.sol";
+import "./TokenSwapBase.sol";
 
 /// this struct is used to circumvent the stack too deep error that occurs when passing too many arguments to a function
 struct TokenSwapInitializerArguments {
@@ -44,7 +38,7 @@ struct TokenSwapInitializerArguments {
  *          Then any party wanting to sell tokens can do so through the sell function.
  * @dev The contract inherits from ERC2771Context in order to be usable with Gas Station Network (GSN) https://docs.opengsn.org/faq/troubleshooting.html#my-contract-is-using-openzeppelin-how-do-i-add-gsn-support
  */
-contract TokenSwap is ERC2771ContextUpgradeable, OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
+contract TokenSwap is TokenSwapBase {
     using SafeERC20 for IERC20;
 
     /// address that receives the currency/tokens when tokens are bought/sold
@@ -52,28 +46,9 @@ contract TokenSwap is ERC2771ContextUpgradeable, OwnableUpgradeable, PausableUpg
     /// holder. Tokens/currency will be transferred from this address.
     address public holder;
 
-    /// The price of a token, expressed as amount of bits of currency per main unit token (e.g.: 2 USDC (6 decimals) per TOK (18 decimals) => price = 2*10^6 ).
-    /// @dev units: [tokenPrice] = [currency_bits]/[token], so for above example: [tokenPrice] = [USDC_bits]/[TOK]
-    uint256 public tokenPrice;
-    /// currency used to pay for the token purchase. Must be ERC20, so ether can only be used as wrapped ether (WETH)
-    IERC20 public currency;
-    /// token to be transferred
-    Token public token;
-
     /// @notice receiver has been changed to `newReceiver`
     /// @param newReceiver address that receives the payment (in currency/tokens) when tokens are bought/sold
     event ReceiverChanged(address indexed newReceiver);
-
-    /// @notice Price changed.
-    /// @param newTokenPrice new price of a token, expressed as amount of bits of currency per main unit token (e.g.: 2 USDC (6 decimals) per TOK (18 decimals) => price = 2*10^6 ).
-    event TokenPriceChanged(uint256 newTokenPrice);
-    /**
-     * @notice `buyer` bought `tokenAmount` tokens for `currencyAmount` currency.
-     * @param buyer Address that bought the tokens
-     * @param tokenAmount Amount of tokens bought
-     * @param currencyAmount Amount of currency paid
-     */
-    event TokensBought(address indexed buyer, uint256 tokenAmount, uint256 currencyAmount);
 
     /**
      * @notice `seller` sold `tokenAmount` tokens for `currencyAmount` currency.
@@ -88,51 +63,19 @@ contract TokenSwap is ERC2771ContextUpgradeable, OwnableUpgradeable, PausableUpg
      * It has no owner, and can not be used directly.
      * @param _trustedForwarder This address can execute transactions in the name of any other address
      */
-    constructor(address _trustedForwarder) ERC2771ContextUpgradeable(_trustedForwarder) {
-        _disableInitializers();
-    }
+    constructor(address _trustedForwarder) TokenSwapBase(_trustedForwarder) {}
 
     /**
      * @notice Sets up the TokenSwap. The contract is usable immediately after being initialized.
      * @param _arguments Struct containing all arguments for the initializer
      */
     function initialize(TokenSwapInitializerArguments memory _arguments) external initializer {
-        require(_arguments.owner != address(0), "owner can not be zero address");
-        __Ownable_init(); // sets msgSender() as owner
-        _transferOwnership(_arguments.owner); // sets owner as owner
+        _initializeBase(_arguments.owner, _arguments.tokenPrice, _arguments.currency, _arguments.token);
 
         require(_arguments.receiver != address(0), "receiver can not be zero address");
-        require(address(_arguments.currency) != address(0), "currency can not be zero address");
-        require(address(_arguments.token) != address(0), "token can not be zero address");
         require(_arguments.holder != address(0), "holder can not be zero address");
-        require(_arguments.tokenPrice != 0, "_tokenPrice needs to be a non-zero amount");
-        require(
-            _arguments.token.allowList().map(address(_arguments.currency)) == TRUSTED_CURRENCY,
-            "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
-        );
         receiver = _arguments.receiver;
-        tokenPrice = _arguments.tokenPrice;
-        token = _arguments.token;
         holder = _arguments.holder;
-        currency = _arguments.currency;
-    }
-
-    /**
-     * @notice Retrieves the fee amount and the fee receiver for a token swap transaction.
-     * @dev This internal function queries the token's fee settings to determine:
-     *      1. The fee amount to be deducted from the transaction
-     *      2. The address that should receive the collected fees
-     *      The fee is calculated based on the currency amount and the specific token.
-     * @param _currencyAmount The total currency amount involved in the swap transaction, in bits (smallest subunit of currency)
-     * @return fee The fee amount to be collected, in bits (smallest subunit of currency)
-     * @return feeCollector The address that will receive the collected fees
-     */
-    function _getFeeAndFeeReceiver(uint256 _currencyAmount) internal view returns (uint256, address) {
-        IFeeSettingsV2 feeSettings = token.feeSettings();
-        return (
-            feeSettings.crowdinvestingFee(_currencyAmount, address(token)),
-            feeSettings.crowdinvestingFeeCollector(address(token))
-        );
     }
 
     /**
@@ -201,56 +144,5 @@ contract TokenSwap is ERC2771ContextUpgradeable, OwnableUpgradeable, PausableUpg
         require(_receiver != address(0), "receiver can not be zero address");
         receiver = _receiver;
         emit ReceiverChanged(_receiver);
-    }
-
-    /**
-     * @notice change tokenPrice to `_tokenPrice`
-     * @param _tokenPrice new tokenPrice
-     */
-    function setTokenPrice(uint256 _tokenPrice) external onlyOwner {
-        require(_tokenPrice != 0, "_tokenPrice needs to be a non-zero amount");
-        tokenPrice = _tokenPrice;
-        emit TokenPriceChanged(_tokenPrice);
-    }
-
-    /**
-     * @notice pause the contract
-     */
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    /**
-     * @notice unpause the contract
-     */
-    function unpause() external onlyOwner {
-        _unpause();
-    }
-
-    /**
-     * @dev both Ownable and ERC2771Context have a _msgSender() function, so we need to override and select which one to use.
-     */
-    function _msgSender() internal view override(ContextUpgradeable, ERC2771ContextUpgradeable) returns (address) {
-        return ERC2771ContextUpgradeable._msgSender();
-    }
-
-    /**
-     * @dev both Ownable and ERC2771Context have a _msgData() function, so we need to override and select which one to use.
-     */
-    function _msgData() internal view override(ContextUpgradeable, ERC2771ContextUpgradeable) returns (bytes calldata) {
-        return ERC2771ContextUpgradeable._msgData();
-    }
-
-    /**
-     * @dev both Ownable and ERC2771Context have a _contextSuffixLength() function, so we need to override and select which one to use.
-     */
-    function _contextSuffixLength()
-        internal
-        view
-        virtual
-        override(ContextUpgradeable, ERC2771ContextUpgradeable)
-        returns (uint256)
-    {
-        return ERC2771ContextUpgradeable._contextSuffixLength();
     }
 }
