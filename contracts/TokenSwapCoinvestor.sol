@@ -5,15 +5,20 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 
 import "./TokenSwapBase.sol";
 
+struct LeadInvestor {
+    /// lead investor address that receives carry
+    address account;
+    /// carry percentage, divided by uint64.max
+    uint64 carryFraction;
+}
+
 struct TokenSwapCoinvestorInitializerArguments {
     /// Owner of the contract
     address owner;
     /// coinvestor address: receives base price payout and carry dust
     address receiver;
-    /// lead investors who receive carry
-    address[] leadInvestors;
-    /// carry percentages for each lead investor, divided by uint64.max
-    uint64[] percentage;
+    /// lead investors and their carry fractions
+    LeadInvestor[] leadInvestors;
     /// base price per token in currency bits (amount coinvestor is entitled to per token before carry)
     uint256 basePrice;
     /// sell price per token in currency bits
@@ -38,10 +43,8 @@ struct TokenSwapCoinvestorInitializerArguments {
 contract TokenSwapCoinvestor is TokenSwapBase {
     using SafeERC20 for IERC20;
 
-    /// lead investors who receive carry
-    address[] public leadInvestors;
-    /// carry percentages for each lead investor, divided by uint64.max
-    uint64[] public percentage;
+    /// lead investors and their carry fractions
+    LeadInvestor[] leadInvestors;
     /// base price per token in currency bits
     uint256 public basePrice;
 
@@ -57,20 +60,22 @@ contract TokenSwapCoinvestor is TokenSwapBase {
      * @param _arguments Struct containing all arguments for the initializer
      */
     function initialize(TokenSwapCoinvestorInitializerArguments memory _arguments) external initializer {
-        _initializeBase(_arguments.owner, _arguments.tokenPrice, _arguments.currency, _arguments.token, _arguments.receiver);
-
-        require(
-            _arguments.leadInvestors.length == _arguments.percentage.length,
-            "leadInvestors and percentage arrays must have same length"
+        _initializeBase(
+            _arguments.owner,
+            _arguments.tokenPrice,
+            _arguments.currency,
+            _arguments.token,
+            _arguments.receiver
         );
-        for (uint256 i = 0; i < _arguments.leadInvestors.length; i++) {
-            require(_arguments.leadInvestors[i] != address(0), "lead investor can not be zero address");
-        }
 
-        leadInvestors = _arguments.leadInvestors;
-        percentage = _arguments.percentage;
+        require(_arguments.leadInvestors.length > 0, "There must be at least one lead investor");
+        for (uint256 i = 0; i < _arguments.leadInvestors.length; i++) {
+            require(_arguments.leadInvestors[i].account != address(0), "lead investor can not be zero address");
+            leadInvestors.push(_arguments.leadInvestors[i]);
+        }
         basePrice = _arguments.basePrice;
 
+        // Pausing the contract prevents an immediate sell of the tokens. Once they should be sold, update price and unpause.
         _pause();
     }
 
@@ -112,9 +117,9 @@ contract TokenSwapCoinvestor is TokenSwapBase {
             uint256 carry = remaining - payoutCoinvestor;
             uint256 distributed = 0;
             for (uint256 i = 0; i < leadInvestors.length; i++) {
-                uint256 share = (uint256(percentage[i]) * carry) / type(uint64).max;
+                uint256 share = (uint256(leadInvestors[i].carryFraction) * carry) / type(uint64).max;
                 if (share != 0) {
-                    currency.safeTransferFrom(_msgSender(), leadInvestors[i], share);
+                    currency.safeTransferFrom(_msgSender(), leadInvestors[i].account, share);
                     distributed += share;
                 }
             }
@@ -138,5 +143,22 @@ contract TokenSwapCoinvestor is TokenSwapBase {
     function withdrawToTokenAdmin(Token _token, address _admin) external onlyOwner {
         require(_token.hasRole(bytes32(0), _admin), "_admin must be token admin");
         _token.transfer(_admin, _token.balanceOf(address(this)));
+    }
+
+    /**
+     * @notice Returns the lead investor at `_index`.
+     * @param _index index in the leadInvestors array
+     * @return the LeadInvestor struct (address and carry fraction)
+     */
+    function getLeadInvestor(uint256 _index) external view returns (LeadInvestor memory) {
+        return leadInvestors[_index];
+    }
+
+    /**
+     * @notice Returns the number of lead investors.
+     * @return the length of the leadInvestors array
+     */
+    function getLeadInvestorsCount() external view returns (uint256) {
+        return leadInvestors.length;
     }
 }
