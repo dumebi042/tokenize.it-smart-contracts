@@ -21,8 +21,6 @@ struct TokenSwapCoinvestorInitializerArguments {
     LeadInvestor[] leadInvestors;
     /// base price per token in currency bits (amount coinvestor is entitled to per token before carry)
     uint256 basePrice;
-    /// sell price per token in currency bits
-    uint256 tokenPrice;
     /// currency used for payment. Must be ERC20.
     IERC20 currency;
     /// token being sold
@@ -62,7 +60,7 @@ contract TokenSwapCoinvestor is TokenSwapBase {
     function initialize(TokenSwapCoinvestorInitializerArguments memory _arguments) external initializer {
         _initializeBase(
             _arguments.owner,
-            _arguments.tokenPrice,
+            0,
             _arguments.currency,
             _arguments.token,
             _arguments.receiver

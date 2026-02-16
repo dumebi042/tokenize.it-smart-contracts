@@ -73,7 +73,6 @@ abstract contract TokenSwapBase is
         require(_owner != address(0), "owner can not be zero address");
         __Ownable_init();
         _transferOwnership(_owner);
-        require(_tokenPrice != 0, "_tokenPrice needs to be a non-zero amount");
         require(address(_currency) != address(0), "currency can not be zero address");
         require(address(_token) != address(0), "token can not be zero address");
         require(
@@ -132,6 +131,7 @@ abstract contract TokenSwapBase is
      * @notice unpause the contract
      */
     function unpause() external onlyOwner {
+        require(tokenPrice != 0, "tokenPrice must be set before unpausing");
         _unpause();
     }
 

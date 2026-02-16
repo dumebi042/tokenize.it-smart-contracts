@@ -64,6 +64,7 @@ contract TokenSwap is TokenSwapBase {
      * @param _arguments Struct containing all arguments for the initializer
      */
     function initialize(TokenSwapInitializerArguments memory _arguments) external initializer {
+        require(_arguments.tokenPrice != 0, "_tokenPrice needs to be a non-zero amount");
         _initializeBase(_arguments.owner, _arguments.tokenPrice, _arguments.currency, _arguments.token, _arguments.receiver);
 
         require(_arguments.holder != address(0), "holder can not be zero address");
