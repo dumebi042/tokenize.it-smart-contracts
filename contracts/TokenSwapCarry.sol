@@ -47,7 +47,12 @@ struct TokenSwapInitializerArguments {
  *          Then any party wanting to sell tokens can do so through the sell function.
  * @dev The contract inherits from ERC2771Context in order to be usable with Gas Station Network (GSN) https://docs.opengsn.org/faq/troubleshooting.html#my-contract-is-using-openzeppelin-how-do-i-add-gsn-support
  */
-contract TokenSwapCarry is ERC2771ContextUpgradeable, OwnableUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
+contract TokenSwapCarry is
+    ERC2771ContextUpgradeable,
+    OwnableUpgradeable,
+    PausableUpgradeable,
+    ReentrancyGuardUpgradeable
+{
     using SafeERC20 for IERC20;
 
     /// address that receives the currency/tokens when tokens are bought/sold
@@ -172,8 +177,8 @@ contract TokenSwapCarry is ERC2771ContextUpgradeable, OwnableUpgradeable, Pausab
         // payout rest + carries
         uint length = holder.beneficiaries().length();
 
-        for (uint i=0; i<length; i++) {
-            uint amount = holder.percentage(i) * totalAmount / type(uint64).max;
+        for (uint i = 0; i < length; i++) {
+            uint amount = (holder.percentage(i) * totalAmount) / type(uint64).max;
             paidOut[holder] += amount;
             currency.transfer(holder.beneficiaries(i), amount);
         }
