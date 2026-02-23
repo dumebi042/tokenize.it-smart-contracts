@@ -43,7 +43,7 @@ contract CoinvestedPosition is TokenSwapBase {
     using SafeERC20 for IERC20;
 
     /// lead investors and their carry fractions
-    LeadInvestor[] leadInvestors;
+    LeadInvestor[] public leadInvestors;
     /// base price per token in currency bits
     uint256 public basePrice;
 
@@ -170,15 +170,6 @@ contract CoinvestedPosition is TokenSwapBase {
         if (dust > 0) {
             currency.safeTransfer(receiver, dust);
         }
-    }
-
-    /**
-     * @notice Returns the lead investor at `_index`.
-     * @param _index index in the leadInvestors array
-     * @return the LeadInvestor struct (address and carry fraction)
-     */
-    function getLeadInvestor(uint256 _index) external view returns (LeadInvestor memory) {
-        return leadInvestors[_index];
     }
 
     /**
