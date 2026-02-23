@@ -52,7 +52,9 @@ contract CoinvestedPosition is TokenSwapBase {
      * It has no owner, and can not be used directly.
      * @param _trustedForwarder This address can execute transactions in the name of any other address
      */
-    constructor(address _trustedForwarder) TokenSwapBase(_trustedForwarder) {}
+    constructor(address _trustedForwarder) TokenSwapBase(_trustedForwarder) {
+        _disableInitializers();
+    }
 
     /**
      * @notice Sets up the CoinvestedPosition. The contract is usable immediately after being initialized.
