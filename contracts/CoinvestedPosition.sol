@@ -151,6 +151,7 @@ contract CoinvestedPosition is TokenSwapBase {
      * @param _dist the Distribution contract to claim from
      */
     function distribute(IDistribution _dist) external onlyOwner nonReentrant {
+        require(_dist.currency() == currency, "Distribution currency does not match");
         uint256 before = currency.balanceOf(address(this));
         // this transfers the currency to the contract
         _dist.claim(address(this));
