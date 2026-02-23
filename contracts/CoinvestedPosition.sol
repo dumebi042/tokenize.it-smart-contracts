@@ -93,10 +93,13 @@ contract CoinvestedPosition is TokenSwapBase {
 
         require(currencyAmount <= _maxCurrencyAmount, "Purchase more expensive than _maxCurrencyAmount");
 
+        // pull full amount to this contract first, then distribute from here
+        currency.safeTransferFrom(_msgSender(), address(this), currencyAmount);
+
         // collect fee
         (uint256 fee, address feeCollector) = _getFeeAndFeeReceiver(currencyAmount);
         if (fee != 0) {
-            currency.safeTransferFrom(_msgSender(), feeCollector, fee);
+            currency.safeTransfer(feeCollector, fee);
         }
 
         uint256 remaining = currencyAmount - fee;
@@ -106,32 +109,37 @@ contract CoinvestedPosition is TokenSwapBase {
 
         if (payoutCoinvestor >= remaining) {
             // sale price minus fees doesn't cover base price: all goes to coinvestor
-            currency.safeTransferFrom(_msgSender(), receiver, remaining);
+            currency.safeTransfer(receiver, remaining);
         } else {
-            // pay base price to coinvestor
-            currency.safeTransferFrom(_msgSender(), receiver, payoutCoinvestor);
-
-            // split carry among lead investors
-            uint256 carry = remaining - payoutCoinvestor;
-            uint256 distributed = 0;
-            for (uint256 i = 0; i < leadInvestors.length; i++) {
-                uint256 share = (uint256(leadInvestors[i].carryFraction) * carry) / type(uint64).max;
-                if (share != 0) {
-                    currency.safeTransferFrom(_msgSender(), leadInvestors[i].account, share);
-                    distributed += share;
-                }
-            }
-            // remainder goes to receiver
-            uint256 receiverShare = carry - distributed;
-            if (receiverShare > 0) {
-                currency.safeTransferFrom(_msgSender(), receiver, receiverShare);
-            }
+            // pay base price to coinvestor, split remainder as carry
+            currency.safeTransfer(receiver, payoutCoinvestor);
+            _distributeCarry(remaining - payoutCoinvestor);
         }
 
         // transfer tokens from this contract to the buyer's receiver
         token.transfer(_tokenReceiver, _tokenAmount);
 
         emit TokensBought(_msgSender(), _tokenAmount, currencyAmount);
+    }
+
+    /**
+     * @notice Splits `carry` among lead investors by carryFraction; rounding dust goes to receiver.
+     * @dev Assumes `carry` is already held by this contract.
+     * @param carry amount of currency to distribute as carry
+     */
+    function _distributeCarry(uint256 carry) internal {
+        uint256 distributed = 0;
+        for (uint256 i = 0; i < leadInvestors.length; i++) {
+            uint256 share = (uint256(leadInvestors[i].carryFraction) * carry) / type(uint64).max;
+            if (share != 0) {
+                currency.safeTransfer(leadInvestors[i].account, share);
+                distributed += share;
+            }
+        }
+        uint256 receiverShare = carry - distributed;
+        if (receiverShare > 0) {
+            currency.safeTransfer(receiver, receiverShare);
+        }
     }
 
     /**
@@ -144,6 +152,7 @@ contract CoinvestedPosition is TokenSwapBase {
      */
     function distribute(IDistribution _dist) external onlyOwner nonReentrant {
         uint256 before = currency.balanceOf(address(this));
+        // this transfers the currency to the contract
         _dist.claim(address(this));
         uint256 received = currency.balanceOf(address(this)) - before;
 
@@ -161,20 +170,7 @@ contract CoinvestedPosition is TokenSwapBase {
             carry = received - basePayout;
         }
 
-        // split carry among lead investors, rounding dust to receiver (mirrors buy() logic)
-        uint256 distributed = 0;
-        for (uint256 i = 0; i < leadInvestors.length; i++) {
-            uint256 amount = (uint256(leadInvestors[i].carryFraction) * carry) / type(uint64).max;
-            if (amount > 0) {
-                currency.safeTransfer(leadInvestors[i].account, amount);
-                distributed += amount;
-            }
-        }
-        // remainder goes to receiver
-        uint256 receiverShare = carry - distributed;
-        if (receiverShare > 0) {
-            currency.safeTransfer(receiver, receiverShare);
-        }
+        _distributeCarry(carry);
     }
 
     /**
