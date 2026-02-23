@@ -24,7 +24,7 @@ struct CoinvestedPositionInitializerArguments {
     uint256 basePrice;
     /// currency used for payment. Must be ERC20.
     IERC20 currency;
-    /// token being sold
+    /// token being held
     Token token;
 }
 
@@ -64,10 +64,13 @@ contract CoinvestedPosition is TokenSwapBase {
         _initializeBase(_arguments.owner, 0, _arguments.currency, _arguments.token, _arguments.receiver);
 
         require(_arguments.leadInvestors.length > 0, "There must be at least one lead investor");
+        uint256 carryFractionsSum = 0;
         for (uint256 i = 0; i < _arguments.leadInvestors.length; i++) {
             require(_arguments.leadInvestors[i].account != address(0), "lead investor can not be zero address");
+            carryFractionsSum += _arguments.leadInvestors[i].carryFraction;
             leadInvestors.push(_arguments.leadInvestors[i]);
         }
+        require(carryFractionsSum < type(uint64).max, "carry fractions must leave a share for the receiver");
         basePrice = _arguments.basePrice;
 
         // Pausing the contract prevents an immediate sell of the tokens. Once they should be sold, update price and unpause.
@@ -118,9 +121,10 @@ contract CoinvestedPosition is TokenSwapBase {
                     distributed += share;
                 }
             }
-            // send any rounding dust to the coinvestor
-            if (distributed < carry) {
-                currency.safeTransferFrom(_msgSender(), receiver, carry - distributed);
+            // remainder goes to receiver
+            uint256 receiverShare = carry - distributed;
+            if (receiverShare > 0) {
+                currency.safeTransferFrom(_msgSender(), receiver, receiverShare);
             }
         }
 
@@ -166,9 +170,10 @@ contract CoinvestedPosition is TokenSwapBase {
                 distributed += amount;
             }
         }
-        uint256 dust = carry - distributed;
-        if (dust > 0) {
-            currency.safeTransfer(receiver, dust);
+        // remainder goes to receiver
+        uint256 receiverShare = carry - distributed;
+        if (receiverShare > 0) {
+            currency.safeTransfer(receiver, receiverShare);
         }
     }
 
