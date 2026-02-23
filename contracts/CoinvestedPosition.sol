@@ -13,7 +13,7 @@ struct LeadInvestor {
     uint64 carryFraction;
 }
 
-struct TokenSwapCoinvestorInitializerArguments {
+struct CoinvestedPositionInitializerArguments {
     /// Owner of the contract
     address owner;
     /// coinvestor address: receives base price payout and carry dust
@@ -29,7 +29,7 @@ struct TokenSwapCoinvestorInitializerArguments {
 }
 
 /**
- * @title TokenSwapCoinvestor
+ * @title CoinvestedPosition
  * @author malteish, cjentzsch
  * @notice This contract holds tokens and sells them at a preset price, distributing proceeds
  *      between a coinvestor (receiver) and lead investors.
@@ -39,7 +39,7 @@ struct TokenSwapCoinvestorInitializerArguments {
  *      If the sale price minus fees is less than the base price, all proceeds go to the coinvestor.
  * @dev Uses clone/proxy pattern. Constructor disables initializers, separate initialize().
  */
-contract TokenSwapCoinvestor is TokenSwapBase {
+contract CoinvestedPosition is TokenSwapBase {
     using SafeERC20 for IERC20;
 
     /// lead investors and their carry fractions
@@ -55,10 +55,10 @@ contract TokenSwapCoinvestor is TokenSwapBase {
     constructor(address _trustedForwarder) TokenSwapBase(_trustedForwarder) {}
 
     /**
-     * @notice Sets up the TokenSwapCoinvestor. The contract is usable immediately after being initialized.
+     * @notice Sets up the CoinvestedPosition. The contract is usable immediately after being initialized.
      * @param _arguments Struct containing all arguments for the initializer
      */
-    function initialize(TokenSwapCoinvestorInitializerArguments memory _arguments) external initializer {
+    function initialize(CoinvestedPositionInitializerArguments memory _arguments) external initializer {
         _initializeBase(
             _arguments.owner,
             0,
