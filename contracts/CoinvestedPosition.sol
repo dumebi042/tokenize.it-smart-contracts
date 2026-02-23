@@ -61,13 +61,7 @@ contract CoinvestedPosition is TokenSwapBase {
      * @param _arguments Struct containing all arguments for the initializer
      */
     function initialize(CoinvestedPositionInitializerArguments memory _arguments) external initializer {
-        _initializeBase(
-            _arguments.owner,
-            0,
-            _arguments.currency,
-            _arguments.token,
-            _arguments.receiver
-        );
+        _initializeBase(_arguments.owner, 0, _arguments.currency, _arguments.token, _arguments.receiver);
 
         require(_arguments.leadInvestors.length > 0, "There must be at least one lead investor");
         for (uint256 i = 0; i < _arguments.leadInvestors.length; i++) {
@@ -137,16 +131,6 @@ contract CoinvestedPosition is TokenSwapBase {
     }
 
     /**
-     * @notice Emergency exit: transfer all tokens of `_token` to `_admin`, who must be a token admin.
-     * @param _token the token to withdraw
-     * @param _admin the token admin to send to
-     */
-    function withdrawToTokenAdmin(Token _token, address _admin) external onlyOwner {
-        require(_token.hasRole(bytes32(0), _admin), "_admin must be token admin");
-        _token.transfer(_admin, _token.balanceOf(address(this)));
-    }
-
-    /**
      * @notice Claim this contract's eligible share from `_dist` and split it among the receiver and lead investors.
      * @dev Calls Distribution.claim() as msg.sender (this contract is the holder), then distributes received currency.
      *      On exit: receiver gets base first; if proceeds < base, receiver gets everything; remainder is carry.
@@ -162,7 +146,8 @@ contract CoinvestedPosition is TokenSwapBase {
         uint256 carry = received;
 
         if (_dist.exit()) {
-            uint256 basePayout = basePrice * token.balanceOfAt(address(this), _dist.snapshotId()) / 10 ** token.decimals();
+            uint256 basePayout = (basePrice * token.balanceOfAt(address(this), _dist.snapshotId())) /
+                10 ** token.decimals();
             if (basePayout >= received) {
                 // proceeds don't cover base: all goes to receiver
                 currency.safeTransfer(receiver, received);
