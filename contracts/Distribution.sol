@@ -64,24 +64,39 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         _claim(address(_holder), _recipient);
     }
 
-    // TODO: update this broken logic
     function claimForCoinvestor(TokenSwapCoinvestor _coinvestor) external {
         require(_msgSender() == _coinvestor.owner());
         address holder = address(_coinvestor);
-        uint length = _coinvestor.getLeadInvestorsCount();
         uint totalAmount = eligible(holder);
+        uint carry = totalAmount;
+
         if (exit) {
-            uint payoutCoinvestor = _coinvestor.basePrice() * token.balanceOfAt(holder, snapshotId);
-            totalAmount -= payoutCoinvestor;
-            paidOut[holder] += payoutCoinvestor;
-            currency.transfer(_coinvestor.receiver(), payoutCoinvestor); // TODO handle case when the payout is lower than the base
+            uint basePayout = _coinvestor.basePrice() * token.balanceOfAt(holder, snapshotId) / 10 ** token.decimals();
+            if (basePayout >= totalAmount) {
+                // proceeds don't cover base: all goes to receiver
+                paidOut[holder] += totalAmount;
+                currency.transfer(_coinvestor.receiver(), totalAmount);
+                return;
+            }
+            paidOut[holder] += basePayout;
+            currency.transfer(_coinvestor.receiver(), basePayout);
+            carry = totalAmount - basePayout;
         }
 
+        // split carry among lead investors, dust to receiver (mirrors buy() logic)
+        uint distributed = 0;
+        uint length = _coinvestor.getLeadInvestorsCount();
         for (uint i = 0; i < length; i++) {
             LeadInvestor memory li = _coinvestor.getLeadInvestor(i);
-            uint amount = (uint256(li.carryFraction) * totalAmount) / type(uint64).max;
+            uint amount = (uint256(li.carryFraction) * carry) / type(uint64).max;
             paidOut[holder] += amount;
             currency.transfer(li.account, amount);
+            distributed += amount;
+        }
+        uint dust = carry - distributed;
+        if (dust > 0) {
+            paidOut[holder] += dust;
+            currency.transfer(_coinvestor.receiver(), dust);
         }
     }
 
