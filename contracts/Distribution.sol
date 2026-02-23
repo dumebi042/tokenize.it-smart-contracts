@@ -5,10 +5,10 @@ pragma solidity 0.8.23;
 import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
 import "@openzeppelin/contracts/interfaces/IERC1271.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "./Vesting.sol";
 import "./Token.sol";
-import "./TokenSwapCoinvestor.sol";
 
 /**
  * @title tokenize.it Distribution
@@ -62,42 +62,6 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         //only works for lockups, where there is only one vesting plan per deployment. For EP it will not and should not work, since there are not tokens in EP contracts
         require(_msgSender() == _holder.beneficiary(0));
         _claim(address(_holder), _recipient);
-    }
-
-    function claimForCoinvestor(TokenSwapCoinvestor _coinvestor) external {
-        require(_msgSender() == _coinvestor.owner());
-        address holder = address(_coinvestor);
-        uint totalAmount = eligible(holder);
-        uint carry = totalAmount;
-
-        if (exit) {
-            uint basePayout = _coinvestor.basePrice() * token.balanceOfAt(holder, snapshotId) / 10 ** token.decimals();
-            if (basePayout >= totalAmount) {
-                // proceeds don't cover base: all goes to receiver
-                paidOut[holder] += totalAmount;
-                currency.transfer(_coinvestor.receiver(), totalAmount);
-                return;
-            }
-            paidOut[holder] += basePayout;
-            currency.transfer(_coinvestor.receiver(), basePayout);
-            carry = totalAmount - basePayout;
-        }
-
-        // split carry among lead investors, dust to receiver (mirrors buy() logic)
-        uint distributed = 0;
-        uint length = _coinvestor.getLeadInvestorsCount();
-        for (uint i = 0; i < length; i++) {
-            LeadInvestor memory li = _coinvestor.getLeadInvestor(i);
-            uint amount = (uint256(li.carryFraction) * carry) / type(uint64).max;
-            paidOut[holder] += amount;
-            currency.transfer(li.account, amount);
-            distributed += amount;
-        }
-        uint dust = carry - distributed;
-        if (dust > 0) {
-            paidOut[holder] += dust;
-            currency.transfer(_coinvestor.receiver(), dust);
-        }
     }
 
     function _claim(address _holder, address _recipient) internal {

@@ -4,6 +4,7 @@ pragma solidity 0.8.23;
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
 import "./TokenSwapBase.sol";
+import "./IDistribution.sol";
 
 struct LeadInvestor {
     /// lead investor address that receives carry
@@ -141,6 +142,47 @@ contract TokenSwapCoinvestor is TokenSwapBase {
     function withdrawToTokenAdmin(Token _token, address _admin) external onlyOwner {
         require(_token.hasRole(bytes32(0), _admin), "_admin must be token admin");
         _token.transfer(_admin, _token.balanceOf(address(this)));
+    }
+
+    /**
+     * @notice Claim this contract's eligible share from `_dist` and split it among the receiver and lead investors.
+     * @dev Calls Distribution.claim() as msg.sender (this contract is the holder), then distributes received currency.
+     *      On exit: receiver gets base first; if proceeds < base, receiver gets everything; remainder is carry.
+     *      On non-exit: full amount is treated as carry.
+     *      Carry is split among lead investors by carryFraction; rounding dust goes to receiver.
+     * @param _dist the Distribution contract to claim from
+     */
+    function distribute(IDistribution _dist) external onlyOwner nonReentrant {
+        uint256 before = currency.balanceOf(address(this));
+        _dist.claim(address(this));
+        uint256 received = currency.balanceOf(address(this)) - before;
+
+        uint256 carry = received;
+
+        if (_dist.exit()) {
+            uint256 basePayout = basePrice * token.balanceOfAt(address(this), _dist.snapshotId()) / 10 ** token.decimals();
+            if (basePayout >= received) {
+                // proceeds don't cover base: all goes to receiver
+                currency.safeTransfer(receiver, received);
+                return;
+            }
+            currency.safeTransfer(receiver, basePayout);
+            carry = received - basePayout;
+        }
+
+        // split carry among lead investors, rounding dust to receiver (mirrors buy() logic)
+        uint256 distributed = 0;
+        for (uint256 i = 0; i < leadInvestors.length; i++) {
+            uint256 amount = (uint256(leadInvestors[i].carryFraction) * carry) / type(uint64).max;
+            if (amount > 0) {
+                currency.safeTransfer(leadInvestors[i].account, amount);
+                distributed += amount;
+            }
+        }
+        uint256 dust = carry - distributed;
+        if (dust > 0) {
+            currency.safeTransfer(receiver, dust);
+        }
     }
 
     /**
