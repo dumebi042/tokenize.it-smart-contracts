@@ -29,6 +29,7 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     /// @notice Extra currency credit assigned to an address via reassign(), analogous to token reissuance after key loss
     mapping(address => uint256) public extraCredit;
     bool public exit;
+    uint public reassignAfter;
 
     event Reassigned(address indexed from, address indexed to, uint256 amount);
 
@@ -43,7 +44,7 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         _transferOwnership(_owner);
     }
 
-    function confirm(uint _snapshotId, IERC20 _currency, uint _totalCurrencyAmount) external onlyOwner {
+    function confirm(uint _snapshotId, IERC20 _currency, uint _totalCurrencyAmount, uint _reassignDelay) external onlyOwner {
         // one could also rename it to initalized, both work
         snapshotId = _snapshotId;
         totalTokenAmount = token.totalSupplyAt(snapshotId);
@@ -54,6 +55,7 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         );
         require(_currency.balanceOf(address(this)) >= _totalCurrencyAmount);
         totalCurrencyAmount = _totalCurrencyAmount;
+        reassignAfter = block.timestamp + _reassignDelay;
     }
 
     function eligible(address _holder) public view returns (uint) {
@@ -74,6 +76,7 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
      *  current token holders.
      */
     function reassign(address _from, address _to) external onlyOwner {
+        require(block.timestamp >= reassignAfter, "reassignment not yet available");
         uint256 remaining = eligible(_from);
         require(remaining > 0, "nothing to reassign");
         paidOut[_from] += remaining;
