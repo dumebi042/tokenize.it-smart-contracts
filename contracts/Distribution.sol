@@ -21,15 +21,15 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     using SafeERC20 for IERC20;
 
     Token public token;
-    uint public snapshotId;
-    uint public totalTokenAmount;
+    uint256 public snapshotId;
+    uint256 public totalTokenAmount;
     IERC20 public currency;
-    uint public totalCurrencyAmount;
+    uint256 public totalCurrencyAmount;
     mapping(address => uint256) public paidOut;
     /// @notice Extra currency credit assigned to an address via reassign(), analogous to token reissuance after key loss
     mapping(address => uint256) public extraCredit;
     bool public exit;
-    uint public reassignAfter;
+    uint64 public reassignAfter;
 
     event Reassigned(address indexed from, address indexed to, uint256 amount);
 
@@ -44,8 +44,9 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         _transferOwnership(_owner);
     }
 
-    function confirm(uint _snapshotId, IERC20 _currency, uint _totalCurrencyAmount, uint _reassignDelay) external onlyOwner {
+    function confirm(uint256 _snapshotId, IERC20 _currency, uint256 _totalCurrencyAmount, uint64 _reassignAfter) external onlyOwner {
         // one could also rename it to initalized, both work
+        require(_reassignAfter >= block.timestamp + 30 days, "reassignAfter must be at least 1 month in the future");
         snapshotId = _snapshotId;
         totalTokenAmount = token.totalSupplyAt(snapshotId);
         currency = _currency;
@@ -55,10 +56,10 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         );
         require(_currency.balanceOf(address(this)) >= _totalCurrencyAmount);
         totalCurrencyAmount = _totalCurrencyAmount;
-        reassignAfter = block.timestamp + _reassignDelay;
+        reassignAfter = _reassignAfter;
     }
 
-    function eligible(address _holder) public view returns (uint) {
+    function eligible(address _holder) public view returns (uint256) {
         return
             (totalCurrencyAmount * token.balanceOfAt(_holder, snapshotId)) /
             totalTokenAmount +
@@ -100,7 +101,7 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     }
 
     function _claim(address _holder, address _recipient) internal {
-        uint amount = eligible(_holder);
+        uint256 amount = eligible(_holder);
         paidOut[_holder] += amount;
         currency.safeTransfer(_recipient, amount);
     }
