@@ -28,7 +28,6 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     mapping(address => uint256) public paidOut;
     /// @notice Extra currency credit assigned to an address via reassign(), analogous to token reissuance after key loss
     mapping(address => uint256) public extraCredit;
-    bool public exit;
     uint64 public reassignAfter;
 
     event Reassigned(address indexed from, address indexed to, uint256 amount);
@@ -45,7 +44,6 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     function initialize(
         Token _token,
         address _owner,
-        bool _exit,
         uint256 _snapshotId,
         IERC20 _currency,
         uint256 _totalCurrencyAmount,
@@ -55,7 +53,6 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         __Ownable2Step_init();
         _transferOwnership(_owner);
         token = _token;
-        exit = _exit;
         snapshotId = _snapshotId;
         totalTokenAmount = token.totalSupplyAt(snapshotId);
         currency = _currency;

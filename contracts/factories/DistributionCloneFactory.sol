@@ -29,7 +29,6 @@ contract DistributionCloneFactory is CloneFactory {
      * @param _currencyProvider address from which the currency is transferred; does not affect clone address
      * @param _token the token whose snapshot determines distribution shares
      * @param _owner owner of the new Distribution contract
-     * @param _exit whether this distribution represents an exit event
      * @param _snapshotId the token snapshot id that determines distribution shares
      * @param _currency the ERC20 token used for distribution payouts
      * @param _totalCurrencyAmount total amount of currency to distribute
@@ -41,17 +40,16 @@ contract DistributionCloneFactory is CloneFactory {
         address _currencyProvider,
         Token _token,
         address _owner,
-        bool _exit,
         uint256 _snapshotId,
         IERC20 _currency,
         uint256 _totalCurrencyAmount,
         uint64 _reassignAfter
     ) external returns (address) {
-        bytes32 salt = _getSalt(_rawSalt, _trustedForwarder, _token, _owner, _exit, _snapshotId, _currency, _totalCurrencyAmount, _reassignAfter);
+        bytes32 salt = _getSalt(_rawSalt, _trustedForwarder, _token, _owner, _snapshotId, _currency, _totalCurrencyAmount, _reassignAfter);
         Distribution clone = Distribution(Clones.cloneDeterministic(implementation, salt));
         require(clone.isTrustedForwarder(_trustedForwarder), "DistributionCloneFactory: Unexpected trustedForwarder");
         _currency.safeTransferFrom(_currencyProvider, address(clone), _totalCurrencyAmount);
-        clone.initialize(_token, _owner, _exit, _snapshotId, _currency, _totalCurrencyAmount, _reassignAfter);
+        clone.initialize(_token, _owner, _snapshotId, _currency, _totalCurrencyAmount, _reassignAfter);
         emit NewClone(address(clone));
         return address(clone);
     }
@@ -62,7 +60,6 @@ contract DistributionCloneFactory is CloneFactory {
      * @param _trustedForwarder can not be changed, but is checked for security
      * @param _token the token whose snapshot determines distribution shares
      * @param _owner owner of the new Distribution contract
-     * @param _exit whether this distribution represents an exit event
      * @param _snapshotId the token snapshot id that determines distribution shares
      * @param _currency the ERC20 token used for distribution payouts
      * @param _totalCurrencyAmount total amount of currency to distribute
@@ -73,13 +70,12 @@ contract DistributionCloneFactory is CloneFactory {
         address _trustedForwarder,
         Token _token,
         address _owner,
-        bool _exit,
         uint256 _snapshotId,
         IERC20 _currency,
         uint256 _totalCurrencyAmount,
         uint64 _reassignAfter
     ) external view returns (address) {
-        bytes32 salt = _getSalt(_rawSalt, _trustedForwarder, _token, _owner, _exit, _snapshotId, _currency, _totalCurrencyAmount, _reassignAfter);
+        bytes32 salt = _getSalt(_rawSalt, _trustedForwarder, _token, _owner, _snapshotId, _currency, _totalCurrencyAmount, _reassignAfter);
         return Clones.predictDeterministicAddress(implementation, salt);
     }
 
@@ -91,12 +87,11 @@ contract DistributionCloneFactory is CloneFactory {
         address _trustedForwarder,
         Token _token,
         address _owner,
-        bool _exit,
         uint256 _snapshotId,
         IERC20 _currency,
         uint256 _totalCurrencyAmount,
         uint64 _reassignAfter
     ) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_rawSalt, _trustedForwarder, _token, _owner, _exit, _snapshotId, _currency, _totalCurrencyAmount, _reassignAfter));
+        return keccak256(abi.encode(_rawSalt, _trustedForwarder, _token, _owner, _snapshotId, _currency, _totalCurrencyAmount, _reassignAfter));
     }
 }

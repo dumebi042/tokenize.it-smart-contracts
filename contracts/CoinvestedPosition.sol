@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 
 import "./TokenSwapBase.sol";
 import "./IDistribution.sol";
+import "./IExit.sol";
 
 struct LeadInvestor {
     /// lead investor address that receives carry
@@ -143,35 +144,42 @@ contract CoinvestedPosition is TokenSwapBase {
     }
 
     /**
-     * @notice Claim this contract's eligible share from `_dist` and split it among the receiver and lead investors.
-     * @dev Calls Distribution.claim() as msg.sender (this contract is the holder), then distributes received currency.
-     *      On exit: receiver gets base first; if proceeds < base, receiver gets everything; remainder is carry.
-     *      On non-exit: full amount is treated as carry.
-     *      Carry is split among lead investors by carryFraction; remainder goes to receiver.
-     * @param _dist the Distribution contract to claim from
+     * @notice Claim this contract's eligible dividend share from `_dist` and split it among lead investors.
+     * @dev The full received amount is treated as carry and split among lead investors by carryFraction;
+     *      remainder goes to receiver.
+     * @param _dist the Distribution (dividend) contract to claim from
      */
-    function distribute(IDistribution _dist) external onlyOwner nonReentrant {
+    function distributeDividends(IDistribution _dist) external onlyOwner nonReentrant {
         uint256 before = currency.balanceOf(address(this));
-        // this transfers the currency to the contract
         _dist.claim(address(this));
         uint256 received = currency.balanceOf(address(this)) - before;
         require(received > 0, "didn't receive expected currency from distribution");
+        _distributeCarry(received);
+    }
 
-        uint256 carry = received;
-
-        if (_dist.exit()) {
-            uint256 basePayout = (basePrice * token.balanceOfAt(address(this), _dist.snapshotId())) /
-                10 ** token.decimals();
-            if (basePayout >= received) {
-                // proceeds don't cover base: all goes to receiver
-                currency.safeTransfer(receiver, received);
-                return;
-            }
-            currency.safeTransfer(receiver, basePayout);
-            carry = received - basePayout;
+    /**
+     * @notice Claim exit proceeds for this contract's full token balance and split them among the receiver and lead investors.
+     * @dev Transfers all held tokens to the Exit contract in exchange for currency. Named separately from distribute()
+     *      to avoid ABI-level clash (both IDistribution and IExit encode as address in external signatures).
+     *      Receiver gets basePrice per token first; if proceeds < base, receiver gets everything; remainder is carry.
+     *      Carry is split among lead investors by carryFraction; remainder goes to receiver.
+     * @param _exit the Exit contract to claim from
+     */
+    function distributeExit(IExit _exit) external onlyOwner nonReentrant {
+        uint256 tokenBalance = token.balanceOf(address(this));
+        require(tokenBalance > 0, "no tokens to claim");
+        IERC20(address(token)).approve(address(_exit), tokenBalance);
+        uint256 before = currency.balanceOf(address(this));
+        _exit.claim(tokenBalance, address(this));
+        uint256 received = currency.balanceOf(address(this)) - before;
+        require(received > 0, "didn't receive expected currency from exit");
+        uint256 basePayout = (basePrice * tokenBalance) / 10 ** token.decimals();
+        if (basePayout >= received) {
+            currency.safeTransfer(receiver, received);
+            return;
         }
-
-        _distributeCarry(carry);
+        currency.safeTransfer(receiver, basePayout);
+        _distributeCarry(received - basePayout);
     }
 
     /**
