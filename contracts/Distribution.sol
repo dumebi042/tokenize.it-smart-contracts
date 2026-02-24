@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
 import "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./Vesting.sol";
 import "./Token.sol";
@@ -17,6 +18,8 @@ import "./Token.sol";
  *
  */
 contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
+    using SafeERC20 for IERC20;
+
     Token public token;
     uint public snapshotId;
     uint public totalTokenAmount;
@@ -71,7 +74,7 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     function _claim(address _holder, address _recipient) internal {
         uint amount = eligible(_holder);
         paidOut[_holder] += amount;
-        currency.transfer(_recipient, amount);
+        currency.safeTransfer(_recipient, amount);
     }
 
     function _msgSender() internal view override(ContextUpgradeable, ERC2771ContextUpgradeable) returns (address) {
