@@ -57,7 +57,7 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         totalTokenAmount = token.totalSupplyAt(snapshotId);
         currency = _currency;
         require(
-            token.allowList().map(address(_currency)) == TRUSTED_CURRENCY,
+            token.allowList().map(address(_currency)) & TRUSTED_CURRENCY == TRUSTED_CURRENCY,
             "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
         );
         require(_currency.balanceOf(address(this)) == _totalCurrencyAmount);

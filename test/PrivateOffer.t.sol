@@ -464,7 +464,7 @@ contract PrivateOfferTest is Test {
     }
 
     function testInvalidCurrency(uint256 _attributes) public {
-        vm.assume(_attributes != TRUSTED_CURRENCY);
+        vm.assume(_attributes & TRUSTED_CURRENCY != TRUSTED_CURRENCY);
 
         // remove trusted currency from allowlist
         list.set(address(currency), _attributes);

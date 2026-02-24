@@ -53,7 +53,7 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         _transferOwnership(_owner);
         token = _token;
         require(
-            token.allowList().map(address(_currency)) == TRUSTED_CURRENCY,
+            token.allowList().map(address(_currency)) & TRUSTED_CURRENCY == TRUSTED_CURRENCY,
             "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
         );
         currency = _currency;
