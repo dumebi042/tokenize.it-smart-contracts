@@ -17,6 +17,7 @@ import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol
  * This constant is defined here so other contracts can easily access it.
  */
 uint256 constant TRUSTED_CURRENCY = 2 ** 255;
+uint256 constant EURO_CURRENCY = 2 ** 254;
 
 /**
  * @title AllowList
