@@ -147,15 +147,15 @@ contract CoinvestedPosition is TokenSwapBase {
      * @dev Calls Distribution.claim() as msg.sender (this contract is the holder), then distributes received currency.
      *      On exit: receiver gets base first; if proceeds < base, receiver gets everything; remainder is carry.
      *      On non-exit: full amount is treated as carry.
-     *      Carry is split among lead investors by carryFraction; rounding dust goes to receiver.
+     *      Carry is split among lead investors by carryFraction; remainder goes to receiver.
      * @param _dist the Distribution contract to claim from
      */
     function distribute(IDistribution _dist) external onlyOwner nonReentrant {
-        require(_dist.currency() == currency, "Distribution currency does not match");
         uint256 before = currency.balanceOf(address(this));
         // this transfers the currency to the contract
         _dist.claim(address(this));
         uint256 received = currency.balanceOf(address(this)) - before;
+        require(received > 0, "didn't receive expected currency from distribution");
 
         uint256 carry = received;
 
