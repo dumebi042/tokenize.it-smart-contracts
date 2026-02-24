@@ -26,7 +26,11 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     IERC20 public currency;
     uint public totalCurrencyAmount;
     mapping(address => uint256) public paidOut;
+    /// @notice Extra currency credit assigned to an address via reassign(), analogous to token reissuance after key loss
+    mapping(address => uint256) public extraCredit;
     bool public exit;
+
+    event Reassigned(address indexed from, address indexed to, uint256 amount);
 
     constructor(
         Token _token,
@@ -53,7 +57,28 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     }
 
     function eligible(address _holder) public view returns (uint) {
-        return (totalCurrencyAmount * token.balanceOfAt(_holder, snapshotId)) / totalTokenAmount - paidOut[_holder];
+        return
+            (totalCurrencyAmount * token.balanceOfAt(_holder, snapshotId)) /
+            totalTokenAmount +
+            extraCredit[_holder] -
+            paidOut[_holder];
+    }
+
+    /**
+     * @notice Reassigns unclaimed distribution funds from one address to another. This is used to fix
+     *  holders in the snapshot not being able to claim their funds. It can be audited because the
+     *  reassignment is emitted on-chain. Some cases that could lead to this being needed:
+     *      - holder loosing key and only noticing after snapshot
+     *      - CoinvestedPosition being unable to claim because of currency mismatch
+     * @dev onlyOwner, matching the requirements of calling Token.burn+mint to fix an issue with
+     *  current token holders.
+     */
+    function reassign(address _from, address _to) external onlyOwner {
+        uint256 remaining = eligible(_from);
+        require(remaining > 0, "nothing to reassign");
+        paidOut[_from] += remaining;
+        extraCredit[_to] += remaining;
+        emit Reassigned(_from, _to, remaining);
     }
 
     function claim(address _recipient) external {
