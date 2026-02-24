@@ -33,20 +33,29 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
 
     event Reassigned(address indexed from, address indexed to, uint256 amount);
 
-    constructor(
-        Token _token,
-        address _owner,
-        address _trustedForwarder,
-        bool _exit
-    ) ERC2771ContextUpgradeable(_trustedForwarder) {
-        token = _token;
-        exit = _exit;
-        _transferOwnership(_owner);
+    /**
+     * This constructor creates a logic contract that is used to clone new distribution contracts.
+     * It has no owner, and can not be used directly.
+     * @param _trustedForwarder This address can execute transactions in the name of any other address
+     */
+    constructor(address _trustedForwarder) ERC2771ContextUpgradeable(_trustedForwarder) {
+        _disableInitializers();
     }
 
-    function confirm(uint256 _snapshotId, IERC20 _currency, uint256 _totalCurrencyAmount, uint64 _reassignAfter) external onlyOwner {
-        // one could also rename it to initalized, both work
+    function initialize(
+        Token _token,
+        address _owner,
+        bool _exit,
+        uint256 _snapshotId,
+        IERC20 _currency,
+        uint256 _totalCurrencyAmount,
+        uint64 _reassignAfter
+    ) external initializer {
         require(_reassignAfter >= block.timestamp + 30 days, "reassignAfter must be at least 1 month in the future");
+        __Ownable2Step_init();
+        _transferOwnership(_owner);
+        token = _token;
+        exit = _exit;
         snapshotId = _snapshotId;
         totalTokenAmount = token.totalSupplyAt(snapshotId);
         currency = _currency;
@@ -54,7 +63,7 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
             token.allowList().map(address(_currency)) == TRUSTED_CURRENCY,
             "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
         );
-        require(_currency.balanceOf(address(this)) >= _totalCurrencyAmount);
+        require(_currency.balanceOf(address(this)) == _totalCurrencyAmount);
         totalCurrencyAmount = _totalCurrencyAmount;
         reassignAfter = _reassignAfter;
     }
