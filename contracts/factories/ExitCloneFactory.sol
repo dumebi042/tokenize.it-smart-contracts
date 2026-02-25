@@ -31,7 +31,8 @@ contract ExitCloneFactory is CloneFactory {
      * @param _owner owner of the new Exit contract
      * @param _currency the ERC20 token used for exit payouts
      * @param _pricePerToken currency amount (in smallest units) per 10**token.decimals() token units
-     * @param _exitDate timestamp from which claims are valid; claims expire after EXIT_WINDOW
+     * @param _claimStart timestamp from which claims are valid
+     * @param _claimEnd timestamp after which claims expire
      * @param _totalCurrencyAmount total amount of currency to fund the exit contract with
      */
     function createExitClone(
@@ -42,7 +43,8 @@ contract ExitCloneFactory is CloneFactory {
         address _owner,
         IERC20 _currency,
         uint256 _pricePerToken,
-        uint64 _exitDate,
+        uint64 _claimStart,
+        uint64 _claimEnd,
         uint256 _totalCurrencyAmount
     ) external returns (address) {
         bytes32 salt = _getSalt(
@@ -52,13 +54,14 @@ contract ExitCloneFactory is CloneFactory {
             _owner,
             _currency,
             _pricePerToken,
-            _exitDate,
+            _claimStart,
+            _claimEnd,
             _totalCurrencyAmount
         );
         Exit clone = Exit(Clones.cloneDeterministic(implementation, salt));
         require(clone.isTrustedForwarder(_trustedForwarder), "ExitCloneFactory: Unexpected trustedForwarder");
         _currency.safeTransferFrom(_currencyProvider, address(clone), _totalCurrencyAmount);
-        clone.initialize(_token, _owner, _currency, _pricePerToken, _exitDate, _totalCurrencyAmount);
+        clone.initialize(_token, _owner, _currency, _pricePerToken, _claimStart, _claimEnd, _totalCurrencyAmount);
         emit NewClone(address(clone));
         return address(clone);
     }
@@ -71,7 +74,8 @@ contract ExitCloneFactory is CloneFactory {
      * @param _owner owner of the new Exit contract
      * @param _currency the ERC20 token used for exit payouts
      * @param _pricePerToken currency amount (in smallest units) per 10**token.decimals() token units
-     * @param _exitDate timestamp from which claims are valid; claims expire after EXIT_WINDOW
+     * @param _claimStart timestamp from which claims are valid
+     * @param _claimEnd timestamp after which claims expire
      * @param _totalCurrencyAmount total amount of currency to fund the exit contract with
      */
     function predictCloneAddress(
@@ -81,7 +85,8 @@ contract ExitCloneFactory is CloneFactory {
         address _owner,
         IERC20 _currency,
         uint256 _pricePerToken,
-        uint64 _exitDate,
+        uint64 _claimStart,
+        uint64 _claimEnd,
         uint256 _totalCurrencyAmount
     ) external view returns (address) {
         bytes32 salt = _getSalt(
@@ -91,7 +96,8 @@ contract ExitCloneFactory is CloneFactory {
             _owner,
             _currency,
             _pricePerToken,
-            _exitDate,
+            _claimStart,
+            _claimEnd,
             _totalCurrencyAmount
         );
         return Clones.predictDeterministicAddress(implementation, salt);
@@ -107,7 +113,8 @@ contract ExitCloneFactory is CloneFactory {
         address _owner,
         IERC20 _currency,
         uint256 _pricePerToken,
-        uint64 _exitDate,
+        uint64 _claimStart,
+        uint64 _claimEnd,
         uint256 _totalCurrencyAmount
     ) internal pure returns (bytes32) {
         return
@@ -119,7 +126,8 @@ contract ExitCloneFactory is CloneFactory {
                     _owner,
                     _currency,
                     _pricePerToken,
-                    _exitDate,
+                    _claimStart,
+                    _claimEnd,
                     _totalCurrencyAmount
                 )
             );
