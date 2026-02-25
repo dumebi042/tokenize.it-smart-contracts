@@ -28,7 +28,10 @@ contract CoinvestedPositionCloneFactory is CloneFactory {
     ) external returns (address) {
         bytes32 salt = _getSalt(_rawSalt, _trustedForwarder, _arguments);
         CoinvestedPosition clone = CoinvestedPosition(Clones.cloneDeterministic(implementation, salt));
-        require(clone.isTrustedForwarder(_trustedForwarder), "CoinvestedPositionCloneFactory: Unexpected trustedForwarder");
+        require(
+            clone.isTrustedForwarder(_trustedForwarder),
+            "CoinvestedPositionCloneFactory: Unexpected trustedForwarder"
+        );
         clone.initialize(_arguments);
         emit NewClone(address(clone));
         return address(clone);

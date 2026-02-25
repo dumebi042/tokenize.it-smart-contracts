@@ -45,7 +45,16 @@ contract DistributionCloneFactory is CloneFactory {
         uint256 _totalCurrencyAmount,
         uint64 _reassignAfter
     ) external returns (address) {
-        bytes32 salt = _getSalt(_rawSalt, _trustedForwarder, _token, _owner, _snapshotId, _currency, _totalCurrencyAmount, _reassignAfter);
+        bytes32 salt = _getSalt(
+            _rawSalt,
+            _trustedForwarder,
+            _token,
+            _owner,
+            _snapshotId,
+            _currency,
+            _totalCurrencyAmount,
+            _reassignAfter
+        );
         Distribution clone = Distribution(Clones.cloneDeterministic(implementation, salt));
         require(clone.isTrustedForwarder(_trustedForwarder), "DistributionCloneFactory: Unexpected trustedForwarder");
         _currency.safeTransferFrom(_currencyProvider, address(clone), _totalCurrencyAmount);
@@ -75,7 +84,16 @@ contract DistributionCloneFactory is CloneFactory {
         uint256 _totalCurrencyAmount,
         uint64 _reassignAfter
     ) external view returns (address) {
-        bytes32 salt = _getSalt(_rawSalt, _trustedForwarder, _token, _owner, _snapshotId, _currency, _totalCurrencyAmount, _reassignAfter);
+        bytes32 salt = _getSalt(
+            _rawSalt,
+            _trustedForwarder,
+            _token,
+            _owner,
+            _snapshotId,
+            _currency,
+            _totalCurrencyAmount,
+            _reassignAfter
+        );
         return Clones.predictDeterministicAddress(implementation, salt);
     }
 
@@ -92,6 +110,18 @@ contract DistributionCloneFactory is CloneFactory {
         uint256 _totalCurrencyAmount,
         uint64 _reassignAfter
     ) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_rawSalt, _trustedForwarder, _token, _owner, _snapshotId, _currency, _totalCurrencyAmount, _reassignAfter));
+        return
+            keccak256(
+                abi.encode(
+                    _rawSalt,
+                    _trustedForwarder,
+                    _token,
+                    _owner,
+                    _snapshotId,
+                    _currency,
+                    _totalCurrencyAmount,
+                    _reassignAfter
+                )
+            );
     }
 }

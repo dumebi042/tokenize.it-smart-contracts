@@ -45,7 +45,16 @@ contract ExitCloneFactory is CloneFactory {
         uint64 _exitDate,
         uint256 _totalCurrencyAmount
     ) external returns (address) {
-        bytes32 salt = _getSalt(_rawSalt, _trustedForwarder, _token, _owner, _currency, _pricePerToken, _exitDate, _totalCurrencyAmount);
+        bytes32 salt = _getSalt(
+            _rawSalt,
+            _trustedForwarder,
+            _token,
+            _owner,
+            _currency,
+            _pricePerToken,
+            _exitDate,
+            _totalCurrencyAmount
+        );
         Exit clone = Exit(Clones.cloneDeterministic(implementation, salt));
         require(clone.isTrustedForwarder(_trustedForwarder), "ExitCloneFactory: Unexpected trustedForwarder");
         _currency.safeTransferFrom(_currencyProvider, address(clone), _totalCurrencyAmount);
@@ -75,7 +84,16 @@ contract ExitCloneFactory is CloneFactory {
         uint64 _exitDate,
         uint256 _totalCurrencyAmount
     ) external view returns (address) {
-        bytes32 salt = _getSalt(_rawSalt, _trustedForwarder, _token, _owner, _currency, _pricePerToken, _exitDate, _totalCurrencyAmount);
+        bytes32 salt = _getSalt(
+            _rawSalt,
+            _trustedForwarder,
+            _token,
+            _owner,
+            _currency,
+            _pricePerToken,
+            _exitDate,
+            _totalCurrencyAmount
+        );
         return Clones.predictDeterministicAddress(implementation, salt);
     }
 
@@ -92,6 +110,18 @@ contract ExitCloneFactory is CloneFactory {
         uint64 _exitDate,
         uint256 _totalCurrencyAmount
     ) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_rawSalt, _trustedForwarder, _token, _owner, _currency, _pricePerToken, _exitDate, _totalCurrencyAmount));
+        return
+            keccak256(
+                abi.encode(
+                    _rawSalt,
+                    _trustedForwarder,
+                    _token,
+                    _owner,
+                    _currency,
+                    _pricePerToken,
+                    _exitDate,
+                    _totalCurrencyAmount
+                )
+            );
     }
 }

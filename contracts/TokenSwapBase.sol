@@ -69,7 +69,13 @@ abstract contract TokenSwapBase is
      * @param _token token being swapped
      * @param _receiver address that receives payment
      */
-    function _initializeBase(address _owner, uint256 _tokenPrice, IERC20 _currency, Token _token, address _receiver) internal onlyInitializing {
+    function _initializeBase(
+        address _owner,
+        uint256 _tokenPrice,
+        IERC20 _currency,
+        Token _token,
+        address _receiver
+    ) internal onlyInitializing {
         require(_owner != address(0), "owner can not be zero address");
         __Ownable_init();
         _transferOwnership(_owner);
