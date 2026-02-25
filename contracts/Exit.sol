@@ -83,6 +83,11 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         _claim(address(_holder), _tokenAmount, _recipient);
     }
 
+    function drain(address _recipient) external onlyOwner {
+        require(block.timestamp > uint256(exitDate) + EXIT_WINDOW, "exit window not yet closed");
+        currency.safeTransfer(_recipient, currency.balanceOf(address(this)));
+    }
+
     function _claim(address _holder, uint256 _tokenAmount, address _recipient) internal {
         require(block.timestamp >= exitDate, "exit not yet started");
         require(block.timestamp <= uint256(exitDate) + EXIT_WINDOW, "exit window closed");

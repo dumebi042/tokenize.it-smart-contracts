@@ -230,7 +230,7 @@ contract CoinvestedPosition is TokenSwapBase {
 
     /**
      * @notice Returns the number of lead investors.
-     * @return the length of the leadInvestors array
+     * @return length of the leadInvestors array
      */
     function getLeadInvestorsCount() external view returns (uint256) {
         return leadInvestors.length;

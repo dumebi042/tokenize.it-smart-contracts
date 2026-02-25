@@ -14,8 +14,8 @@ import "./Token.sol";
 /**
  * @title tokenize.it Distribution
  * @author malteish, cjentzsch
- * @notice This contract implements the distribution of any proceeds (Exit, Liquidation, Dividends) based on a snapshot of Token.sol
- *
+ * @notice This contract implements the distribution of any proceeds (Liquidation, Dividends)
+ *      based on a snapshot of Token.sol
  */
 contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     using SafeERC20 for IERC20;
