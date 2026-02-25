@@ -16,19 +16,18 @@ import "./Token.sol";
  * @author malteish, cjentzsch
  * @notice This contract implements the automated exit: token holders transfer their tokens here
  *  and receive exit proceeds in return. The price is fixed at deployment.
- *  Claims are only valid within 3 years of the exit date.
+ *  Claims are only valid within the exit window set at initialization.
  *  Received tokens are held in this contract (not burned).
  */
 contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     using SafeERC20 for IERC20;
 
-    uint64 public constant EXIT_WINDOW = 3 * 365 days;
-
     Token public token;
     IERC20 public currency;
     /// @notice Currency amount (in smallest currency units) per 10**token.decimals() token units
     uint256 public pricePerToken;
-    uint64 public exitDate;
+    uint64 public claimStart;
+    uint64 public claimEnd;
 
     /**
      * This constructor creates a logic contract that is used to clone new exit contracts.
@@ -44,11 +43,13 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         address _owner,
         IERC20 _currency,
         uint256 _pricePerToken,
-        uint64 _exitDate,
+        uint64 _claimStart,
+        uint64 _claimEnd,
         uint256 _totalCurrencyAmount
     ) external initializer {
         require(_pricePerToken > 0, "price must be positive");
-        require(_exitDate > 0, "exitDate must be set");
+        require(_claimStart > 0, "claimStart must be set");
+        require(_claimEnd > _claimStart, "claimEnd must be after claimStart");
         __Ownable2Step_init();
         _transferOwnership(_owner);
         token = _token;
@@ -58,7 +59,8 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         );
         currency = _currency;
         pricePerToken = _pricePerToken;
-        exitDate = _exitDate;
+        claimStart = _claimStart;
+        claimEnd = _claimEnd;
         require(_currency.balanceOf(address(this)) == _totalCurrencyAmount);
     }
 
@@ -84,13 +86,13 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     }
 
     function drain(address _recipient) external onlyOwner {
-        require(block.timestamp > uint256(exitDate) + EXIT_WINDOW, "exit window not yet closed");
+        require(block.timestamp > claimEnd, "exit window not yet closed");
         currency.safeTransfer(_recipient, currency.balanceOf(address(this)));
     }
 
     function _claim(address _holder, uint256 _tokenAmount, address _recipient) internal {
-        require(block.timestamp >= exitDate, "exit not yet started");
-        require(block.timestamp <= uint256(exitDate) + EXIT_WINDOW, "exit window closed");
+        require(block.timestamp >= claimStart, "exit not yet started");
+        require(block.timestamp <= claimEnd, "exit window closed");
         IERC20(address(token)).safeTransferFrom(_holder, address(this), _tokenAmount);
         uint256 currencyAmount = (_tokenAmount * pricePerToken) / 10 ** token.decimals();
         currency.safeTransfer(_recipient, currencyAmount);
