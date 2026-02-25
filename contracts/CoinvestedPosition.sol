@@ -22,10 +22,10 @@ struct CoinvestedPositionInitializerArguments {
     address receiver;
     /// lead investors and their carry fractions
     LeadInvestor[] leadInvestors;
-    /// base price per token in EURO bits (smallest subunit of any EURO currency; amount coinvestor is entitled to per token before carry)
+    /// base price per token in bits in currency below
     uint256 basePrice;
     /// currency used for buy() payments. Must be a EURO ERC20 (TRUSTED_CURRENCY | EURO_CURRENCY bits set on the token's allowList).
-    IERC20 currency;
+    IERC20 baseCurrency;
     /// token being held
     Token token;
 }
@@ -67,10 +67,10 @@ contract CoinvestedPosition is TokenSwapBase {
      * @param _arguments Struct containing all arguments for the initializer
      */
     function initialize(CoinvestedPositionInitializerArguments memory _arguments) external initializer {
-        _initializeBase(_arguments.owner, 0, _arguments.currency, _arguments.token, _arguments.receiver);
+        _initializeBase(_arguments.owner, 0, _arguments.baseCurrency, _arguments.token, _arguments.receiver);
 
         require(
-            _arguments.token.allowList().map(address(_arguments.currency)) & (TRUSTED_CURRENCY | EURO_CURRENCY) ==
+            _arguments.token.allowList().map(address(_arguments.baseCurrency)) & (TRUSTED_CURRENCY | EURO_CURRENCY) ==
                 (TRUSTED_CURRENCY | EURO_CURRENCY),
             "currency must be a trusted EURO currency"
         );
@@ -83,7 +83,7 @@ contract CoinvestedPosition is TokenSwapBase {
         }
         require(carryFractionsSum < type(uint64).max, "carry fractions must leave a share for the receiver");
         basePrice = _arguments.basePrice;
-        basePriceDecimals = IERC20Metadata(address(_arguments.currency)).decimals();
+        basePriceDecimals = IERC20Metadata(address(_arguments.baseCurrency)).decimals();
 
         // Pausing the contract prevents an immediate sell of the tokens. Once they should be sold, update price and unpause.
         _pause();
