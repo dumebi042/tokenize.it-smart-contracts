@@ -9,7 +9,7 @@ import "../contracts/factories/FeeSettingsCloneFactory.sol";
 import "./resources/ERC2771Helper.sol";
 import "./resources/CloneCreators.sol";
 
-contract tokenTest is Test {
+contract CrowdinvestingCloneFactoryTest is Test {
     using ECDSA for bytes32;
 
     AllowList allowList;
@@ -437,7 +437,7 @@ contract tokenTest is Test {
 
     function testInitializationRevertsWithUntrustedCurrency(address someCurrency, uint256 currencyAttributes) public {
         vm.assume(someCurrency != address(0));
-        vm.assume(currencyAttributes != TRUSTED_CURRENCY);
+        vm.assume(currencyAttributes & TRUSTED_CURRENCY != TRUSTED_CURRENCY);
         vm.prank(feeSettingsAndAllowListOwner);
         allowList.set(someCurrency, currencyAttributes);
 
