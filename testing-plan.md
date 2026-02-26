@@ -1128,3 +1128,62 @@ Standard pattern plus funding-via-approval. `_currencyProvider` is excluded from
 - [ ] Trusted non-EURO currency → succeeds (Distribution only requires `TRUSTED_CURRENCY`)
 - [ ] `_reassignAfter < block.timestamp + 30 days` → reverts
 - [ ] `_reassignAfter == block.timestamp + 30 days` → succeeds (boundary)
+
+---
+
+# Implementation Guidelines
+
+## Shared Infrastructure First
+
+Before writing any contract-specific tests, build the shared helpers that every file will need:
+
+- `Token`, `AllowList`, `FeeSettings` deployment helpers (already exist in `CloneCreators.sol` — extend as needed)
+- Fake ERC20 currencies with configurable decimals and `TRUSTED_CURRENCY` / `EURO_CURRENCY` allowlist bits
+- A `warp(timestamp)` helper for time-dependent tests (claimStart/claimEnd, reassignAfter)
+- Reusable `LeadInvestor[]` builders for CoinvestedPosition tests
+
+Keep this in a shared base contract (e.g. `TestBase.sol`) or a fixture file imported by all test files.
+
+## Recommended Implementation Order
+
+Work through the sections roughly in this order. The first three can be written in parallel since
+they have no dependencies on each other; everything after depends on them being solid.
+
+1. **`Exit.t.sol`** — smallest surface area, no carry math, straightforward claim window and funding
+2. **`Distribution.t.sol`** — snapshot math and reassignment accounting, no carry
+3. **`ExitCloneFactory.t.sol`** — write immediately after Exit unit tests while the setup is fresh
+4. **`DistributionCloneFactory.t.sol`** — write immediately after Distribution unit tests
+5. **`CoinvestedPosition.t.sol`** — depends on allowlist/currency setup established above; carry math and decimal scaling are the most complex part
+6. **`CoinvestedPositionCloneFactory.t.sol`** — write immediately after CoinvestedPosition unit tests
+7. **`CoinvestedPositionExit.t.sol`** — integration; requires both Exit and CoinvestedPosition to be well-understood
+8. **`CoinvestedPositionDistribution.t.sol`** — integration; requires both Distribution and CoinvestedPosition to be well-understood
+
+## Fuzz Variants After Concrete Tests Pass
+
+For every section that has a fuzz test (`D10`, `E7`, sections `10`/`IX`/`DI-XI`, etc.):
+- Write and get the **concrete fixed-value tests green first**.
+- Only then add the fuzz variant. Fuzzing a broken concrete case produces misleading counterexamples.
+- The fixed-value examples in this plan are chosen to serve as the seed corpus for fuzz inputs.
+
+## Cross-Decimal Scaling Is the Highest-Risk Area
+
+`_scaleToDecimals` and the `basePriceDecimals` path in `buy()` / `distributeExit()` are the most
+subtle parts of the codebase. Prioritise:
+
+- Concrete upscale (6→18) and downscale (18→6) examples early, before fuzz
+- Equal-decimals case as a sanity check
+- Fuzz with the full decimal range (0–18) to catch overflow and off-by-one errors
+
+## Factory Tests Are Structural, Not Math
+
+Factory tests (F1–F8 in each section) are mostly structural — address prediction, salt sensitivity,
+re-init guard, funding approval. They do not exercise carry math. Keep them short and focused.
+The one non-obvious item across all three factories is the **approval-to-clone, not factory** pattern
+(F7-E / F7-D): test both the correct and incorrect approval target explicitly.
+
+## Integration Tests Are the Final Confidence Check
+
+The integration test files (`CoinvestedPositionExit.t.sol`, `CoinvestedPositionDistribution.t.sol`)
+should assert the **Key Invariants** listed at the bottom of each section in every test case, not
+just the fuzz tests. Assert them as inline `assertEq` / `assertLe` statements so failures are
+immediately locatable.
