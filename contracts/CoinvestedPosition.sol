@@ -39,8 +39,9 @@ struct CoinvestedPositionInitializerArguments {
  *      Any remaining proceeds after fees and coinvestor payout are split among lead investors
  *      according to their carry percentages, with dust going to the coinvestor.
  *      If the sale price minus fees is less than the base price, all proceeds go to the coinvestor.
- *      For exits and dividends, any EURO token (with TRUSTED_CURRENCY | EURO_CURRENCY bits set on the
- *      token's allowList) may be used, not just the currency stored for buy().
+ *      For exits, any EURO token (TRUSTED_CURRENCY | EURO_CURRENCY bits) may be used.
+ *      For dividends, any trusted token (TRUSTED_CURRENCY bit) may be used.
+ *      Neither needs to match the currency stored for buy().
  * @dev Uses clone/proxy pattern. Constructor disables initializers, separate initialize().
  */
 contract CoinvestedPosition is TokenSwapBase {
@@ -182,15 +183,14 @@ contract CoinvestedPosition is TokenSwapBase {
     /**
      * @notice Claim this contract's eligible dividend share from `_dist` and split it among lead investors.
      * @dev The full received amount is treated as carry and split among lead investors by carryFraction;
-     *      remainder goes to receiver. Any EURO token (TRUSTED_CURRENCY | EURO_CURRENCY) may be used.
+     *      remainder goes to receiver. Any trusted currency may be used (TRUSTED_CURRENCY bit required).
      * @param _dist the Distribution (dividend) contract to claim from
-     * @param _dividendCurrency the EURO token paid out by the distribution
+     * @param _dividendCurrency the currency paid out by the distribution
      */
     function distributeDividends(IDistribution _dist, IERC20 _dividendCurrency) external onlyOwner nonReentrant {
         require(
-            token.allowList().map(address(_dividendCurrency)) & (TRUSTED_CURRENCY | EURO_CURRENCY) ==
-                (TRUSTED_CURRENCY | EURO_CURRENCY),
-            "dividend currency must be a trusted EURO currency"
+            token.allowList().map(address(_dividendCurrency)) & TRUSTED_CURRENCY == TRUSTED_CURRENCY,
+            "dividend currency must be a trusted currency"
         );
         uint256 before = _dividendCurrency.balanceOf(address(this));
         _dist.claim(address(this));
