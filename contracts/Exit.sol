@@ -11,6 +11,23 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./Vesting.sol";
 import "./Token.sol";
 
+struct ExitInitializerArguments {
+    /// @notice Owner of the contract
+    address owner;
+    /// @notice Token holders will return in exchange for exit proceeds
+    Token token;
+    /// @notice ERC20 token used for exit payouts; must have TRUSTED_CURRENCY | EURO_CURRENCY bits set on the token's allowList
+    IERC20 currency;
+    /// @notice Currency amount (in smallest currency units) per 10**token.decimals() token units
+    uint256 pricePerToken;
+    /// @notice Timestamp from which claims are valid
+    uint64 claimStart;
+    /// @notice Timestamp after which claims expire
+    uint64 claimEnd;
+    /// @notice Total amount of currency to fund the exit contract with
+    uint256 totalCurrencyAmount;
+}
+
 /**
  * @title tokenize.it Exit
  * @author malteish, cjentzsch
@@ -38,33 +55,24 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         _disableInitializers();
     }
 
-    function initialize(
-        Token _token,
-        address _owner,
-        IERC20 _currency,
-        uint256 _pricePerToken,
-        uint64 _claimStart,
-        uint64 _claimEnd,
-        address _currencyProvider,
-        uint256 _totalCurrencyAmount
-    ) external initializer {
-        require(_pricePerToken > 0, "price must be positive");
-        require(_claimStart > 0, "claimStart must be set");
-        require(_claimEnd > _claimStart, "claimEnd must be after claimStart");
-        require(address(_currency) != address(_token), "currency and token must be different");
+    function initialize(ExitInitializerArguments memory _arguments, address _currencyProvider) external initializer {
+        require(_arguments.pricePerToken > 0, "price must be positive");
+        require(_arguments.claimStart > 0, "claimStart must be set");
+        require(_arguments.claimEnd > _arguments.claimStart, "claimEnd must be after claimStart");
+        require(address(_arguments.currency) != address(_arguments.token), "currency and token must be different");
         __Ownable2Step_init();
-        _transferOwnership(_owner);
-        token = _token;
+        _transferOwnership(_arguments.owner);
+        token = _arguments.token;
         require(
-            token.allowList().map(address(_currency)) & (TRUSTED_CURRENCY | EURO_CURRENCY) ==
+            token.allowList().map(address(_arguments.currency)) & (TRUSTED_CURRENCY | EURO_CURRENCY) ==
                 (TRUSTED_CURRENCY | EURO_CURRENCY),
             "currency needs to be a trusted EURO currency"
         );
-        currency = _currency;
-        pricePerToken = _pricePerToken;
-        claimStart = _claimStart;
-        claimEnd = _claimEnd;
-        _currency.safeTransferFrom(_currencyProvider, address(this), _totalCurrencyAmount);
+        currency = _arguments.currency;
+        pricePerToken = _arguments.pricePerToken;
+        claimStart = _arguments.claimStart;
+        claimEnd = _arguments.claimEnd;
+        _arguments.currency.safeTransferFrom(_currencyProvider, address(this), _arguments.totalCurrencyAmount);
     }
 
     function claim(uint256 _tokenAmount, address _recipient) external {

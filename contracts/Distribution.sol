@@ -11,6 +11,21 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./Vesting.sol";
 import "./Token.sol";
 
+struct DistributionInitializerArguments {
+    /// @notice Owner of the contract
+    address owner;
+    /// @notice Token whose snapshot determines distribution shares
+    Token token;
+    /// @notice Snapshot id that determines distribution shares
+    uint256 snapshotId;
+    /// @notice ERC20 token used for distribution payouts; must have TRUSTED_CURRENCY bit set on the token's allowList
+    IERC20 currency;
+    /// @notice Total amount of currency to distribute
+    uint256 totalCurrencyAmount;
+    /// @notice Earliest timestamp at which the owner can reassign unclaimed funds; must be at least 30 days in the future
+    uint64 reassignAfter;
+}
+
 /**
  * @title tokenize.it Distribution
  * @author malteish, cjentzsch
@@ -42,28 +57,26 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     }
 
     function initialize(
-        Token _token,
-        address _owner,
-        uint256 _snapshotId,
-        IERC20 _currency,
-        uint256 _totalCurrencyAmount,
-        uint64 _reassignAfter,
+        DistributionInitializerArguments memory _arguments,
         address _currencyProvider
     ) external initializer {
-        require(_reassignAfter >= block.timestamp + 30 days, "reassignAfter must be at least 1 month in the future");
-        __Ownable2Step_init();
-        _transferOwnership(_owner);
-        token = _token;
-        snapshotId = _snapshotId;
-        totalTokenAmount = token.totalSupplyAt(snapshotId);
-        currency = _currency;
         require(
-            token.allowList().map(address(_currency)) & TRUSTED_CURRENCY == TRUSTED_CURRENCY,
+            _arguments.reassignAfter >= block.timestamp + 30 days,
+            "reassignAfter must be at least 1 month in the future"
+        );
+        __Ownable2Step_init();
+        _transferOwnership(_arguments.owner);
+        token = _arguments.token;
+        snapshotId = _arguments.snapshotId;
+        totalTokenAmount = token.totalSupplyAt(snapshotId);
+        currency = _arguments.currency;
+        require(
+            token.allowList().map(address(_arguments.currency)) & TRUSTED_CURRENCY == TRUSTED_CURRENCY,
             "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
         );
-        totalCurrencyAmount = _totalCurrencyAmount;
-        reassignAfter = _reassignAfter;
-        _currency.safeTransferFrom(_currencyProvider, address(this), _totalCurrencyAmount);
+        totalCurrencyAmount = _arguments.totalCurrencyAmount;
+        reassignAfter = _arguments.reassignAfter;
+        _arguments.currency.safeTransferFrom(_currencyProvider, address(this), _arguments.totalCurrencyAmount);
     }
 
     function eligible(address _holder) public view returns (uint256) {
