@@ -4,7 +4,6 @@ pragma solidity 0.8.23;
 
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "../Exit.sol";
 import "./CloneFactory.sol";
@@ -13,20 +12,20 @@ import "./CloneFactory.sol";
  * @title ExitCloneFactory
  * @author malteish
  * @notice Use this contract to create deterministic clones of Exit contracts.
- *  In a single transaction, it clones the contract, transfers the currency from the caller, and initializes the clone.
+ *  In a single transaction, it clones the contract and initializes it.
+ *  The clone address can be predicted with predictCloneAddress() before deployment,
+ *  so _currencyProvider can approve the clone address directly rather than this factory.
  */
 contract ExitCloneFactory is CloneFactory {
-    using SafeERC20 for IERC20;
-
     constructor(address _implementation) CloneFactory(_implementation) {}
 
     /**
      * @notice Create a new Exit clone, fund it with currency from `_currencyProvider`, and initialize it.
-     *  `_currencyProvider` must have approved this factory to spend at least `_totalCurrencyAmount` of `_currency`.
+     *  `_currencyProvider` must have approved the clone address (use predictCloneAddress()) for `_totalCurrencyAmount`.
      *  `_currencyProvider` does not affect the clone's address.
      * @param _rawSalt influences the address of the clone, but not the initialization
      * @param _trustedForwarder can not be changed, but is checked for security
-     * @param _currencyProvider address from which the currency is transferred; does not affect clone address
+     * @param _currencyProvider address from which the currency is pulled; must have approved the clone address (use predictCloneAddress()) for _totalCurrencyAmount; does not affect clone address
      * @param _token the token holders will return in exchange for exit proceeds
      * @param _owner owner of the new Exit contract
      * @param _currency the ERC20 token used for exit payouts
@@ -60,8 +59,7 @@ contract ExitCloneFactory is CloneFactory {
         );
         Exit clone = Exit(Clones.cloneDeterministic(implementation, salt));
         require(clone.isTrustedForwarder(_trustedForwarder), "ExitCloneFactory: Unexpected trustedForwarder");
-        _currency.safeTransferFrom(_currencyProvider, address(clone), _totalCurrencyAmount);
-        clone.initialize(_token, _owner, _currency, _pricePerToken, _claimStart, _claimEnd, _totalCurrencyAmount);
+        clone.initialize(_token, _owner, _currency, _pricePerToken, _claimStart, _claimEnd, _currencyProvider, _totalCurrencyAmount);
         emit NewClone(address(clone));
         return address(clone);
     }

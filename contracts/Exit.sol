@@ -45,11 +45,13 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         uint256 _pricePerToken,
         uint64 _claimStart,
         uint64 _claimEnd,
+        address _currencyProvider,
         uint256 _totalCurrencyAmount
     ) external initializer {
         require(_pricePerToken > 0, "price must be positive");
         require(_claimStart > 0, "claimStart must be set");
         require(_claimEnd > _claimStart, "claimEnd must be after claimStart");
+        require(address(_currency) != address(_token), "currency and token must be different");
         __Ownable2Step_init();
         _transferOwnership(_owner);
         token = _token;
@@ -61,7 +63,7 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         pricePerToken = _pricePerToken;
         claimStart = _claimStart;
         claimEnd = _claimEnd;
-        require(_currency.balanceOf(address(this)) == _totalCurrencyAmount);
+        _currency.safeTransferFrom(_currencyProvider, address(this), _totalCurrencyAmount);
     }
 
     function claim(uint256 _tokenAmount, address _recipient) external {

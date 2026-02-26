@@ -47,7 +47,8 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         uint256 _snapshotId,
         IERC20 _currency,
         uint256 _totalCurrencyAmount,
-        uint64 _reassignAfter
+        uint64 _reassignAfter,
+        address _currencyProvider
     ) external initializer {
         require(_reassignAfter >= block.timestamp + 30 days, "reassignAfter must be at least 1 month in the future");
         __Ownable2Step_init();
@@ -60,9 +61,9 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
             token.allowList().map(address(_currency)) & TRUSTED_CURRENCY == TRUSTED_CURRENCY,
             "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
         );
-        require(_currency.balanceOf(address(this)) == _totalCurrencyAmount);
         totalCurrencyAmount = _totalCurrencyAmount;
         reassignAfter = _reassignAfter;
+        _currency.safeTransferFrom(_currencyProvider, address(this), _totalCurrencyAmount);
     }
 
     function eligible(address _holder) public view returns (uint256) {
