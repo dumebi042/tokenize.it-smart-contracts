@@ -82,6 +82,7 @@ contract CoinvestedPosition is TokenSwapBase {
             leadInvestors.push(_arguments.leadInvestors[i]);
         }
         require(carryFractionsSum < type(uint64).max, "carry fractions must leave a share for the receiver");
+        require(carryFractionsSum > 0, "using this contract with 0 carry fraction doesn't make sense");
         basePrice = _arguments.basePrice;
         basePriceDecimals = IERC20Metadata(address(_arguments.baseCurrency)).decimals();
 
