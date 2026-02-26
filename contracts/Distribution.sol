@@ -78,8 +78,8 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
      * @notice Reassigns unclaimed distribution funds from one address to another. This is used to fix
      *  holders in the snapshot not being able to claim their funds. It can be audited because the
      *  reassignment is emitted on-chain. Some cases that could lead to this being needed:
-     *      - holder loosing key and only noticing after snapshot
-     *      - CoinvestedPosition being unable to claim because of currency mismatch
+     *      - holder losing their key and only noticing after the snapshot
+     *      - a smart contract holder that cannot execute the claim for any reason
      * @dev onlyOwner, matching the requirements of calling Token.burn+mint to fix an issue with
      *  current token holders.
      */
