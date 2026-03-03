@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import "./Vesting.sol";
 import "./Token.sol";
 import "./interfaces/IFeeSettings.sol";
 
@@ -88,12 +87,6 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         address _recipient
     ) external {
         require(_holder.isValidSignature(_hash, _signature) == 0x1626ba7e);
-        _claim(address(_holder), _tokenAmount, _recipient);
-    }
-
-    function claim(Vesting _holder, uint256 _tokenAmount, address _recipient) external {
-        // only works for lockups, where there is only one vesting plan per deployment
-        require(_msgSender() == _holder.beneficiary(0));
         _claim(address(_holder), _tokenAmount, _recipient);
     }
 
