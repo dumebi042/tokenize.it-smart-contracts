@@ -10,6 +10,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./Vesting.sol";
 import "./Token.sol";
+import "./interfaces/IFeeSettings.sol";
 
 struct ExitInitializerArguments {
     /// @notice Owner of the contract
@@ -106,7 +107,12 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         require(block.timestamp <= claimEnd, "exit window closed");
         IERC20(address(token)).safeTransferFrom(_holder, address(this), _tokenAmount);
         uint256 currencyAmount = (_tokenAmount * pricePerToken) / 10 ** token.decimals();
-        currency.safeTransfer(_recipient, currencyAmount);
+        IFeeSettingsV2 feeSettings = token.feeSettings();
+        uint256 fee = feeSettings.privateOfferFee(currencyAmount, address(token));
+        if (fee != 0) {
+            currency.safeTransfer(feeSettings.privateOfferFeeCollector(address(token)), fee);
+        }
+        currency.safeTransfer(_recipient, currencyAmount - fee);
     }
 
     function _msgSender() internal view override(ContextUpgradeable, ERC2771ContextUpgradeable) returns (address) {

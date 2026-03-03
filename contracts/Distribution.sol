@@ -10,6 +10,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./Vesting.sol";
 import "./Token.sol";
+import "./interfaces/IFeeSettings.sol";
 
 struct DistributionInitializerArguments {
     /// @notice Owner of the contract
@@ -74,9 +75,18 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
             token.allowList().map(address(_arguments.currency)) & TRUSTED_CURRENCY == TRUSTED_CURRENCY,
             "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
         );
-        totalCurrencyAmount = _arguments.totalCurrencyAmount;
+        IFeeSettingsV2 feeSettings = _arguments.token.feeSettings();
+        uint256 fee = feeSettings.privateOfferFee(_arguments.totalCurrencyAmount, address(_arguments.token));
+        if (fee != 0) {
+            _arguments.currency.safeTransferFrom(
+                _currencyProvider,
+                feeSettings.privateOfferFeeCollector(address(_arguments.token)),
+                fee
+            );
+        }
+        totalCurrencyAmount = _arguments.totalCurrencyAmount - fee;
         reassignAfter = _arguments.reassignAfter;
-        _arguments.currency.safeTransferFrom(_currencyProvider, address(this), _arguments.totalCurrencyAmount);
+        _arguments.currency.safeTransferFrom(_currencyProvider, address(this), totalCurrencyAmount);
     }
 
     function eligible(address _holder) public view returns (uint256) {

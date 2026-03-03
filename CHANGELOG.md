@@ -22,7 +22,9 @@ Abstract base extracted from duplicated logic in `TokenSwap` and `CoinvestedPosi
 
 Distributes a fixed currency amount among token holders proportional to their balance at a given snapshot. Supports direct claims, ERC-1271 smart-contract holders, and vesting contracts. An owner-only `reassign` function (available after a configurable delay post-deployment) handles recovery cases. Deployed via an atomic clone-and-fund factory.
 
----
+## Fee collection
+
+Note that for Distributions, all fees are collected at smart contract creation instead of at claim time. Rationale: there is no way to extract the currency without a fee payment, so we might as well collect at the beginning and save gas because we do it only once instead of bite-by-bite.
 
 ### New contract: `Exit`
 
