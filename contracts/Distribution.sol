@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import "./Vesting.sol";
 import "./Token.sol";
 import "./interfaces/IFeeSettings.sol";
 
@@ -103,16 +102,19 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
      *  reassignment is emitted on-chain. Some cases that could lead to this being needed:
      *      - holder losing their key and only noticing after the snapshot
      *      - a smart contract holder that cannot execute the claim for any reason
+     *      - a Vesting contract holding tokens for multiple beneficiaries: the owner can reassign
+     *        each beneficiary's proportional share individually
      * @dev onlyOwner, matching the requirements of calling Token.burn+mint to fix an issue with
      *  current token holders.
+     * @param _amount amount of currency to reassign; must not exceed eligible(_from)
      */
-    function reassign(address _from, address _to) external onlyOwner {
+    function reassign(address _from, address _to, uint256 _amount) external onlyOwner {
         require(block.timestamp >= reassignAfter, "reassignment not yet available");
-        uint256 remaining = eligible(_from);
-        require(remaining > 0, "nothing to reassign");
-        paidOut[_from] += remaining;
-        extraCredit[_to] += remaining;
-        emit Reassigned(_from, _to, remaining);
+        require(_amount > 0, "amount must be positive");
+        require(_amount <= eligible(_from), "amount exceeds eligible");
+        paidOut[_from] += _amount;
+        extraCredit[_to] += _amount;
+        emit Reassigned(_from, _to, _amount);
     }
 
     function claim(address _recipient) external {
@@ -124,11 +126,6 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         _claim(address(_holder), _recipient);
     }
 
-    function claim(Vesting _holder, address _recipient) external {
-        //only works for lockups, where there is only one vesting plan per deployment. For EP it will not and should not work, since there are not tokens in EP contracts
-        require(_msgSender() == _holder.beneficiary(0));
-        _claim(address(_holder), _recipient);
-    }
 
     function _claim(address _holder, address _recipient) internal {
         uint256 amount = eligible(_holder);
