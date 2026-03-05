@@ -28,7 +28,7 @@ Note that for Distributions, all fees are collected at smart contract creation i
 
 ### New contract: `Exit`
 
-Allows token holders to redeem tokens for a fixed currency payout within a configurable duration after the exit date. Mirrors `Distribution`'s claim overloads and factory pattern.
+Allows token holders to redeem tokens for a fixed currency payout within a configurable duration after the exit date. Deployed via an atomic clone-and-fund factory.
 
 ---
 

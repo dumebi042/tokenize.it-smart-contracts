@@ -76,14 +76,13 @@ contract CoinvestedPosition is TokenSwapBase {
             "currency must be a trusted EURO currency"
         );
         require(_arguments.leadInvestors.length > 0, "There must be at least one lead investor");
-        uint256 carryFractionsSum = 0;
+        uint64 carryFractionsSum = 0;
         for (uint256 i = 0; i < _arguments.leadInvestors.length; i++) {
             require(_arguments.leadInvestors[i].account != address(0), "lead investor can not be zero address");
-            carryFractionsSum += _arguments.leadInvestors[i].carryFraction;
+            require(_arguments.leadInvestors[i].carryFraction > 0, "lead investor carry fraction can not be zero");
+            carryFractionsSum += _arguments.leadInvestors[i].carryFraction; // reverts on overflow
             leadInvestors.push(_arguments.leadInvestors[i]);
         }
-        require(carryFractionsSum < type(uint64).max, "carry fractions must leave a share for the receiver");
-        require(carryFractionsSum > 0, "using this contract with 0 carry fraction doesn't make sense");
         basePrice = _arguments.basePrice;
         basePriceDecimals = IERC20Metadata(address(_arguments.baseCurrency)).decimals();
 

@@ -126,7 +126,6 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         _claim(address(_holder), _recipient);
     }
 
-
     function _claim(address _holder, address _recipient) internal {
         uint256 amount = eligible(_holder);
         paidOut[_holder] += amount;
