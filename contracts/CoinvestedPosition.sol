@@ -206,8 +206,14 @@ contract CoinvestedPosition is TokenSwapBase {
      *      Any EURO token (TRUSTED_CURRENCY | EURO_CURRENCY) may be used, independent of the currency used for buy().
      * @param _exit the Exit contract to claim from
      * @param _exitCurrency the EURO token paid out by the exit
+     * @param _minCurrencyAmount minimum currency the call must receive; reverts if proceeds fall short.
+     *      This guards against faulty or malicious exit contracts.
      */
-    function distributeExit(IExit _exit, IERC20 _exitCurrency) external onlyOwner nonReentrant {
+    function distributeExit(
+        IExit _exit,
+        IERC20 _exitCurrency,
+        uint256 _minCurrencyAmount
+    ) external onlyOwner nonReentrant {
         require(
             token.allowList().map(address(_exitCurrency)) & (TRUSTED_CURRENCY | EURO_CURRENCY) ==
                 (TRUSTED_CURRENCY | EURO_CURRENCY),
@@ -219,7 +225,7 @@ contract CoinvestedPosition is TokenSwapBase {
         uint256 before = _exitCurrency.balanceOf(address(this));
         _exit.claim(tokenBalance, address(this));
         uint256 received = _exitCurrency.balanceOf(address(this)) - before;
-        require(received > 0, "didn't receive expected currency from exit");
+        require(received >= _minCurrencyAmount, "received less than _minCurrencyAmount");
         uint256 basePayout = _scaleToDecimals(
             (basePrice * tokenBalance) / 10 ** token.decimals(),
             IERC20Metadata(address(_exitCurrency)).decimals()
