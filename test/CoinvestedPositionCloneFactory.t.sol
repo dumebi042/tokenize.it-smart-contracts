@@ -1,0 +1,302 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+pragma solidity 0.8.23;
+
+import "../lib/forge-std/src/Test.sol";
+import "../contracts/factories/TokenProxyFactory.sol";
+import "../contracts/factories/CoinvestedPositionCloneFactory.sol";
+import "../contracts/CoinvestedPosition.sol";
+import "./resources/FakePaymentToken.sol";
+import "./resources/CloneCreators.sol";
+
+contract CoinvestedPositionCloneFactoryTest is Test {
+    address public constant admin = 0x0109709eCFa91a80626FF3989D68f67f5b1dD120;
+    address public constant owner = 0x1109709ecFA91a80626ff3989D68f67F5B1Dd121;
+    address public constant receiver = 0x2109709EcFa91a80626Ff3989d68F67F5B1Dd122;
+    address public constant leadA = 0x3109709ECfA91A80626fF3989D68f67F5B1Dd123;
+    address public constant leadB = 0x4109709eCFa91A80626ff3989d68F67f5b1DD124;
+    address public constant trustedForwarder = 0x9109709EcFA91A80626FF3989D68f67F5B1dD129;
+
+    bytes32 public constant EXAMPLE_SALT = bytes32(0);
+    uint256 public constant EXAMPLE_BASE_PRICE = 100e6;
+
+    AllowList allowList;
+    FakePaymentToken currency;
+    Token token;
+    CoinvestedPositionCloneFactory factory;
+    TokenProxyFactory tokenFactory;
+
+    function setUp() public {
+        allowList = createAllowList(trustedForwarder, admin);
+        currency = new FakePaymentToken(0, 6);
+        vm.prank(admin);
+        allowList.set(address(currency), TRUSTED_CURRENCY | EURO_CURRENCY);
+
+        address tokenLogic = address(new Token(trustedForwarder));
+        tokenFactory = new TokenProxyFactory(tokenLogic);
+        Fees memory fees = Fees(0, 0, 0, 0);
+        IFeeSettingsV2 feeSettings = createFeeSettings(trustedForwarder, admin, fees, admin, admin, admin);
+        token = Token(
+            tokenFactory.createTokenProxy(0, trustedForwarder, feeSettings, admin, allowList, 0, "CPToken", "CPT")
+        );
+
+        factory = new CoinvestedPositionCloneFactory(address(new CoinvestedPosition(trustedForwarder)));
+    }
+
+    /// @dev Returns baseline arguments with two lead investors.
+    ///     We use a function instead of a variable because the array needs to be in memory
+    function _baseArgs() internal view returns (CoinvestedPositionInitializerArguments memory) {
+        LeadInvestor[] memory leads = new LeadInvestor[](2);
+        leads[0] = LeadInvestor({account: leadA, carryFraction: type(uint64).max / 10}); // 10%
+        leads[1] = LeadInvestor({account: leadB, carryFraction: type(uint64).max / 20}); // 5%
+        return
+            CoinvestedPositionInitializerArguments({
+                owner: owner,
+                receiver: receiver,
+                leadInvestors: leads,
+                basePrice: EXAMPLE_BASE_PRICE,
+                baseCurrency: IERC20(address(currency)),
+                token: token
+            });
+    }
+
+    function _deploy(
+        bytes32 salt,
+        address _trustedForwarder,
+        CoinvestedPositionInitializerArguments memory args
+    ) internal returns (CoinvestedPosition) {
+        return CoinvestedPosition(factory.createCoinvestedPositionClone(salt, _trustedForwarder, args));
+    }
+
+    // ========== F1-CP. Address Prediction ==========
+
+    function testBothPredictOverloadsMatch() public {
+        CoinvestedPositionInitializerArguments memory args = _baseArgs();
+        bytes32 precomputed = keccak256(abi.encode(EXAMPLE_SALT, trustedForwarder, args));
+
+        address fromSalt = factory.predictCloneAddress(precomputed);
+        address fromParams = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
+        assertEq(fromSalt, fromParams);
+    }
+
+    function testActualAddressMatchesPrediction() public {
+        CoinvestedPositionInitializerArguments memory args = _baseArgs();
+        address predicted = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
+        address actual = factory.createCoinvestedPositionClone(EXAMPLE_SALT, trustedForwarder, args);
+        assertEq(predicted, actual);
+    }
+
+    function testNewCloneEventEmitted() public {
+        CoinvestedPositionInitializerArguments memory args = _baseArgs();
+        address predicted = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
+        vm.expectEmit(true, false, false, false, address(factory));
+        emit CloneFactory.NewClone(predicted);
+        factory.createCoinvestedPositionClone(EXAMPLE_SALT, trustedForwarder, args);
+    }
+
+    // ========== F2-CP. Each Salt Parameter Changes the Address ==========
+
+    function testRawSaltChangesAddress() public {
+        CoinvestedPositionInitializerArguments memory args = _baseArgs();
+        address a1 = factory.predictCloneAddress(bytes32(uint256(1)), trustedForwarder, args);
+        address a2 = factory.predictCloneAddress(bytes32(uint256(2)), trustedForwarder, args);
+        assertFalse(a1 == a2);
+    }
+
+    function testTrustedForwarderChangesAddress() public {
+        CoinvestedPositionInitializerArguments memory args = _baseArgs();
+        address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
+        address a2 = factory.predictCloneAddress(EXAMPLE_SALT, address(0x9999), args);
+        assertFalse(a1 == a2);
+    }
+
+    function testOwnerChangesAddress() public {
+        CoinvestedPositionInitializerArguments memory args = _baseArgs();
+        address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
+        args.owner = address(0x9999);
+        address a2 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
+        assertFalse(a1 == a2);
+    }
+
+    function testReceiverChangesAddress() public {
+        CoinvestedPositionInitializerArguments memory args = _baseArgs();
+        address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
+        args.receiver = address(0x9999);
+        address a2 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
+        assertFalse(a1 == a2);
+    }
+
+    function testBasePriceChangesAddress() public {
+        CoinvestedPositionInitializerArguments memory args = _baseArgs();
+        address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
+        args.basePrice = EXAMPLE_BASE_PRICE + 1;
+        address a2 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
+        assertFalse(a1 == a2);
+    }
+
+    function testBaseCurrencyChangesAddress() public {
+        CoinvestedPositionInitializerArguments memory args = _baseArgs();
+        address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
+        args.baseCurrency = IERC20(address(0x9999));
+        address a2 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
+        assertFalse(a1 == a2);
+    }
+
+    function testTokenChangesAddress() public {
+        CoinvestedPositionInitializerArguments memory args = _baseArgs();
+        address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
+        args.token = Token(address(0x9999));
+        address a2 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
+        assertFalse(a1 == a2);
+    }
+
+    function testLeadInvestorsCarryFractionChangesAddress() public {
+        CoinvestedPositionInitializerArguments memory args = _baseArgs();
+        address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
+        args.leadInvestors[0].carryFraction = type(uint64).max / 10 + 1;
+        address a2 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
+        assertFalse(a1 == a2);
+    }
+
+    function testLeadInvestorsLengthChangesAddress() public {
+        CoinvestedPositionInitializerArguments memory args = _baseArgs();
+        address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
+
+        LeadInvestor[] memory threeLeads = new LeadInvestor[](3);
+        threeLeads[0] = args.leadInvestors[0];
+        threeLeads[1] = args.leadInvestors[1];
+        threeLeads[2] = LeadInvestor({account: address(0xBBB), carryFraction: 1});
+        args.leadInvestors = threeLeads;
+        address a2 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
+        assertFalse(a1 == a2);
+    }
+
+    // ========== F3-CP. Wrong Trusted Forwarder Reverts ==========
+
+    function testCreateWithWrongForwarderReverts() public {
+        CoinvestedPositionInitializerArguments memory args = _baseArgs();
+        vm.expectRevert("CoinvestedPositionCloneFactory: Unexpected trustedForwarder");
+        factory.createCoinvestedPositionClone(EXAMPLE_SALT, address(0xBAD), args);
+    }
+
+    // ========== F4-CP. Second Deployment Fails ==========
+
+    function testSecondDeploymentReverts() public {
+        CoinvestedPositionInitializerArguments memory args = _baseArgs();
+        factory.createCoinvestedPositionClone(EXAMPLE_SALT, trustedForwarder, args);
+        vm.expectRevert("ERC1167: create2 failed");
+        factory.createCoinvestedPositionClone(EXAMPLE_SALT, trustedForwarder, args);
+    }
+
+    // ========== F5-CP. Initialization ==========
+
+    function testStateVariablesSetCorrectly() public {
+        CoinvestedPositionInitializerArguments memory args = _baseArgs();
+        CoinvestedPosition cp = _deploy(EXAMPLE_SALT, trustedForwarder, args);
+
+        assertEq(cp.owner(), args.owner);
+        assertEq(cp.receiver(), args.receiver);
+        assertEq(address(cp.currency()), address(args.baseCurrency));
+        assertEq(address(cp.token()), address(args.token));
+        assertEq(cp.basePrice(), args.basePrice);
+        assertEq(cp.basePriceDecimals(), 6); // FakePaymentToken has 6 decimals
+        assertEq(cp.getLeadInvestorsCount(), 2);
+        assertTrue(cp.paused()); // starts paused
+        assertEq(cp.tokenPrice(), 0);
+    }
+
+    function testLeadInvestorsStoredCorrectly() public {
+        CoinvestedPositionInitializerArguments memory args = _baseArgs();
+        CoinvestedPosition cp = _deploy(EXAMPLE_SALT, trustedForwarder, args);
+
+        (address accA, uint64 fracA) = cp.leadInvestors(0);
+        (address accB, uint64 fracB) = cp.leadInvestors(1);
+        assertEq(accA, leadA);
+        assertEq(fracA, type(uint64).max / 10);
+        assertEq(accB, leadB);
+        assertEq(fracB, type(uint64).max / 20);
+    }
+
+    function testFuzzLeadInvestorsStoredCorrectly(
+        address[100] calldata accounts,
+        uint64[100] calldata fractions,
+        uint8 count
+    ) public {
+        vm.assume(count > 0 && count <= 100);
+
+        // build a valid lead investors array: non-zero accounts, non-zero fractions, sum fits uint64
+        LeadInvestor[] memory leads = new LeadInvestor[](count);
+        uint256 usedSlots = 0;
+        uint64 runningSum = 0;
+        for (uint256 i = 0; i < count; i++) {
+            address acc = accounts[i];
+            uint64 frac = fractions[i];
+            if (acc == address(0)) continue;
+            if (frac == 0) continue;
+            if (uint256(runningSum) + uint256(frac) > type(uint64).max) break;
+            leads[usedSlots] = LeadInvestor({account: acc, carryFraction: frac});
+            runningSum += frac;
+            usedSlots++;
+        }
+        vm.assume(usedSlots > 0);
+
+        // trim array to usedSlots
+        LeadInvestor[] memory trimmed = new LeadInvestor[](usedSlots);
+        for (uint256 i = 0; i < usedSlots; i++) {
+            trimmed[i] = leads[i];
+        }
+
+        CoinvestedPositionInitializerArguments memory args = _baseArgs();
+        args.leadInvestors = trimmed;
+
+        CoinvestedPosition cp = _deploy(bytes32(uint256(1)), trustedForwarder, args);
+
+        assertEq(cp.getLeadInvestorsCount(), usedSlots);
+        for (uint256 i = 0; i < usedSlots; i++) {
+            (address acc, uint64 frac) = cp.leadInvestors(i);
+            assertEq(acc, trimmed[i].account);
+            assertEq(frac, trimmed[i].carryFraction);
+        }
+    }
+
+    function testTrustedForwarderSetCorrectly() public {
+        CoinvestedPositionInitializerArguments memory args = _baseArgs();
+        CoinvestedPosition cp = _deploy(EXAMPLE_SALT, trustedForwarder, args);
+        assertTrue(cp.isTrustedForwarder(trustedForwarder));
+    }
+
+    function testReInitializingCloneReverts() public {
+        CoinvestedPositionInitializerArguments memory args = _baseArgs();
+        CoinvestedPosition cp = _deploy(EXAMPLE_SALT, trustedForwarder, args);
+        vm.expectRevert("Initializable: contract is already initialized");
+        cp.initialize(args);
+    }
+
+    // ========== F6-CP. Invalid Currency Reverts ==========
+
+    function testMissingTrustedCurrencyBitReverts() public {
+        FakePaymentToken badCurrency = new FakePaymentToken(0, 6);
+        vm.prank(admin);
+        allowList.set(address(badCurrency), EURO_CURRENCY); // only EURO, no TRUSTED
+        CoinvestedPositionInitializerArguments memory args = _baseArgs();
+        args.baseCurrency = IERC20(address(badCurrency));
+        // TokenSwapBase._initializeBase() checks TRUSTED_CURRENCY first
+        vm.expectRevert("currency needs to be on the allowlist with TRUSTED_CURRENCY attribute");
+        factory.createCoinvestedPositionClone(bytes32("bad1"), trustedForwarder, args);
+    }
+
+    function testMissingEuroCurrencyBitReverts() public {
+        FakePaymentToken nonEuro = new FakePaymentToken(0, 6);
+        vm.prank(admin);
+        allowList.set(address(nonEuro), TRUSTED_CURRENCY); // only TRUSTED, no EURO
+        CoinvestedPositionInitializerArguments memory args = _baseArgs();
+        args.baseCurrency = IERC20(address(nonEuro));
+        vm.expectRevert("currency must be a trusted EURO currency");
+        factory.createCoinvestedPositionClone(bytes32("bad2"), trustedForwarder, args);
+    }
+
+    function testBothBitsSetSucceeds() public {
+        CoinvestedPositionInitializerArguments memory args = _baseArgs();
+        address actual = factory.createCoinvestedPositionClone(EXAMPLE_SALT, trustedForwarder, args);
+        assertFalse(actual == address(0));
+    }
+}

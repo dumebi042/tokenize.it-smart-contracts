@@ -136,8 +136,10 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             baseCurrency: IERC20(address(eurc)),
             token: token
         });
+
+        CoinvestedPosition localLogic = new CoinvestedPosition(trustedForwarder);
         vm.expectRevert("Initializable: contract is already initialized");
-        logic.initialize(args);
+        localLogic.initialize(args);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
