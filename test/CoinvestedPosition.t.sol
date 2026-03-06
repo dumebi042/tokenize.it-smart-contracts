@@ -1,14 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.23;
 
-import "../lib/forge-std/src/Test.sol";
-
-import "../contracts/factories/TokenProxyFactory.sol";
-import "../contracts/factories/CoinvestedPositionCloneFactory.sol";
-import "../contracts/CoinvestedPosition.sol";
-import "../contracts/FeeSettings.sol";
-import "./resources/FakePaymentToken.sol";
-import "./resources/CloneCreators.sol";
+import "./resources/CoinvestedPositionTestBase.sol";
 
 // ── Malicious currency that re-enters CoinvestedPosition.buy() ──────────────
 contract MaliciousCoinvestedToken is FakePaymentToken {
@@ -33,47 +26,29 @@ contract MaliciousCoinvestedToken is FakePaymentToken {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-contract CoinvestedPositionTest is Test {
+contract CoinvestedPositionTest is CoinvestedPositionTestBase {
     // ── Events ────────────────────────────────────────────────────────────────
     event TokensBought(address indexed buyer, uint256 tokenAmount, uint256 currencyAmount);
     event ReceiverChanged(address indexed newReceiver);
     event TokenPriceChanged(uint256 newTokenPrice);
 
     // ── Well-known addresses ──────────────────────────────────────────────────
-    address public constant admin = 0x0109709eCFa91a80626FF3989D68f67f5b1dD120;
-    address public constant owner = 0x6109709EcFA91A80626FF3989d68f67F5b1dd126;
-    address public constant receiver = 0x7109709eCfa91A80626Ff3989D68f67f5b1dD127;
     address public constant buyer = 0x1109709ecFA91a80626ff3989D68f67F5B1Dd121;
-    address public constant leadA = 0x2109709EcFa91a80626Ff3989d68F67F5B1Dd122;
     address public constant leadB = 0x3109709ECfA91A80626fF3989D68f67F5B1Dd123;
-    address public constant trustedForwarder = 0xa109709ecfA91A80626ff3989D68F67F5b1dD12a;
-    address public constant tokenReceiver = 0x5109709EcFA91a80626ff3989d68f67F5B1dD125;
     address public constant feeCollector = 0x4109709eCFa91A80626ff3989d68F67f5b1DD124;
 
     // ── Test constants ────────────────────────────────────────────────────────
-    // 10% of uint64.max (floor)
-    uint64 public constant CARRY_10PCT = type(uint64).max / 10;
     // 5% of uint64.max (floor)
     uint64 public constant CARRY_5PCT = type(uint64).max / 20;
     // 2% of uint64.max (floor)
     uint64 public constant CARRY_2PCT = type(uint64).max / 50;
 
     // ── Shared state ──────────────────────────────────────────────────────────
-    AllowList allowList;
-    IFeeSettingsV2 feeSettings;
-    Token token;
-    TokenProxyFactory tokenFactory;
-
-    // EURc: 6 decimals (the "base currency" used at init)
-    FakePaymentToken eurc;
     // EURe: 18 decimals (used for cross-currency tests)
     FakePaymentToken eure;
 
     CoinvestedPosition logic;
     CoinvestedPositionCloneFactory factory;
-
-    // The clone deployed for most tests
-    CoinvestedPosition coinvestedPosition;
 
     // ── setUp ─────────────────────────────────────────────────────────────────
     function setUp() public {
@@ -140,16 +115,6 @@ contract CoinvestedPositionTest is Test {
         return CoinvestedPosition(factory.createCoinvestedPositionClone(salt, trustedForwarder, args));
     }
 
-    /// Mint tokens to coinvestedPosition then set price and unpause
-    function _setupBuy(uint256 tokenAmount, uint256 tokenPrice) internal {
-        vm.prank(admin);
-        token.mint(address(coinvestedPosition), tokenAmount);
-        vm.prank(owner);
-        coinvestedPosition.setTokenPrice(tokenPrice);
-        vm.prank(owner);
-        coinvestedPosition.unpause();
-    }
-
     /// Give buyer currency and approve coinvestedPosition
     function _fundBuyer(FakePaymentToken currency, uint256 amount) internal {
         currency.mint(buyer, amount);
@@ -203,7 +168,7 @@ contract CoinvestedPositionTest is Test {
             eure,
             _defaultLeadInvestors()
         );
-        assertEq(coinvestedPosition18.basePriceDecimals(), 18, "basePriceDecimals should be 18");
+        assertEq(coinvestedPosition18.basePriceDecimals(), 18, "wrong basePriceDecimals");
     }
 
     function testFuzz_InitBasePriceDecimalsAndPriceStoredCorrectly(uint8 decimals, uint256 basePrice) public {
@@ -227,16 +192,16 @@ contract CoinvestedPositionTest is Test {
             factory.createCoinvestedPositionClone(salt, trustedForwarder, args)
         );
 
-        assertEq(fuzzPosition.basePriceDecimals(), decimals, "basePriceDecimals must match currency decimals");
-        assertEq(fuzzPosition.basePrice(), basePrice, "basePrice must be stored as-is");
+        assertEq(fuzzPosition.basePriceDecimals(), decimals, "basePriceDecimals does not match currency decimals");
+        assertEq(fuzzPosition.basePrice(), basePrice, "basePrice not stored as-is");
     }
 
     function testInitTokenPriceIsZero() public view {
-        assertEq(coinvestedPosition.tokenPrice(), 0, "tokenPrice should start at 0");
+        assertEq(coinvestedPosition.tokenPrice(), 0, "tokenPrice is not 0 at init");
     }
 
     function testInitContractStartsPaused() public view {
-        assertTrue(coinvestedPosition.paused(), "contract should start paused");
+        assertTrue(coinvestedPosition.paused(), "contract is not paused at init");
     }
 
     function testInitNonEuroCurrencyReverts() public {
@@ -428,7 +393,7 @@ contract CoinvestedPositionTest is Test {
         assertTrue(eure.decimals() != decimalsBefore, "test requires new currency to have different decimals");
         vm.prank(owner);
         coinvestedPosition.setCurrency(IERC20(address(eure)));
-        assertEq(coinvestedPosition.basePriceDecimals(), decimalsBefore, "basePriceDecimals must not change");
+        assertEq(coinvestedPosition.basePriceDecimals(), decimalsBefore, "basePriceDecimals changed after setCurrency");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -508,6 +473,7 @@ contract CoinvestedPositionTest is Test {
     }
 
     function testSetReceiverStoresAndEmitsEvent() public {
+        assertEq(coinvestedPosition.receiver(), receiver);
         vm.prank(owner);
         vm.expectEmit(true, false, false, false);
         emit ReceiverChanged(leadA);
@@ -543,8 +509,8 @@ contract CoinvestedPositionTest is Test {
         address differentReceiver = address(0xBEEF);
         vm.prank(buyer);
         coinvestedPosition.buy(1e18, 400e6, differentReceiver);
-        assertEq(token.balanceOf(differentReceiver), 1e18, "tokens should go to tokenReceiver");
-        assertEq(token.balanceOf(buyer), 0, "buyer should not receive tokens");
+        assertEq(token.balanceOf(differentReceiver), 1e18, "tokens did not go to tokenReceiver");
+        assertEq(token.balanceOf(buyer), 0, "buyer received tokens");
     }
 
     function testBuyEmitsTokensBoughtEvent() public {
@@ -569,6 +535,15 @@ contract CoinvestedPositionTest is Test {
         uint256 expectedA = (uint256(CARRY_10PCT) * carry) / type(uint64).max;
         uint256 expectedB = (uint256(CARRY_5PCT) * carry) / type(uint64).max;
         uint256 expectedReceiver = 400e6 - expectedA - expectedB;
+
+        // base price 100e6, sell 2 tokens for 200e6 each => 400e6 proceeds, of which 200e6 are carry
+        assertEq(expectedA, 20e6 - 1, "leadA expected wrong");
+        assertEq(expectedB, 10e6 - 1, "leadB expected wrong");
+        assertEq(expectedReceiver, 400e6 - 30e6 + 2, "receiver expected wrong");
+
+        assertEq(eurc.balanceOf(leadA), 0, "leadA has currency");
+        assertEq(eurc.balanceOf(leadB), 0, "leadB has currency");
+        assertEq(eurc.balanceOf(receiver), 0, "receiver has currency");
 
         vm.prank(buyer);
         coinvestedPosition.buy(2e18, 400e6, tokenReceiver);
@@ -640,6 +615,74 @@ contract CoinvestedPositionTest is Test {
         assertEq(eurc.balanceOf(receiver), expectedReceiver, "receiver");
     }
 
+    function testBuyFeeEatsAllCarryLeadInvestorsGetNothing() public {
+        // basePrice=100e6, tokenPrice=110e6, 1 token → paid=110e6
+        // Without fee, carry would be 10e6.
+        // With 10% fee (max allowed): fee=11e6, remaining=99e6 < basePayout=100e6 → carry=0
+        Fees memory fees = Fees(0, 1000, 0, 0); // 10% crowdinvesting fee (max allowed)
+        IFeeSettingsV2 feeSettings10 = createFeeSettings(
+            trustedForwarder,
+            admin,
+            fees,
+            feeCollector,
+            feeCollector,
+            feeCollector
+        );
+        Token tokenHighFee = Token(
+            tokenFactory.createTokenProxy(
+                0,
+                trustedForwarder,
+                feeSettings10,
+                admin,
+                allowList,
+                0,
+                "HighFeeToken",
+                "HFT"
+            )
+        );
+        vm.startPrank(admin);
+        tokenHighFee.grantRole(tokenHighFee.MINTALLOWER_ROLE(), admin);
+        vm.stopPrank();
+
+        LeadInvestor[] memory leadInvestors = _defaultLeadInvestors();
+        CoinvestedPositionInitializerArguments memory args = CoinvestedPositionInitializerArguments({
+            owner: owner,
+            receiver: receiver,
+            leadInvestors: leadInvestors,
+            basePrice: 100e6,
+            baseCurrency: IERC20(address(eurc)),
+            token: tokenHighFee
+        });
+        CoinvestedPosition coinvestedPositionHighFee = CoinvestedPosition(
+            factory.createCoinvestedPositionClone(bytes32("highFee"), trustedForwarder, args)
+        );
+
+        vm.prank(admin);
+        tokenHighFee.mint(address(coinvestedPositionHighFee), 1e18);
+        vm.prank(owner);
+        coinvestedPositionHighFee.setTokenPrice(110e6);
+        vm.prank(owner);
+        coinvestedPositionHighFee.unpause();
+
+        uint256 currencyAmount = 110e6; // 1 token at 110e6
+        eurc.mint(buyer, currencyAmount);
+        vm.prank(buyer);
+        eurc.approve(address(coinvestedPositionHighFee), currencyAmount);
+
+        // fee = 10% of 110e6 = 11e6; remaining = 99e6 < basePayout (100e6) → carry = 0
+        uint256 expectedFee = (currencyAmount * 1000) / 10000;
+        uint256 remaining = currencyAmount - expectedFee;
+        assertLt(remaining, 100e6, "precondition: remaining must be below basePayout");
+
+        vm.prank(buyer);
+        coinvestedPositionHighFee.buy(1e18, currencyAmount, tokenReceiver);
+
+        assertEq(eurc.balanceOf(feeCollector), expectedFee, "fee collector");
+        assertEq(eurc.balanceOf(leadA), 0, "leadA got carry despite fee");
+        assertEq(eurc.balanceOf(leadB), 0, "leadB got carry despite fee");
+        assertEq(eurc.balanceOf(receiver), remaining, "receiver did not get all remaining");
+    }
+
     function testBuyAtExactlyBasePriceCarryIsZero() public {
         // tokenPrice == basePrice → carry = 0, receiver gets everything
         _setupBuy(10e18, 100e6); // tokenPrice = basePrice = 100e6
@@ -649,9 +692,9 @@ contract CoinvestedPositionTest is Test {
         vm.prank(buyer);
         coinvestedPosition.buy(1e18, paid, tokenReceiver);
 
-        assertEq(eurc.balanceOf(leadA), 0, "leadA should get 0");
-        assertEq(eurc.balanceOf(leadB), 0, "leadB should get 0");
-        assertEq(eurc.balanceOf(receiver), paid, "receiver gets everything");
+        assertEq(eurc.balanceOf(leadA), 0, "leadA got non-zero carry");
+        assertEq(eurc.balanceOf(leadB), 0, "leadB got non-zero carry");
+        assertEq(eurc.balanceOf(receiver), paid, "receiver did not get everything");
     }
 
     function testBuyBelowBasePriceCarryIsZero() public {
@@ -664,9 +707,9 @@ contract CoinvestedPositionTest is Test {
         vm.prank(buyer);
         coinvestedPosition.buy(1e18, paid, tokenReceiver);
 
-        assertEq(eurc.balanceOf(leadA), 0, "leadA should get 0");
-        assertEq(eurc.balanceOf(leadB), 0, "leadB should get 0");
-        assertEq(eurc.balanceOf(receiver), paid, "receiver gets full remaining");
+        assertEq(eurc.balanceOf(leadA), 0, "leadA got non-zero carry");
+        assertEq(eurc.balanceOf(leadB), 0, "leadB got non-zero carry");
+        assertEq(eurc.balanceOf(receiver), paid, "receiver did not get full remaining");
     }
 
     function testBuyConcreteExampleWithThreeLeadInvestors() public {
@@ -685,7 +728,7 @@ contract CoinvestedPositionTest is Test {
         );
 
         vm.prank(admin);
-        token.mint(address(coinvestedPositionThreeLeads), 10e18);
+        token.mint(address(coinvestedPositionThreeLeads), 2e18);
         vm.prank(owner);
         coinvestedPositionThreeLeads.setTokenPrice(400e6);
         vm.prank(owner);
@@ -701,6 +744,8 @@ contract CoinvestedPositionTest is Test {
         uint256 shareB = (uint256(CARRY_2PCT) * carry) / type(uint64).max;
         uint256 shareC = (uint256(CARRY_10PCT) * carry) / type(uint64).max;
 
+        assertEq(token.balanceOf(address(coinvestedPositionThreeLeads)), 2e18, "wrong token amount");
+
         vm.prank(buyer);
         coinvestedPositionThreeLeads.buy(2e18, paid, address(0xCAFE));
 
@@ -708,6 +753,7 @@ contract CoinvestedPositionTest is Test {
         assertEq(eurc.balanceOf(leadB), shareB, "2% share"); // 4e6
         assertEq(eurc.balanceOf(tokenReceiver), shareC, "10% share"); // 20e6
         assertEq(eurc.balanceOf(receiver), paid - shareA - shareB - shareC, "receiver");
+        assertEq(token.balanceOf(address(coinvestedPositionThreeLeads)), 0, "some tokens left");
     }
 
     function testBuyCurrencyAmountCeilingRounded() public {
@@ -730,7 +776,7 @@ contract CoinvestedPositionTest is Test {
         vm.prank(buyer);
         coinvestedPosition.buy(tokenAmt, 10e6, tokenReceiver);
         uint256 spent = balBefore - eurc.balanceOf(buyer);
-        assertEq(spent, expectedCost, "ceiling rounding should charge 2 bits");
+        assertEq(spent, expectedCost, "wrong ceiling rounding amount");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -741,7 +787,7 @@ contract CoinvestedPositionTest is Test {
         // basePriceDecimals=6, setCurrency→EURe (18 dec), tokenPrice=200e18
         // scaledBasePrice = 100e6 scaled to 18 dec = 100e18
         // buy 2 tokens: paid=400e18, basePayout=200e18, carry=200e18
-        assertEq(coinvestedPosition.basePriceDecimals(), 6, "basePriceDecimals unchanged");
+        assertEq(coinvestedPosition.basePriceDecimals(), 6, "basePriceDecimals changed");
 
         vm.prank(owner);
         coinvestedPosition.setCurrency(IERC20(address(eure)));
@@ -758,6 +804,8 @@ contract CoinvestedPositionTest is Test {
         vm.prank(buyer);
         eure.approve(address(coinvestedPosition), paid);
 
+        // Base cost was 200e6 eurc, which equals 200€. Proceeds are 400e18 eure, which equals 400€. Carry is 200e18 eure = 200€.
+        // All decimals must be handled correctly here.
         uint256 carry = 200e18;
         uint256 expectedA = (uint256(CARRY_10PCT) * carry) / type(uint64).max;
         uint256 expectedB = (uint256(CARRY_5PCT) * carry) / type(uint64).max;
@@ -823,12 +871,18 @@ contract CoinvestedPositionTest is Test {
         uint256 expectedB = (uint256(CARRY_5PCT) * carry) / type(uint64).max;
         uint256 expectedReceiver = paid - expectedA - expectedB;
 
+        assertEq(token.balanceOf(address(coinvestedPosition)), 10e18, "wrong token amount before");
+        assertEq(eurc.balanceOf(address(coinvestedPosition)), 0, "wrong currency amount before: coinvestedPosition");
+
         vm.prank(buyer);
         coinvestedPosition.buy(1e18, paid, tokenReceiver);
 
         assertEq(eurc.balanceOf(leadA), expectedA);
         assertEq(eurc.balanceOf(leadB), expectedB);
         assertEq(eurc.balanceOf(receiver), expectedReceiver);
+        assertEq(token.balanceOf(address(coinvestedPosition)), 9e18, "wrong token amount after: coinvestedPosition");
+        assertEq(token.balanceOf(tokenReceiver), 1e18, "wrong token amount after: tokenReceiver");
+        assertEq(eurc.balanceOf(address(coinvestedPosition)), 0, "wrong currency amount after: coinvestedPosition");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -862,6 +916,7 @@ contract CoinvestedPositionTest is Test {
         assertEq(token.balanceOf(address(coinvestedPosition)), 95e18, "95 tokens after tranche 1");
         assertEq(eurc.balanceOf(leadA), t1A, "leadA after tranche 1");
         assertEq(eurc.balanceOf(leadB), t1B, "leadB after tranche 1");
+        assertEq(eurc.balanceOf(receiver), t1paid - t1A - t1B, "receiver EURc after tranche 1");
 
         // ── Tranche 2: 40 tokens, EURe (18 dec), tokenPrice=200e18 ───────────
         vm.prank(owner);
@@ -890,9 +945,11 @@ contract CoinvestedPositionTest is Test {
         assertEq(token.balanceOf(address(coinvestedPosition)), 55e18, "55 tokens after tranche 2");
         assertEq(eure.balanceOf(leadA), t2A, "leadA EURe after tranche 2");
         assertEq(eure.balanceOf(leadB), t2B, "leadB EURe after tranche 2");
-        // EURc from tranche 1 unchanged
-        assertEq(eurc.balanceOf(leadA), t1A, "leadA EURc unchanged");
-        assertEq(eurc.balanceOf(leadB), t1B, "leadB EURc unchanged");
+        assertEq(eure.balanceOf(receiver), t2paid - t2A - t2B, "receiver EURe after tranche 2");
+        // EURc balances from tranche 1 unchanged
+        assertEq(eurc.balanceOf(leadA), t1A, "leadA EURc changed");
+        assertEq(eurc.balanceOf(leadB), t1B, "leadB EURc changed");
+        assertEq(eurc.balanceOf(receiver), t1paid - t1A - t1B, "receiver EURc changed");
 
         // ── Tranche 3: 55 tokens, tokenPrice=80e18 (below base after scaling) ─
         vm.prank(owner);
@@ -912,9 +969,10 @@ contract CoinvestedPositionTest is Test {
         coinvestedPosition.buy(55e18, t3paid, tokenReceiver);
 
         assertEq(token.balanceOf(address(coinvestedPosition)), 0, "0 tokens after tranche 3");
-        // EURe lead balances unchanged after tranche 3 (carry=0)
-        assertEq(eure.balanceOf(leadA), t2A, "leadA EURe unchanged after tranche 3");
-        assertEq(eure.balanceOf(leadB), t2B, "leadB EURe unchanged after tranche 3");
+        // carry=0 in tranche 3, so lead and receiver EURe changes only for receiver
+        assertEq(eure.balanceOf(leadA), t2A, "leadA EURe changed after tranche 3");
+        assertEq(eure.balanceOf(leadB), t2B, "leadB EURe changed after tranche 3");
+        assertEq(eure.balanceOf(receiver), t2paid - t2A - t2B + t3paid, "receiver EURe after tranche 3");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -960,8 +1018,8 @@ contract CoinvestedPositionTest is Test {
         vm.prank(buyer);
         coinvestedPositionSweep.buy(10e18, paid, tokenReceiver);
 
-        assertEq(eurc.balanceOf(leadA), expectedA, "A's carry not inflated");
-        assertEq(eurc.balanceOf(receiver), expectedReceiver, "receiver gets share + extra");
+        assertEq(eurc.balanceOf(leadA), expectedA, "A's carry was inflated by extra balance");
+        assertEq(eurc.balanceOf(receiver), expectedReceiver, "receiver did not get share + extra");
     }
 
     function testSettleSweepCarryZeroWithExtra() public {
@@ -992,8 +1050,8 @@ contract CoinvestedPositionTest is Test {
         vm.prank(buyer);
         coinvestedPositionZeroCarry.buy(1e18, paid, tokenReceiver);
 
-        assertEq(eurc.balanceOf(leadA), 0, "lead investor gets 0 when carry=0");
-        assertEq(eurc.balanceOf(receiver), paid + 300e6, "receiver gets all including extra");
+        assertEq(eurc.balanceOf(leadA), 0, "lead investor got non-zero carry when carry=0");
+        assertEq(eurc.balanceOf(receiver), paid + 300e6, "receiver did not get all including extra");
     }
 
     function testSettleDifferentCurrencyNotSwept() public {
@@ -1020,14 +1078,102 @@ contract CoinvestedPositionTest is Test {
         coinvestedPosition.buy(1e18, paid, tokenReceiver);
 
         // EURc should remain on contract (not swept)
-        assertEq(eurc.balanceOf(address(coinvestedPosition)), 1000e6, "EURc not swept");
+        assertEq(eurc.balanceOf(address(coinvestedPosition)), 1000e6, "EURc was swept");
         // EURe swept to receiver and leads
-        assertEq(eure.balanceOf(address(coinvestedPosition)), 0, "EURe fully distributed");
+        assertEq(eure.balanceOf(address(coinvestedPosition)), 0, "EURe not fully distributed");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // ── Section 10: Fuzz ──────────────────────────────────────────────────────
     // ─────────────────────────────────────────────────────────────────────────
+
+    /// @dev Verify lead-investor balances and the receiver after a buy.
+    ///      Extracted to avoid stack-too-deep in the fuzz entry point.
+    function _assertCarrySplit(
+        uint8 numLeads,
+        uint64[] memory carries,
+        address[] memory leadAddrs,
+        uint256 spent,
+        uint256 carry
+    ) internal view {
+        uint256 totalLeadShares;
+        for (uint8 i = 0; i < numLeads; i++) {
+            uint256 expectedShare = (uint256(carries[i]) * carry) / type(uint64).max;
+            assertEq(eurc.balanceOf(leadAddrs[i]), expectedShare, "lead share mismatch");
+            totalLeadShares += expectedShare;
+        }
+        assertEq(eurc.balanceOf(receiver), spent - totalLeadShares, "receiver mismatch");
+        assertEq(eurc.balanceOf(receiver) + totalLeadShares, spent, "payout sum invariant violated");
+    }
+
+    /// @dev Fuzz sell price, token amount, number of lead investors (1–10) and
+    ///      their carry fractions.  Verifies:
+    ///      1. Each lead investor receives exactly floor(carry × fraction / uint64.max).
+    ///      2. The receiver gets exactly (spent − Σ lead shares).
+    ///      3. Σ all payouts == currency spent by the buyer (conservation).
+    function testFuzz_ComplexCarrySplitMultiLeadInvestors(
+        uint8 numLeads,
+        uint64[10] memory rawCarries,
+        uint96 tokenAmt,
+        uint64 priceAboveBase
+    ) public {
+        // ── Bound inputs ──────────────────────────────────────────────────────
+        numLeads = uint8(bound(uint256(numLeads), 1, 10));
+        tokenAmt = uint96(bound(uint256(tokenAmt), 1, 1e24));
+
+        // Arrays hoisted so they survive the inner scope and reach the assertion
+        address[] memory leadAddrs = new address[](numLeads);
+        uint64[] memory carries = new uint64[](numLeads);
+        uint256 spent;
+        uint256 carry;
+
+        // ── Scoped block: frees leadInvestors, fuzzPosition, etc. from stack ──
+        // tokenPrice ≥ basePrice (100e6) so carry is always non-negative
+        {
+            uint256 tokenPrice = uint256(100e6) + uint256(priceAboveBase);
+
+            // Cap each fraction so the sum can't overflow uint64:
+            //   maxPerInvestor × numLeads ≤ uint64.max   ✓
+            LeadInvestor[] memory leadInvestors = new LeadInvestor[](numLeads);
+            for (uint8 i = 0; i < numLeads; i++) {
+                carries[i] = uint64(bound(uint256(rawCarries[i]), 1, type(uint64).max / uint64(numLeads)));
+                // Low addresses that don't collide with any named test constant
+                leadAddrs[i] = address(uint160(0x2000 + i));
+                leadInvestors[i] = LeadInvestor({account: leadAddrs[i], carryFraction: carries[i]});
+            }
+
+            CoinvestedPosition fuzzPosition = _deployCoinvestedPosition(
+                keccak256(abi.encodePacked(numLeads, tokenAmt, priceAboveBase)),
+                100e6,
+                eurc,
+                leadInvestors
+            );
+            vm.prank(admin);
+            token.mint(address(fuzzPosition), tokenAmt);
+            vm.prank(owner);
+            fuzzPosition.setTokenPrice(tokenPrice);
+            vm.prank(owner);
+            fuzzPosition.unpause();
+
+            uint256 currencyAmount = (uint256(tokenAmt) * tokenPrice + 1e18 - 1) / 1e18;
+            eurc.mint(buyer, currencyAmount);
+            vm.prank(buyer);
+            eurc.approve(address(fuzzPosition), currencyAmount);
+
+            uint256 buyerBefore = eurc.balanceOf(buyer);
+            vm.prank(buyer);
+            fuzzPosition.buy(tokenAmt, currencyAmount, tokenReceiver);
+            spent = buyerBefore - eurc.balanceOf(buyer);
+
+            // basePayout = floor(tokenAmt × scaledBasePrice / 1e18)
+            // scaledBasePrice = 100e6 (basePriceDecimals == currencyDecimals, no scaling)
+            uint256 basePayout = (uint256(tokenAmt) * 100e6) / 1e18;
+            carry = spent > basePayout ? spent - basePayout : 0;
+        }
+
+        // ── Verify distribution ───────────────────────────────────────────────
+        _assertCarrySplit(numLeads, carries, leadAddrs, spent, carry);
+    }
 
     function testFuzz_BuyPayoutsSum(uint96 tokenAmt, uint64 priceAboveBase) public {
         vm.assume(tokenAmt > 0 && tokenAmt <= 1e24); // reasonable range
@@ -1053,65 +1199,179 @@ contract CoinvestedPositionTest is Test {
         uint256 spent = buyerBalBefore - eurc.balanceOf(buyer);
         uint256 totalOut = eurc.balanceOf(leadA) + eurc.balanceOf(leadB) + eurc.balanceOf(receiver);
 
-        assertEq(spent, totalOut, "invariant: sum of payouts == currency paid");
+        assertEq(spent, totalOut, "invariant: sum of payouts != currency paid");
     }
 
-    function testFuzz_ScaleToDecimals(uint256 amount, uint8 targetDecimals) public {
-        // basePriceDecimals = 6 (from setUp)
-        vm.assume(targetDecimals <= 30);
-        vm.assume(amount <= type(uint128).max); // prevent overflow
+    function testFuzz_ScaleToDecimals(uint8 baseDecimals, uint128 basePrice) public {
+        baseDecimals = uint8(bound(uint256(baseDecimals), 0, 36));
+        vm.assume(basePrice > 0);
 
-        // We test via buy() by observing no revert. Instead call directly via a helper.
-        // We can't call _scaleToDecimals directly (internal). Test indirectly:
-        // Deploy coinvestedPosition with eure (18 dec base), set currency to eurc (6 dec) → downscaling
-        CoinvestedPosition coinvestedPosition18 = _deployCoinvestedPosition(
-            bytes32("fuzz18"),
-            100e18,
+        // Compute scaledBasePrice as the contract will when currency switches to eure (18 dec).
+        // Mirrors CoinvestedPosition._scaleToDecimals(basePrice, 18).
+        uint256 scaledBasePrice;
+        if (baseDecimals <= 18) {
+            scaledBasePrice = uint256(basePrice) * 10 ** (18 - baseDecimals);
+        } else {
+            scaledBasePrice = uint256(basePrice) / 10 ** (baseDecimals - 18);
+            vm.assume(scaledBasePrice > 0); // discard inputs where downscaling floors to 0
+        }
+
+        // Create a fresh currency with fuzzed decimals and register it
+        FakePaymentToken fuzzCurrency = new FakePaymentToken(0, baseDecimals);
+        vm.prank(admin);
+        allowList.set(address(fuzzCurrency), TRUSTED_CURRENCY | EURO_CURRENCY);
+
+        // Deploy coinvestedPosition with the fuzz currency and price
+        CoinvestedPosition fuzzPosition = _deployCoinvestedPosition(
+            keccak256(abi.encodePacked(baseDecimals, basePrice)),
+            uint256(basePrice),
+            fuzzCurrency,
+            _defaultLeadInvestors()
+        );
+
+        // Assert initial state is stored correctly
+        assertEq(fuzzPosition.basePriceDecimals(), baseDecimals, "basePriceDecimals");
+        assertEq(fuzzPosition.basePrice(), uint256(basePrice), "basePrice");
+
+        // Switch currency to eure (18 dec) and set tokenPrice = 2× scaledBasePrice
+        // so carry = scaledBasePrice (50% markup over base)
+        uint256 tokenPrice = 2 * scaledBasePrice;
+        vm.prank(owner);
+        fuzzPosition.setCurrency(IERC20(address(eure)));
+
+        vm.prank(admin);
+        token.mint(address(fuzzPosition), 1e18);
+        vm.prank(owner);
+        fuzzPosition.setTokenPrice(tokenPrice);
+        vm.prank(owner);
+        fuzzPosition.unpause();
+
+        // Fund buyer: 1 token × tokenPrice / 1e18 = tokenPrice exactly (no rounding)
+        eure.mint(buyer, tokenPrice);
+        vm.prank(buyer);
+        eure.approve(address(fuzzPosition), tokenPrice);
+
+        vm.prank(buyer);
+        fuzzPosition.buy(1e18, tokenPrice, tokenReceiver);
+
+        // carry = tokenPrice - scaledBasePrice (for 1 token) = scaledBasePrice
+        uint256 carry = scaledBasePrice;
+        uint256 expectedA = (uint256(CARRY_10PCT) * carry) / type(uint64).max;
+        uint256 expectedB = (uint256(CARRY_5PCT) * carry) / type(uint64).max;
+        uint256 expectedReceiver = tokenPrice - expectedA - expectedB;
+
+        assertEq(eure.balanceOf(leadA), expectedA, "leadA carry");
+        assertEq(eure.balanceOf(leadB), expectedB, "leadB carry");
+        assertEq(eure.balanceOf(receiver), expectedReceiver, "receiver");
+        assertEq(token.balanceOf(tokenReceiver), 1e18, "tokens received");
+    }
+
+    function testFuzz_ScaleToDecimals_BaseCurrencyEure(uint8 buyCurrencyDecimals, uint128 basePrice) public {
+        buyCurrencyDecimals = uint8(bound(uint256(buyCurrencyDecimals), 0, 36));
+        vm.assume(basePrice > 0);
+
+        // Deploy with eure (18 dec) as base currency; basePriceDecimals = 18.
+        // Compute scaledBasePrice as the contract will when buy currency has buyCurrencyDecimals.
+        // Mirrors CoinvestedPosition._scaleToDecimals(basePrice, buyCurrencyDecimals).
+        uint256 scaledBasePrice;
+        if (buyCurrencyDecimals >= 18) {
+            scaledBasePrice = uint256(basePrice) * 10 ** (buyCurrencyDecimals - 18);
+        } else {
+            scaledBasePrice = uint256(basePrice) / 10 ** (18 - buyCurrencyDecimals);
+            vm.assume(scaledBasePrice > 0); // discard inputs where downscaling floors to 0
+        }
+
+        // Deploy coinvestedPosition with eure as base currency
+        CoinvestedPosition fuzzPosition = _deployCoinvestedPosition(
+            keccak256(abi.encodePacked(buyCurrencyDecimals, basePrice)),
+            uint256(basePrice),
             eure,
             _defaultLeadInvestors()
         );
 
-        // Just verify the deployment is fine and basePriceDecimals correct
-        assertEq(coinvestedPosition18.basePriceDecimals(), 18);
-        // The actual scaling is tested through buy() in other tests
+        // Assert initial state is stored correctly
+        assertEq(fuzzPosition.basePriceDecimals(), 18, "basePriceDecimals");
+        assertEq(fuzzPosition.basePrice(), uint256(basePrice), "basePrice");
+
+        // Create a fresh buy currency with fuzzed decimals and register it
+        FakePaymentToken buyCurrency = new FakePaymentToken(0, buyCurrencyDecimals);
+        vm.prank(admin);
+        allowList.set(address(buyCurrency), TRUSTED_CURRENCY | EURO_CURRENCY);
+
+        // Switch to the fuzz buy currency and set tokenPrice = 2× scaledBasePrice
+        // so carry = scaledBasePrice (50% markup over base)
+        uint256 tokenPrice = 2 * scaledBasePrice;
+        vm.prank(owner);
+        fuzzPosition.setCurrency(IERC20(address(buyCurrency)));
+
+        vm.prank(admin);
+        token.mint(address(fuzzPosition), 1e18);
+        vm.prank(owner);
+        fuzzPosition.setTokenPrice(tokenPrice);
+        vm.prank(owner);
+        fuzzPosition.unpause();
+
+        // Fund buyer: 1 token × tokenPrice / 1e18 = tokenPrice exactly (no rounding)
+        buyCurrency.mint(buyer, tokenPrice);
+        vm.prank(buyer);
+        buyCurrency.approve(address(fuzzPosition), tokenPrice);
+
+        vm.prank(buyer);
+        fuzzPosition.buy(1e18, tokenPrice, tokenReceiver);
+
+        // carry = tokenPrice - scaledBasePrice (for 1 token) = scaledBasePrice
+        uint256 carry = scaledBasePrice;
+        uint256 expectedA = (uint256(CARRY_10PCT) * carry) / type(uint64).max;
+        uint256 expectedB = (uint256(CARRY_5PCT) * carry) / type(uint64).max;
+        uint256 expectedReceiver = tokenPrice - expectedA - expectedB;
+
+        assertEq(buyCurrency.balanceOf(leadA), expectedA, "leadA carry");
+        assertEq(buyCurrency.balanceOf(leadB), expectedB, "leadB carry");
+        assertEq(buyCurrency.balanceOf(receiver), expectedReceiver, "receiver");
+        assertEq(token.balanceOf(tokenReceiver), 1e18, "tokens received");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // ── Section 11: Access Control (consolidated) ─────────────────────────────
     // ─────────────────────────────────────────────────────────────────────────
 
-    function testAccessControl_SetCurrency() public {
-        vm.prank(buyer);
+    function testFuzz_AccessControl_SetCurrency(address caller) public {
+        vm.assume(caller != address(0) && caller != owner);
+        vm.prank(caller);
         vm.expectRevert("Ownable: caller is not the owner");
         coinvestedPosition.setCurrency(IERC20(address(eure)));
     }
 
-    function testAccessControl_SetTokenPrice() public {
-        vm.prank(buyer);
+    function testFuzz_AccessControl_SetTokenPrice(address caller) public {
+        vm.assume(caller != address(0) && caller != owner);
+        vm.prank(caller);
         vm.expectRevert("Ownable: caller is not the owner");
         coinvestedPosition.setTokenPrice(200e6);
     }
 
-    function testAccessControl_SetReceiver() public {
-        vm.prank(buyer);
+    function testFuzz_AccessControl_SetReceiver(address caller) public {
+        vm.assume(caller != address(0) && caller != owner);
+        vm.prank(caller);
         vm.expectRevert("Ownable: caller is not the owner");
-        coinvestedPosition.setReceiver(buyer);
+        coinvestedPosition.setReceiver(caller);
     }
 
-    function testAccessControl_Pause() public {
+    function testFuzz_AccessControl_Pause(address caller) public {
+        vm.assume(caller != address(0) && caller != owner);
         vm.prank(owner);
         coinvestedPosition.setTokenPrice(200e6);
         vm.prank(owner);
         coinvestedPosition.unpause();
-        vm.prank(buyer);
+        vm.prank(caller);
         vm.expectRevert("Ownable: caller is not the owner");
         coinvestedPosition.pause();
     }
 
-    function testAccessControl_Unpause() public {
+    function testFuzz_AccessControl_Unpause(address caller) public {
+        vm.assume(caller != address(0) && caller != owner);
         vm.prank(owner);
         coinvestedPosition.setTokenPrice(200e6);
-        vm.prank(buyer);
+        vm.prank(caller);
         vm.expectRevert("Ownable: caller is not the owner");
         coinvestedPosition.unpause();
     }
@@ -1157,54 +1417,5 @@ contract CoinvestedPositionTest is Test {
         vm.prank(buyer);
         vm.expectRevert("ReentrancyGuard: reentrant call");
         coinvestedPositionMalicious.buy(1e18, 1000e6, tokenReceiver);
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // ── Section 13: ERC2771 / Meta-transactions ───────────────────────────────
-    // ─────────────────────────────────────────────────────────────────────────
-
-    function testERC2771BuyIdentifiesBuyer() public {
-        _setupBuy(10e18, 200e6);
-        eurc.mint(buyer, 400e6);
-        vm.prank(buyer);
-        eurc.approve(address(coinvestedPosition), 400e6);
-
-        // Encode the call as a trusted forwarder would: calldata + buyer address appended
-        bytes memory callData = abi.encodePacked(
-            abi.encodeWithSelector(CoinvestedPosition.buy.selector, uint256(1e18), uint256(400e6), tokenReceiver),
-            buyer
-        );
-        vm.prank(trustedForwarder);
-        (bool success, ) = address(coinvestedPosition).call(callData);
-        assertTrue(success, "ERC2771 buy should succeed");
-        // The event buyer should be the appended address (buyer), not trustedForwarder
-        assertEq(token.balanceOf(tokenReceiver), 1e18, "tokens transferred");
-    }
-
-    function testUntrustedForwarderCannotSpoofSender() public {
-        _setupBuy(10e18, 200e6);
-        // Mint to untrusted, not buyer
-        address untrusted = address(0xDEAD);
-        eurc.mint(untrusted, 400e6);
-        vm.prank(untrusted);
-        eurc.approve(address(coinvestedPosition), 400e6);
-
-        // Untrusted tries to append buyer as sender
-        bytes memory callData = abi.encodePacked(
-            abi.encodeWithSelector(CoinvestedPosition.buy.selector, uint256(1e18), uint256(400e6), tokenReceiver),
-            buyer // spoof buyer
-        );
-        // When called by untrusted forwarder, _msgSender() returns msg.sender (untrusted),
-        // not the appended address (buyer). So transferFrom charges untrusted, not buyer.
-        uint256 untrustedBefore = eurc.balanceOf(untrusted); // 400e6
-        vm.prank(untrusted);
-        (bool success, ) = address(coinvestedPosition).call(callData);
-        // buyer has 0 balance throughout — it is never the msg.sender
-        assertEq(eurc.balanceOf(buyer), 0, "buyer balance never changes");
-        if (success) {
-            // untrusted was charged (the buy succeeded but used untrusted as sender)
-            assertLt(eurc.balanceOf(untrusted), untrustedBefore, "untrusted was charged, not buyer");
-        }
-        // Either way, the buyer was not spoofed as the payer
     }
 }
