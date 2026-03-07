@@ -22,7 +22,7 @@ struct DistributionInitializerArguments {
     IERC20 currency;
     /// @notice Total amount of currency to distribute
     uint256 totalCurrencyAmount;
-    /// @notice Earliest timestamp at which the owner can reassign unclaimed funds; must be at least 30 days in the future
+    /// @notice Earliest timestamp at which the owner can reassign unclaimed funds
     uint64 reassignAfter;
 }
 
@@ -60,11 +60,7 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         DistributionInitializerArguments memory _arguments,
         address _currencyProvider
     ) external initializer {
-        require(
-            _arguments.reassignAfter >= block.timestamp + 30 days,
-            "reassignAfter must be at least 1 month in the future"
-        );
-        __Ownable2Step_init();
+__Ownable2Step_init();
         _transferOwnership(_arguments.owner);
         token = _arguments.token;
         snapshotId = _arguments.snapshotId;
