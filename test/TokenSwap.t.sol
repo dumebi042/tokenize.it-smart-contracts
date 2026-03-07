@@ -361,7 +361,7 @@ contract TokenSwapTest is Test {
         uint256 paymentTokenBalanceBefore = paymentToken.balanceOf(buyer);
         uint256 holderTokenBalanceBefore = token.balanceOf(holder);
 
-        uint256 expectedFee = token.feeSettings().crowdinvestingFee(costInPaymentToken, address(token));
+        uint256 expectedFee = token.feeSettings().privateOfferFee(costInPaymentToken, address(token));
 
         vm.prank(buyer);
         vm.expectEmit(true, true, true, true, address(tokenSwap));
@@ -378,7 +378,7 @@ contract TokenSwapTest is Test {
             "receiver payment token balance should equal costInPaymentToken minus expectedFee"
         );
         assertTrue(
-            paymentToken.balanceOf(token.feeSettings().crowdinvestingFeeCollector(address(token))) == expectedFee,
+            paymentToken.balanceOf(token.feeSettings().privateOfferFeeCollector(address(token))) == expectedFee,
             "fee collector payment token balance should equal expectedFee"
         );
         assertTrue(
@@ -416,7 +416,7 @@ contract TokenSwapTest is Test {
         // Step 1: Seller sells tokens to holder
         // Seller gives tokens, holder (as receiver) receives tokens, holder (as currency provider) pays currency
         uint256 sellPayoutInPaymentToken = (tokenSellAmount * tokenSwap.tokenPrice()) / (10 ** 18);
-        uint256 sellExpectedFee = token.feeSettings().crowdinvestingFee(sellPayoutInPaymentToken, address(token));
+        uint256 sellExpectedFee = token.feeSettings().privateOfferFee(sellPayoutInPaymentToken, address(token));
         uint256 sellExpectedPayout = sellPayoutInPaymentToken - sellExpectedFee;
 
         // Give holder enough payment tokens to pay the seller
@@ -472,7 +472,7 @@ contract TokenSwapTest is Test {
         vm.prank(holder);
         token.approve(address(tokenSwap), type(uint256).max);
 
-        uint256 buyExpectedFee = token.feeSettings().crowdinvestingFee(buyCostInPaymentToken, address(token));
+        uint256 buyExpectedFee = token.feeSettings().privateOfferFee(buyCostInPaymentToken, address(token));
 
         uint256 holderTokenBalanceBeforeBuy = token.balanceOf(holder);
         uint256 holderPaymentTokenBalanceBeforeBuy = paymentToken.balanceOf(holder);
@@ -506,7 +506,7 @@ contract TokenSwapTest is Test {
 
         uint256 paymentTokenBalanceBefore = paymentToken.balanceOf(buyer);
 
-        uint256 expectedFee = token.feeSettings().crowdinvestingFee(costInPaymentToken, address(token));
+        uint256 expectedFee = token.feeSettings().privateOfferFee(costInPaymentToken, address(token));
 
         if (maxCurrencyAmount >= costInPaymentToken) {
             vm.prank(buyer);
@@ -542,7 +542,7 @@ contract TokenSwapTest is Test {
         vm.assume(tokenSellAmount <= token.balanceOf(buyer));
         uint256 payoutInPaymentToken = (tokenSellAmount * tokenSwap.tokenPrice()) / (10 ** 18);
 
-        uint256 expectedFee = token.feeSettings().crowdinvestingFee(payoutInPaymentToken, address(token));
+        uint256 expectedFee = token.feeSettings().privateOfferFee(payoutInPaymentToken, address(token));
         uint256 expectedPayout = payoutInPaymentToken - expectedFee;
 
         vm.prank(buyer);
@@ -1015,14 +1015,14 @@ contract TokenSwapTest is Test {
         uint256 earningAfterFee = 98 * 10 ** paymentTokenDecimals; // 98 payment tokens
         uint32 feePercentage = 200; // 2%
 
-        // Update fee settings to 2% crowdinvesting fee
+        // Update fee settings to 2% private offer fee
         uint64 feeActivationTime = 13 weeks;
         FeeSettings _feeSettings = FeeSettings(address(token.feeSettings()));
-        Fees memory newFees = Fees(0, feePercentage, 0, feeActivationTime);
+        Fees memory newFees = Fees(0, 0, feePercentage, feeActivationTime);
         _feeSettings.planFeeChange(newFees);
         vm.warp(feeActivationTime + 1);
         _feeSettings.executeFeeChange();
-        assertTrue(_feeSettings.crowdinvestingFee(100 * 10 ** 10, address(token)) == 2 * 10 ** 10);
+        assertTrue(_feeSettings.privateOfferFee(100 * 10 ** 10, address(token)) == 2 * 10 ** 10);
 
         // Update token price
         vm.prank(owner);
@@ -1037,7 +1037,7 @@ contract TokenSwapTest is Test {
         paymentToken.approve(address(tokenSwap), totalCost);
 
         // Get fee collector address
-        address feeCollector = token.feeSettings().crowdinvestingFeeCollector(address(token));
+        address feeCollector = token.feeSettings().privateOfferFeeCollector(address(token));
 
         // Record balances before buy
         uint256 buyerBalanceBefore = paymentToken.balanceOf(buyer);
@@ -1084,14 +1084,14 @@ contract TokenSwapTest is Test {
         uint256 payoutAfterFee = 98 * 10 ** paymentTokenDecimals; // 98 payment tokens
         uint32 feePercentage = 200; // 2%
 
-        // Update fee settings to 2% crowdinvesting fee
+        // Update fee settings to 2% private offer fee
         uint64 feeActivationTime = 13 weeks;
         FeeSettings _feeSettings = FeeSettings(address(token.feeSettings()));
-        Fees memory newFees = Fees(0, feePercentage, 0, feeActivationTime);
+        Fees memory newFees = Fees(0, 0, feePercentage, feeActivationTime);
         _feeSettings.planFeeChange(newFees);
         vm.warp(feeActivationTime + 1);
         _feeSettings.executeFeeChange();
-        assertTrue(_feeSettings.crowdinvestingFee(100 * 10 ** 10, address(token)) == 2 * 10 ** 10);
+        assertTrue(_feeSettings.privateOfferFee(100 * 10 ** 10, address(token)) == 2 * 10 ** 10);
 
         // Update token price
         vm.prank(owner);
@@ -1120,7 +1120,7 @@ contract TokenSwapTest is Test {
         token.approve(address(tokenSwap), sellAmount);
 
         // Get fee collector address
-        address feeCollector = token.feeSettings().crowdinvestingFeeCollector(address(token));
+        address feeCollector = token.feeSettings().privateOfferFeeCollector(address(token));
 
         // Record balances before sell
         uint256 sellerBalanceBefore = paymentToken.balanceOf(buyer);

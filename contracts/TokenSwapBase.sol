@@ -111,8 +111,8 @@ abstract contract TokenSwapBase is
     function _getFeeAndFeeReceiver(uint256 _currencyAmount) internal view returns (uint256, address) {
         IFeeSettingsV2 feeSettings = token.feeSettings();
         return (
-            feeSettings.crowdinvestingFee(_currencyAmount, address(token)),
-            feeSettings.crowdinvestingFeeCollector(address(token))
+            feeSettings.privateOfferFee(_currencyAmount, address(token)),
+            feeSettings.privateOfferFeeCollector(address(token))
         );
     }
 

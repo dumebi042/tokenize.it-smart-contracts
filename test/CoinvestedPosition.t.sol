@@ -557,7 +557,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
 
     function testBuyNonZeroFeeDeductedBeforeCarry() public {
         // Deploy with non-zero fee
-        Fees memory fees = Fees(0, 100, 0, 0); // 1% crowdinvesting fee (bps = 100)
+        Fees memory fees = Fees(0, 0, 100, 0); // 1% private offer fee (bps = 100)
         IFeeSettingsV2 feeSettings100 = createFeeSettings(
             trustedForwarder,
             admin,
@@ -618,10 +618,10 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
     }
 
     function testBuyFeeEatsAllCarryLeadInvestorsGetNothing() public {
-        // basePrice=100e6, tokenPrice=110e6, 1 token → paid=110e6
-        // Without fee, carry would be 10e6.
-        // With 10% fee (max allowed): fee=11e6, remaining=99e6 < basePayout=100e6 → carry=0
-        Fees memory fees = Fees(0, 1000, 0, 0); // 10% crowdinvesting fee (max allowed)
+        // basePrice=100e6, tokenPrice=104e6, 1 token → paid=104e6
+        // Without fee, carry would be 4e6.
+        // With 5% fee (max allowed): fee=5.2e6, remaining=98.8e6 < basePayout=100e6 → carry=0
+        Fees memory fees = Fees(0, 0, 500, 0); // 5% private offer fee (max allowed)
         IFeeSettingsV2 feeSettings10 = createFeeSettings(
             trustedForwarder,
             admin,
@@ -662,17 +662,17 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         vm.prank(admin);
         tokenHighFee.mint(address(coinvestedPositionHighFee), 1e18);
         vm.prank(owner);
-        coinvestedPositionHighFee.setTokenPrice(110e6);
+        coinvestedPositionHighFee.setTokenPrice(104e6);
         vm.prank(owner);
         coinvestedPositionHighFee.unpause();
 
-        uint256 currencyAmount = 110e6; // 1 token at 110e6
+        uint256 currencyAmount = 104e6; // 1 token at 104e6
         eurc.mint(buyer, currencyAmount);
         vm.prank(buyer);
         eurc.approve(address(coinvestedPositionHighFee), currencyAmount);
 
-        // fee = 10% of 110e6 = 11e6; remaining = 99e6 < basePayout (100e6) → carry = 0
-        uint256 expectedFee = (currencyAmount * 1000) / 10000;
+        // fee = 5% of 104e6 = 5.2e6; remaining = 98.8e6 < basePayout (100e6) → carry = 0
+        uint256 expectedFee = (currencyAmount * 500) / 10000;
         uint256 remaining = currencyAmount - expectedFee;
         assertLt(remaining, 100e6, "precondition: remaining must be below basePayout");
 
