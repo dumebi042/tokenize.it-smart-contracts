@@ -59,10 +59,11 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         DistributionInitializerArguments memory _arguments,
         address _currencyProvider
     ) external initializer {
-__Ownable2Step_init();
+        __Ownable2Step_init();
         _transferOwnership(_arguments.owner);
         token = _arguments.token;
         snapshotId = _arguments.snapshotId;
+        // background: totalSupply 0 would make every claim revert, thus locking up funds forever
         require(token.totalSupplyAt(snapshotId) > 0, "snapshot has no tokens");
         currency = _arguments.currency;
         require(
