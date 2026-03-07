@@ -37,7 +37,6 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
 
     Token public token;
     uint256 public snapshotId;
-    uint256 public totalTokenAmount;
     IERC20 public currency;
     uint256 public totalCurrencyAmount;
     mapping(address => uint256) public paidOut;
@@ -64,8 +63,7 @@ __Ownable2Step_init();
         _transferOwnership(_arguments.owner);
         token = _arguments.token;
         snapshotId = _arguments.snapshotId;
-        totalTokenAmount = token.totalSupplyAt(snapshotId);
-        require(totalTokenAmount > 0, "snapshot has no tokens");
+        require(token.totalSupplyAt(snapshotId) > 0, "snapshot has no tokens");
         currency = _arguments.currency;
         require(
             token.allowList().map(address(_arguments.currency)) & TRUSTED_CURRENCY == TRUSTED_CURRENCY,
@@ -88,7 +86,7 @@ __Ownable2Step_init();
     function eligible(address _holder) public view returns (uint256) {
         return
             (totalCurrencyAmount * token.balanceOfAt(_holder, snapshotId)) /
-            totalTokenAmount +
+            token.totalSupplyAt(snapshotId) +
             extraCredit[_holder] -
             paidOut[_holder];
     }
