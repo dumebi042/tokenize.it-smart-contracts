@@ -97,7 +97,6 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
 
     function _claim(address _holder, uint256 _tokenAmount, address _recipient) internal {
         require(block.timestamp >= claimStart, "exit not yet started");
-        require(block.timestamp <= claimEnd, "exit window closed");
         IERC20(address(token)).safeTransferFrom(_holder, address(this), _tokenAmount);
         uint256 currencyAmount = (_tokenAmount * pricePerToken) / 10 ** token.decimals();
         IFeeSettingsV2 feeSettings = token.feeSettings();
