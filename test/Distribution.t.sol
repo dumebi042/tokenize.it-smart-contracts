@@ -727,7 +727,11 @@ contract DistributionTest is Test {
     function testFeeDeductedFromTotalCurrencyAmount() public {
         assertEq(currency.balanceOf(feeCollector), 0, "feeCollector should have no currency before deployment");
         (Distribution localDistribution, uint256 fee) = _deployDistWithNonZeroFee();
-        assertEq(currency.balanceOf(feeCollector), 2e6, "feeCollector should have exactly 2e6 (1% of 200e6) after deployment");
+        assertEq(
+            currency.balanceOf(feeCollector),
+            2e6,
+            "feeCollector should have exactly 2e6 (1% of 200e6) after deployment"
+        );
         assertGt(fee, 0, "fee should be positive");
         assertEq(
             localDistribution.totalCurrencyAmount(),
@@ -790,7 +794,11 @@ contract DistributionTest is Test {
         assertEq(d.eligible(holderA), eligibleA - amount, "holderA eligible wrong after reassign");
         assertEq(d.eligible(holderB), eligibleB + amount, "holderB eligible wrong after reassign");
         assertEq(d.eligible(holderC), eligibleC, "holderC eligible unchanged after reassign");
-        assertEq(d.eligible(holderA) + d.eligible(holderB) + d.eligible(holderC), sumBefore, "sum of eligible changed after reassign");
+        assertEq(
+            d.eligible(holderA) + d.eligible(holderB) + d.eligible(holderC),
+            sumBefore,
+            "sum of eligible changed after reassign"
+        );
 
         vm.prank(holderA);
         d.claim(holderA);
