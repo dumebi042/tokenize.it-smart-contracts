@@ -142,6 +142,21 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         localLogic.initialize(args);
     }
 
+    function testLogicContractStateIsZero() public view {
+        assertEq(address(logic.token()), address(0), "token");
+        assertEq(address(logic.currency()), address(0), "currency");
+        assertEq(address(logic.receiver()), address(0), "receiver");
+        assertEq(logic.tokenPrice(), 0, "tokenPrice");
+        assertEq(logic.basePrice(), 0, "basePrice");
+        assertEq(logic.basePriceDecimals(), 0, "basePriceDecimals");
+        assertEq(logic.getLeadInvestorsCount(), 0, "leadInvestors length");
+        assertEq(logic.owner(), address(0), "owner");
+        // NOTE: logic contract starts unpaused (paused=false is the storage default).
+        // Unlike initialized clones, _pause() is never called here, so buy() is NOT
+        // blocked by whenNotPaused — only by token=address(0) causing a revert.
+        assertFalse(logic.paused(), "paused");
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // ── Section 2: initialize() — Validation ─────────────────────────────────
     // ─────────────────────────────────────────────────────────────────────────
