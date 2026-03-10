@@ -66,6 +66,7 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         // background: totalSupply 0 would make every claim revert, thus locking up funds forever
         require(token.totalSupplyAt(snapshotId) > 0, "snapshot has no tokens");
         currency = _arguments.currency;
+        require(address(_arguments.currency) != address(_arguments.token), "currency and token must be different");
         require(
             token.allowList().map(address(_arguments.currency)) & TRUSTED_CURRENCY == TRUSTED_CURRENCY,
             "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
