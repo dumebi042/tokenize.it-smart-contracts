@@ -131,7 +131,7 @@ contract ExitTest is Test {
     function testLogicContractClaimReverts() public {
         // claimStart is 0, so timestamp >= claimStart passes; claim then tries
         // safeTransferFrom on token=address(0) which reverts (no code at address)
-        vm.expectRevert();
+        vm.expectRevert("Address: call to non-contract");
         exitLogic.claim(1e18, recipient);
     }
 
@@ -265,7 +265,7 @@ contract ExitTest is Test {
         factory.createExitClone(bytes32("lowApproval"), trustedForwarder, currencyProvider, args);
     }
 
-    function testInitializeStateVariables() public {
+    function testInitializeStateVariables() public view {
         assertEq(address(exitContract.token()), address(token), "token address mismatch");
         assertEq(address(exitContract.currency()), address(currency), "currency address mismatch");
         assertEq(exitContract.pricePerToken(), PRICE_PER_TOKEN, "pricePerToken mismatch");
