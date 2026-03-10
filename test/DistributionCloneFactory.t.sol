@@ -80,7 +80,7 @@ contract DistributionCloneFactoryTest is Test {
 
     // ========== F1-D. Address Prediction ==========
 
-    function testBothPredictOverloadsMatch() public {
+    function testBothPredictOverloadsMatch() public view {
         DistributionInitializerArguments memory args = _baseArgs();
         bytes32 precomputed = keccak256(abi.encode(EXAMPLE_SALT, trustedForwarder, args));
 
@@ -109,21 +109,21 @@ contract DistributionCloneFactoryTest is Test {
 
     // ========== F2-D. Each Salt Parameter Changes the Address ==========
 
-    function testRawSaltChangesAddress() public {
+    function testRawSaltChangesAddress() public view {
         DistributionInitializerArguments memory args = _baseArgs();
         address a1 = factory.predictCloneAddress(bytes32(uint256(1)), trustedForwarder, args);
         address a2 = factory.predictCloneAddress(bytes32(uint256(2)), trustedForwarder, args);
         assertFalse(a1 == a2);
     }
 
-    function testTrustedForwarderChangesAddress() public {
+    function testTrustedForwarderChangesAddress() public view {
         DistributionInitializerArguments memory args = _baseArgs();
         address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
         address a2 = factory.predictCloneAddress(EXAMPLE_SALT, address(0x9999), args);
         assertFalse(a1 == a2);
     }
 
-    function testOwnerChangesAddress() public {
+    function testOwnerChangesAddress() public view {
         DistributionInitializerArguments memory args = _baseArgs();
         address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
         args.owner = address(0x9999);
@@ -131,7 +131,7 @@ contract DistributionCloneFactoryTest is Test {
         assertFalse(a1 == a2);
     }
 
-    function testTokenChangesAddress() public {
+    function testTokenChangesAddress() public view {
         DistributionInitializerArguments memory args = _baseArgs();
         address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
         args.token = Token(address(0x9999)); // different address for prediction only
@@ -139,7 +139,7 @@ contract DistributionCloneFactoryTest is Test {
         assertFalse(a1 == a2);
     }
 
-    function testSnapshotIdChangesAddress() public {
+    function testSnapshotIdChangesAddress() public view {
         DistributionInitializerArguments memory args = _baseArgs();
         address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
         args.snapshotId = snapshotId + 1;
@@ -147,7 +147,7 @@ contract DistributionCloneFactoryTest is Test {
         assertFalse(a1 == a2);
     }
 
-    function testCurrencyChangesAddress() public {
+    function testCurrencyChangesAddress() public view {
         DistributionInitializerArguments memory args = _baseArgs();
         address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
         args.currency = IERC20(address(0x9999));
@@ -155,7 +155,7 @@ contract DistributionCloneFactoryTest is Test {
         assertFalse(a1 == a2);
     }
 
-    function testTotalCurrencyAmountChangesAddress() public {
+    function testTotalCurrencyAmountChangesAddress() public view {
         DistributionInitializerArguments memory args = _baseArgs();
         address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
         args.totalCurrencyAmount = EXAMPLE_TOTAL_CURRENCY + 1;
@@ -163,7 +163,7 @@ contract DistributionCloneFactoryTest is Test {
         assertFalse(a1 == a2);
     }
 
-    function testReassignAfterChangesAddress() public {
+    function testReassignAfterChangesAddress() public view {
         DistributionInitializerArguments memory args = _baseArgs();
         address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
         args.reassignAfter = reassignAfter + 1;
@@ -174,6 +174,7 @@ contract DistributionCloneFactoryTest is Test {
     // ========== F3-D. _currencyProvider Is Not in the Salt ==========
 
     function testCurrencyProviderDoesNotAffectAddress(address _currencyProvider) public {
+        vm.assume(_currencyProvider != address(0));
         DistributionInitializerArguments memory args = _baseArgs();
         bytes32 salt = bytes32("salt");
         address cloneAddr = factory.predictCloneAddress(salt, trustedForwarder, args);

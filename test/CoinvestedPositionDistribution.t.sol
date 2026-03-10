@@ -927,8 +927,10 @@ contract CoinvestedPositionDistributionTest is Test {
         vm.assume(numLeads >= 1 && numLeads <= 3);
 
         vm.assume(carryA >= 1 && carryA <= type(uint64).max / 10);
-        if (numLeads >= 2) vm.assume(carryB >= 1 && carryB <= type(uint64).max / 10); else carryB = 0;
-        if (numLeads >= 3) vm.assume(carryC >= 1 && carryC <= type(uint64).max / 10); else carryC = 0;
+        if (numLeads >= 2) vm.assume(carryB >= 1 && carryB <= type(uint64).max / 10);
+        else carryB = 0;
+        if (numLeads >= 3) vm.assume(carryC >= 1 && carryC <= type(uint64).max / 10);
+        else carryC = 0;
         vm.assume(uint256(carryA) + uint256(carryB) + uint256(carryC) < type(uint64).max);
 
         vm.assume(totalCurrencyAmount >= 1);
@@ -950,7 +952,12 @@ contract CoinvestedPositionDistributionTest is Test {
                 uint256 otherTokens = uint256(otherTokenAmount) * 1e18;
 
                 bytes32 salt = bytes32(uint256(leadInvestors[0].carryFraction) ^ coinvestedPositionTokens);
-                CoinvestedPosition tempCoinvestedPosition = _deployCoinvestedPosition(salt, BASE_PRICE_EURC, eurc, leadInvestors);
+                CoinvestedPosition tempCoinvestedPosition = _deployCoinvestedPosition(
+                    salt,
+                    BASE_PRICE_EURC,
+                    eurc,
+                    leadInvestors
+                );
 
                 fuzzToken = Token(
                     tokenFactory.createTokenProxy(
@@ -970,14 +977,15 @@ contract CoinvestedPositionDistributionTest is Test {
                 if (otherTokens > 0) fuzzToken.mint(holderX, otherTokens);
                 vm.stopPrank();
 
-                CoinvestedPositionInitializerArguments memory coinvestedPositionArgs = CoinvestedPositionInitializerArguments({
-                    owner: owner,
-                    receiver: receiver,
-                    leadInvestors: leadInvestors,
-                    basePrice: BASE_PRICE_EURC,
-                    baseCurrency: IERC20(address(eurc)),
-                    token: fuzzToken
-                });
+                CoinvestedPositionInitializerArguments
+                    memory coinvestedPositionArgs = CoinvestedPositionInitializerArguments({
+                        owner: owner,
+                        receiver: receiver,
+                        leadInvestors: leadInvestors,
+                        basePrice: BASE_PRICE_EURC,
+                        baseCurrency: IERC20(address(eurc)),
+                        token: fuzzToken
+                    });
                 coinvestedPositionFuzz = CoinvestedPosition(
                     coinvestedPositionFactory.createCoinvestedPositionClone(
                         bytes32(uint256(uint160(address(tempCoinvestedPosition))) + 1),
@@ -1022,7 +1030,11 @@ contract CoinvestedPositionDistributionTest is Test {
         }
         // leadInvestors, fuzzToken, snapFuzz released; stack: 6 params + coinvestedPositionFuzz + distributionFuzz + coinvestedPositionEligible
 
-        assertEq(distributionFuzz.eligible(address(coinvestedPositionFuzz)), coinvestedPositionEligible, "DI-XI: wrong eligible");
+        assertEq(
+            distributionFuzz.eligible(address(coinvestedPositionFuzz)),
+            coinvestedPositionEligible,
+            "DI-XI: wrong eligible"
+        );
 
         if (coinvestedPositionEligible == 0) {
             vm.expectRevert("didn't receive expected currency from distribution");
@@ -1050,12 +1062,14 @@ contract CoinvestedPositionDistributionTest is Test {
         }
         {
             uint256 bGot = usdc.balanceOf(leadB) - snaps[1];
-            if (numLeads >= 2) assertEq(bGot, _leadShare(carryB, coinvestedPositionEligible), "DI-XI: wrong leadB payout");
+            if (numLeads >= 2)
+                assertEq(bGot, _leadShare(carryB, coinvestedPositionEligible), "DI-XI: wrong leadB payout");
             totalGot += bGot;
         }
         {
             uint256 cGot = usdc.balanceOf(leadC) - snaps[2];
-            if (numLeads >= 3) assertEq(cGot, _leadShare(carryC, coinvestedPositionEligible), "DI-XI: wrong leadC payout");
+            if (numLeads >= 3)
+                assertEq(cGot, _leadShare(carryC, coinvestedPositionEligible), "DI-XI: wrong leadC payout");
             totalGot += cGot;
         }
         totalGot += usdc.balanceOf(receiver) - snaps[3];
