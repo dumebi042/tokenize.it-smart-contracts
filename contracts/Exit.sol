@@ -23,7 +23,7 @@ struct ExitInitializerArguments {
     /// @notice Timestamp from which claims are valid
     uint64 claimStart;
     /// @notice Timestamp after which claims expire
-    uint64 claimEnd;
+    uint64 drainStart;
     /// @notice Total amount of currency to fund the exit contract with
     uint256 totalCurrencyAmount;
 }
@@ -44,7 +44,7 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     /// @notice Currency amount (in smallest currency units) per 10**token.decimals() token units
     uint256 public pricePerToken;
     uint64 public claimStart;
-    uint64 public claimEnd;
+    uint64 public drainStart;
 
     /**
      * This constructor creates a logic contract that is used to clone new exit contracts.
@@ -58,7 +58,7 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     function initialize(ExitInitializerArguments memory _arguments, address _currencyProvider) external initializer {
         require(_arguments.pricePerToken > 0, "price must be positive");
         require(_arguments.claimStart > 0, "claimStart must be set");
-        require(_arguments.claimEnd > _arguments.claimStart, "claimEnd must be after claimStart");
+        require(_arguments.drainStart > _arguments.claimStart, "drainStart must be after claimStart");
         require(address(_arguments.currency) != address(_arguments.token), "currency and token must be different");
         __Ownable2Step_init();
         _transferOwnership(_arguments.owner);
@@ -71,7 +71,7 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         currency = _arguments.currency;
         pricePerToken = _arguments.pricePerToken;
         claimStart = _arguments.claimStart;
-        claimEnd = _arguments.claimEnd;
+        drainStart = _arguments.drainStart;
         _arguments.currency.safeTransferFrom(_currencyProvider, address(this), _arguments.totalCurrencyAmount);
     }
 
@@ -91,7 +91,7 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     }
 
     function drain(address _recipient) external onlyOwner {
-        require(block.timestamp > claimEnd, "exit window not yet closed");
+        require(block.timestamp > drainStart, "exit window not yet closed");
         currency.safeTransfer(_recipient, currency.balanceOf(address(this)));
     }
 
