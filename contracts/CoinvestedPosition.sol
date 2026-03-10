@@ -170,6 +170,7 @@ contract CoinvestedPosition is TokenSwapBase {
      * @param _currency the EURO token to settle
      */
     function _settle(uint256 carry, IERC20 _currency) internal {
+        require(address(_currency) != address(token), "currency cannot be the held token");
         for (uint256 i = 0; i < leadInvestors.length; i++) {
             uint256 share = (uint256(leadInvestors[i].carryFraction) * carry) / type(uint64).max;
             if (share != 0) {

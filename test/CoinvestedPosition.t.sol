@@ -1397,6 +1397,35 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
     // ── Section 12: Reentrancy ────────────────────────────────────────────────
     // ─────────────────────────────────────────────────────────────────────────
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // ── Section 13: _settle rejects currency == held token ───────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+
+    function testBuyRevertsWhenCurrencyIsHeldToken() public {
+        // Give token TRUSTED_CURRENCY | EURO_CURRENCY so setCurrency accepts it
+        vm.prank(admin);
+        allowList.set(address(token), TRUSTED_CURRENCY | EURO_CURRENCY);
+
+        // Switch the sell currency to the equity token itself
+        vm.prank(owner);
+        coinvestedPosition.setCurrency(IERC20(address(token)));
+
+        // Mint tokens to cp and prepare for a buy
+        uint256 tokenPrice = 2e18; // 2 token per token (arbitrary, just needs currencyAmount > 0)
+        _setupBuy(10e18, tokenPrice);
+
+        // Mint equity token to buyer (requirements == 0 so no allowList entry needed)
+        uint256 cost = Math.ceilDiv(1e18 * tokenPrice, 10 ** token.decimals());
+        vm.prank(admin);
+        token.mint(buyer, cost);
+        vm.prank(buyer);
+        IERC20(address(token)).approve(address(coinvestedPosition), cost);
+
+        vm.expectRevert("currency cannot be the held token");
+        vm.prank(buyer);
+        coinvestedPosition.buy(1e18, cost, tokenReceiver);
+    }
+
     function testReentrancyBuyReverts() public {
         // Deploy malicious currency
         MaliciousCoinvestedToken malicious = new MaliciousCoinvestedToken();
