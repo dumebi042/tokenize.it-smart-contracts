@@ -656,6 +656,9 @@ contract DistributionTest is Test {
 
     function testFuzzReassignSumInvariant(address reassignTo) public {
         vm.assume(reassignTo != address(0));
+        vm.assume(reassignTo != holderA);
+        vm.assume(reassignTo != holderB);
+        vm.assume(reassignTo != holderC);
         uint256 sumBefore = dist.eligible(holderA) +
             dist.eligible(holderB) +
             dist.eligible(holderC) +
