@@ -192,7 +192,7 @@ The owner can pause the contract using `pause()` to disable swaps, and unpause i
 
 **Fees:**
 
-TokenSwap charges crowdinvesting fees according to the FeeSettings contract, similar to primary market offerings. Fees are only deducted from the currency transferred, not the token.
+TokenSwap charges private offer fees according to the FeeSettings contract. Fees are only deducted from the currency transferred, not the token.
 
 **Expiration:**
 

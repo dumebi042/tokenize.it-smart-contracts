@@ -102,7 +102,7 @@ fee = amount * feeNumerator / feeDenominator
 
 In both cases the fee is sent to `privateOfferFeeCollector` as determined by the token's FeeSettings contract.
 
-[TokenSwap](../contracts/TokenSwap.sol) uses `crowdinvestingFee` per trade, consistent with its role as a secondary-market contract.
+[TokenSwap](../contracts/TokenSwap.sol) uses `privateOfferFee` per trade.
 
 ## Discounts
 
