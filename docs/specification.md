@@ -148,6 +148,51 @@ The following statements about the smart contracts should always be true
 - A beneficiary can never mint or withdraw more tokens than the allocation of the vesting plan.
 - Third parties can not mint or withdraw tokens from a vesting plan.
 
+## Distribution.sol
+
+- Each holder in the token snapshot underlying the distribution is entitled to claim a fraction a of the currency amount underlying the distribution, minus a fee. The fraction a is the ratio of the holder's balance at the snapshot to the total supply at the snapshot.
+- The platform fee is deducted once at initialization.
+- The currency must have the `TRUSTED_CURRENCY` attribute on the token's AllowList at initialization.
+- The snapshot must have a non-zero total token supply; initialization reverts otherwise to prevent funds being locked forever.
+- Only the owner can reassign eligible funds to another address
+- Reassigning eligible funds can only be done after the `reassignAfter` timestamp.
+- Reassigning funds does not affect the total amount of eligible funds, the amount of currency that one token in the snapshot is entitled to claim (e.g. price).
+- After `reassign(from, to, amount)`, `eligible(from)` decreases by `amount` and `eligible(to)` increases by `amount`.
+- Every reassignment is emitted as a `Reassigned` event for auditability.
+- All functions can be called directly or as meta transaction using ERC-2771.
+
+## Exit.sol
+
+- Tokens are transferred from the holder to the Exit contract during a claim.
+- Claims are only possible after `claimStart`.
+- Payout per claim equals depends on token amount, price per token and fee.
+- Fee is calculated per claim using `privateOfferFee` and sent to `privateOfferFeeCollector`.
+- Currency must have both `TRUSTED_CURRENCY` and `EURO_CURRENCY` attributes on the token's AllowList.
+- `pricePerToken` can never be 0.
+- `drainStart` is always after `claimStart`.
+- The unclaimed currency can be drained by owner only after `drainStart`.
+- All functions can be called directly or as meta transaction using ERC-2771.
+
+## CoinvestedPosition.sol
+
+- The sum of all lead investors' carry fractions can never be more than 1.
+- There must be at least one lead investor.
+- No lead investor address can be the zero address.
+- No lead investor carry fraction can be zero.
+- The contract does not immediately start selling tokens.
+- The owner can unpause the contract when ready to sell.
+- The owner can change the currency used for selling tokens.
+- Only currency with both `TRUSTED_CURRENCY` and `EURO_CURRENCY` attributes can be used for selling tokens or claiming exits.
+- On `buy`: after fee deduction, lead investors get their share of the carry proportional to their `carryFraction`. The co-investor (receiver) receives all remaining proceeds.
+- If net proceeds are less than the scaled base price payout, the co-investor receives all net proceeds and lead investors receive nothing.
+- During settlement of buy or claim, the contract's full remaining currency balance is swept to the receiver after lead investor shares, ensuring no dust is left in the contract.
+- `basePrice` is denominated in the smallest units of `baseCurrency` at initialization time and stored with `basePriceDecimals` for cross-currency scaling.
+- `setCurrency()` can only set a currency with both `TRUSTED_CURRENCY` and `EURO_CURRENCY` attributes.
+- All proceeds from dividends are treated as carry.
+- Proceeds from exits are mathematically split into carry and base price portion. Only a fraction of the carry is distributed to the lead investors, everything else goes to the co-investor (receiver).
+- An exit claim reverts if it receives less than the required minimum currency amount.
+- All functions can be called directly or as meta transaction using ERC-2771.
+
 ## TokenSwap.sol
 
 - One TokenSwap contract represents one limit order to buy or sell tokens at a fixed price.

@@ -15,7 +15,10 @@ Let's assume that there will be one (1) platform, many (**X**) companies and man
 | Vesting | X | company | allows company to vest tokens over a period of time |
 | Crowdinvesting | X | company | most companies will want crowdinvesting funds from all eligible investors |
 | PrivateOffer | >X | --- | most companies will extend special investment offers to specific investors, or receive these from investors |
+| Distribution | >X | company | distributes dividend or liquidation proceeds to token holders proportional to a snapshot of token balances |
+| Exit | >X | company | automated exit redemption: holders return tokens and receive a fixed currency payout within a defined time window |
 | TokenSwap | >X | investor | enables secondary market trading where investors can buy or sell existing tokens from each other at a preset price |
+| CoinvestedPosition | >X | investor | holds tokens for a co-investor and splits sale proceeds and corporate actions (dividends, exit) between co-investor and lead investors |
 
 # Example work flow: creating company and raising funds
 
@@ -61,12 +64,12 @@ Once these steps have been completed, the platform executes the deal by deployin
 
 ### Secondary market trading
 
-After tokens have been issued through primary market offerings (Crowdinvesting or PrivateOffer), investors may want to trade these tokens between each other. The TokenSwap contract enables this secondary market functionality.
+Token holders may want to sell their tokens to third parties. The TokenSwap contract enables this secondary market functionality.
 
 **Key differences from primary market contracts:**
 
 - **Primary market** (Crowdinvesting, PrivateOffer): Mints new tokens or transfers existing tokens directly from the company to investors
-- **Secondary market** (TokenSwap): Transfers existing tokens between investors
+- **Secondary market** (TokenSwap): Transfers existing tokens from a holder to a buyer
 
 **Use cases:**
 
@@ -77,6 +80,50 @@ After tokens have been issued through primary market offerings (Crowdinvesting o
 The contract can be used repeatedly - it acts as a standing buy or sell order that can be filled multiple times until the holder revokes their allowance or the contract is paused by its owner.
 
 Unlike PrivateOffer and Crowdinvesting contracts, TokenSwap does not mint new tokens. Instead, it facilitates peer-to-peer transfers of already-issued tokens, creating liquidity in the secondary market.
+
+### Co-investments / Syndicates
+
+The CoinvestedPosition contract handles the case where a group of investors co-invest in a company alongside one or more lead investors. It holds tokens on behalf of the co-investor and manages the distribution of proceeds according to a carry agreement.
+
+**Parties involved:**
+
+- **Co-investor (receiver)**: The co-investor whose capital bought the tokens. Receives at least `basePrice` (a EURO reference price) per token across any proceeds.
+- **Lead investors**: Each has a `carryFraction` (a share of `uint64.max`). Lead investors receive their carry — the proceeds above the co-investor's `basePrice` — split according to their fractions.
+
+**Three payout paths:**
+
+1. **Token sale (`buy()`)**: A buyer purchases tokens from the contract at `tokenPrice`. After fees, the co-investor receives the base price portion and lead investors split any surplus (carry). Starts paused; owner unpauses when ready to sell.
+2. **Dividends (`distributeDividends()`)**: The contract owner claims a dividend Distribution on behalf of the contract, then settles the received currency among lead investors (all dividend proceeds treated as carry) with remainder to the co-investor receiver.
+3. **Exit (`distributeExit()`)**: The contract owner participates in an Exit contract by redeeming the full token balance, then splits proceeds: lead investors receive carry above the base price, co-investor receives everything else.
+
+**Currency flexibility**: `basePrice` is fixed in EURO bits at initialization. The actual trade currency can be any trusted EURO ERC-20 token and can be changed by the owner; the contract scales `basePrice` automatically to match the current currency's decimals.
+
+## Distributions
+
+### Dividends or similar payouts
+
+After a company earns revenue or undergoes a liquidation event, it can distribute proceeds to token holders using the Distribution contract.
+
+**Workflow:**
+
+1. The token admin takes a snapshot of current token balances by calling `snapshot()` on the Token contract. The snapshot captures every holder's balance at that moment.
+2. The company (or platform on its behalf) clones a Distribution contract, funding it with the total payout amount in currency. A platform fee (using `privateOfferFee`) is deducted from the funded amount at initialization.
+3. Token holders call `claim()` to receive their proportional share: `totalCurrencyAmount * balanceAtSnapshot / totalSupplyAtSnapshot`.
+4. If a holder cannot claim (e.g. lost key, or a smart contract), the contract owner can call `reassign()` after the configured `reassignAfter` timestamp to redirect that share to another address. All reassignments are recorded on-chain for auditability.
+5. Claims are also possible for smart contract holders that implement ERC-1271 (via the overloaded `claim(IERC1271, ...)` function).
+
+### Exit proceeds
+
+When a company exits (e.g. acquisition or winding down), it can set up an automated redemption using the Exit contract.
+
+**Workflow:**
+
+1. The company deploys an Exit contract, specifying: the token, the exit currency (must be a trusted EURO currency), a fixed `pricePerToken`, and a claim window (`claimStart` to `drainStart`).
+2. The Exit contract is funded with the total payout amount at initialization.
+3. From `claimStart` onwards, any token holder can call `claim()` to exchange their tokens for currency. The tokens are transferred to the Exit contract (held there, not burned) and the holder receives `tokenAmount * pricePerToken / 10**decimals` currency minus a platform fee.
+4. After `drainStart`, the company can call `drain()` to recover any unclaimed funds.
+
+Unlike Distribution, Exit does not use snapshots. The holder's token balance at claim time determines the payout.
 
 # Services
 
