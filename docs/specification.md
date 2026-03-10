@@ -187,7 +187,8 @@ The following statements about the smart contracts should always be true
 - If net proceeds are less than the scaled base price payout, the co-investor receives all net proceeds and lead investors receive nothing.
 - During settlement of buy or claim, the contract's full remaining currency balance is swept to the receiver after lead investor shares, ensuring no dust is left in the contract.
 - `basePrice` is denominated in the smallest units of `baseCurrency` at initialization time and stored with `basePriceDecimals` for cross-currency scaling.
-- `setCurrency()` can only set a currency with both `TRUSTED_CURRENCY` and `EURO_CURRENCY` attributes.
+- `setCurrency()` can only set a currency with both `TRUSTED_CURRENCY` and `EURO_CURRENCY` attributes. This must only be true for currencies where 1e(decimals) of base currency equals 1 euro.
+- When calculating carry, base price is scaled to the now-used currency's decimals. This leads to correct carry calculations for all trusted EURO currencies.
 - All proceeds from dividends are treated as carry.
 - Proceeds from exits are mathematically split into carry and base price portion. Only a fraction of the carry is distributed to the lead investors, everything else goes to the co-investor (receiver).
 - An exit claim reverts if it receives less than the required minimum currency amount.

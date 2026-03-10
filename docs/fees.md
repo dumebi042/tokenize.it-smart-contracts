@@ -93,6 +93,17 @@ fee = amount * feeNumerator / feeDenominator
 - Crowdinvesting: When Y currency is paid, the fee is Y\*crowdinvestingFeeNumerator/crowdinvestingFeeDenominator. This fee is DEDUCTED from the Y currency paid and transferred to the feeCollector.
 - PrivateOffer: When Y currency is paid, the fee is Y\*privateOfferFeeNumerator/privateOfferFeeDenominator. This fee is DEDUCTED from the Y currency paid and transferred to the feeCollector.
 
+### Distribution contracts
+
+[Distribution](../contracts/Distribution.sol) and [Exit](../contracts/Exit.sol) both use `privateOfferFee` for fee calculation, but differ in *when* the fee is collected:
+
+- **Distribution**: Fee is deducted **once at initialization** from `totalCurrencyAmount`. Only the net amount is stored and made claimable. Individual `claim()` calls are fee-free. This prevents partial extraction of funds before the full fee is paid.
+- **Exit**: Fee is deducted **per claim** at `claim()` time. The fee is proportional to each claim's currency amount, so late claimers pay the same rate as early ones.
+
+In both cases the fee is sent to `privateOfferFeeCollector` as determined by the token's FeeSettings contract.
+
+[TokenSwap](../contracts/TokenSwap.sol) uses `crowdinvestingFee` per trade, consistent with its role as a secondary-market contract.
+
 ## Discounts
 
 Fee discounts can be realized in two ways, which will be explained in the next paragraphs.
