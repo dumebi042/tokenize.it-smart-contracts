@@ -9,6 +9,7 @@ Token holders can receive dividend payouts proportional to their token balance a
 1. **Snapshot**: The token admin calls `snapshot()` on the Token contract. This freezes every holder's balance under a `snapshotId`. The timing is critical: it must happen before any tokens change hands in anticipation of the dividend.
 
 2. **Deploy Distribution**: The company (or platform) clones a Distribution contract via `DistributionCloneFactory`, providing:
+
    - `token` and `snapshotId`
    - `currency`: the ERC-20 token used for payouts (must have `TRUSTED_CURRENCY` on the AllowList)
    - `totalCurrencyAmount`: gross amount to distribute
@@ -33,6 +34,7 @@ When a company is acquired or wound down, it can set up an automated exit contra
 ### Workflow
 
 1. **Deploy Exit**: The company clones an Exit contract via `ExitCloneFactory`, providing:
+
    - `token`: the token to be redeemed
    - `currency`: the payout currency (must have both `TRUSTED_CURRENCY` and `EURO_CURRENCY` on the AllowList — typically USDC, EURe, EUROC)
    - `pricePerToken`: currency payout in smallest currency units per full token unit (same unit convention as `tokenPrice` in TokenSwap)
@@ -42,6 +44,7 @@ When a company is acquired or wound down, it can set up an automated exit contra
    The full `totalCurrencyAmount` is transferred from the funder to the Exit contract at initialization (no fee is taken here).
 
 2. **Holders claim**: From `claimStart` onwards, any holder calls `claim(tokenAmount, recipient)`. The contract:
+
    - Transfers `tokenAmount` tokens from the caller to itself (tokens are held, not burned)
    - Calculates gross payout: `tokenAmount * pricePerToken / 10**token.decimals()`
    - Deducts `privateOfferFee` and sends it to the fee collector
@@ -51,6 +54,10 @@ When a company is acquired or wound down, it can set up an automated exit contra
 
 3. **Drain**: After `drainStart`, the company can call `drain(recipient)` to recover any unclaimed currency.
 
+### Security considerations
+
+There is no on-chain enforcement that `totalCurrencyAmount` equals `totalTokenSupply × pricePerToken`. The exit can therefore be partially funded by design (e.g. if not all holders are expected to claim), but it also means a rogue admin could mint additional tokens after the exit is deployed, and use those to drain the exit contract. The price per token remains fixed — but the currency balance may run out, causing the last claims to revert.
+
 ### CoinvestedPosition integration
 
 A `CoinvestedPosition` can participate in an exit via `distributeExit(exit, currency, minAmount)`. It redeems its full token balance, then splits proceeds: carry (proceeds above base price) goes to lead investors, everything else to the co-investor (receiver).
@@ -59,11 +66,11 @@ A `CoinvestedPosition` can participate in an exit via `distributeExit(exit, curr
 
 ## Summary
 
-| Feature | Distribution | Exit |
-|---|---|---|
-| Price determination | Proportional to snapshot balance | Fixed price per token |
-| Snapshot required | Yes | No |
-| Token fate | Held by token holder throughout | Transferred to Exit contract |
-| Fee timing | Once at initialization | Per claim |
-| Recovery mechanism | `reassign()` by owner after delay | `drain()` by owner after window |
-| Currency requirement | `TRUSTED_CURRENCY` | `TRUSTED_CURRENCY` + `EURO_CURRENCY` |
+| Feature              | Distribution                      | Exit                                 |
+| -------------------- | --------------------------------- | ------------------------------------ |
+| Price determination  | Proportional to snapshot balance  | Fixed price per token                |
+| Snapshot required    | Yes                               | No                                   |
+| Token fate           | Held by token holder throughout   | Transferred to Exit contract         |
+| Fee timing           | Once at initialization            | Per claim                            |
+| Recovery mechanism   | `reassign()` by owner after delay | `drain()` by owner after window      |
+| Currency requirement | `TRUSTED_CURRENCY`                | `TRUSTED_CURRENCY` + `EURO_CURRENCY` |
