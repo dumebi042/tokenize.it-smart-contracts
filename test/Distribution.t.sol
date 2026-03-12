@@ -2,25 +2,11 @@
 pragma solidity 0.8.23;
 
 import "../lib/forge-std/src/Test.sol";
-import "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/factories/DistributionCloneFactory.sol";
 import "../contracts/Distribution.sol";
 import "./resources/FakePaymentToken.sol";
 import "./resources/CloneCreators.sol";
-
-/// @dev Minimal ERC1271 mock returning valid or invalid magic value
-contract MockERC1271SmartAccount is IERC1271 {
-    bool public valid;
-
-    constructor(bool _valid) {
-        valid = _valid;
-    }
-
-    function isValidSignature(bytes32, bytes memory) external view returns (bytes4) {
-        return valid ? bytes4(0x1626ba7e) : bytes4(0);
-    }
-}
 
 contract DistributionTest is Test {
     address public constant admin = 0x0109709eCFa91a80626FF3989D68f67f5b1dD120;
@@ -340,42 +326,6 @@ contract DistributionTest is Test {
         (bool success, ) = address(dist).call(callData);
         assertTrue(success, "ERC2771 claim call failed");
         assertEq(currency.balanceOf(recipient), expected, "recipient did not receive holderA's share via ERC2771");
-    }
-
-    // ========== D5. claim(IERC1271, ...) — ERC1271 Signature Claim ==========
-
-    function testERC1271ValidSignatureClaims() public {
-        MockERC1271SmartAccount wallet = new MockERC1271SmartAccount(true);
-        // Give wallet a snapshot balance by deploying a new dist that includes its balance
-        // Simpler: use the existing dist where wallet has 0 snapshot balance (eligible = 0)
-        // so claim transfers 0. The key is that valid signature doesn't revert.
-        dist.claim(IERC1271(address(wallet)), bytes32(0), "", recipient);
-        assertEq(dist.eligible(address(wallet)), 0, "wallet with no snapshot balance should have zero eligible");
-    }
-
-    function testERC1271InvalidSignatureReverts() public {
-        MockERC1271SmartAccount wallet = new MockERC1271SmartAccount(false);
-        vm.expectRevert();
-        dist.claim(IERC1271(address(wallet)), bytes32(0), "", recipient);
-        // A wallet with a valid signature does not revert (proves signature check is the gating factor)
-        MockERC1271SmartAccount validWallet = new MockERC1271SmartAccount(true);
-        dist.claim(IERC1271(address(validWallet)), bytes32(0), "", recipient);
-    }
-
-    function testERC1271WithSnapshotBalanceClaims() public {
-        // Deploy a new token snapshot including the wallet
-        MockERC1271SmartAccount wallet = new MockERC1271SmartAccount(true);
-        vm.prank(admin);
-        token.mint(address(wallet), 200e18);
-        vm.prank(admin);
-        uint256 snap2 = token.createSnapshot();
-
-        Distribution dist2 = _deployDistWithSnapshot(bytes32("erc1271"), snap2, TOTAL_CURRENCY);
-        uint256 expected = (TOTAL_CURRENCY * 200e18) / token.totalSupplyAt(snap2);
-
-        assertEq(currency.balanceOf(recipient), 0, "recipient has currency before");
-        dist2.claim(IERC1271(address(wallet)), bytes32(0), "", recipient);
-        assertEq(currency.balanceOf(recipient), expected, "recipient did not receive wallet's share via ERC1271");
     }
 
     /// @dev Helper to deploy a Distribution against a specific snapshot

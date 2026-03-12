@@ -4,7 +4,6 @@ pragma solidity 0.8.23;
 
 import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
-import "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -116,11 +115,6 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
 
     function claim(address _recipient) external {
         _claim(_msgSender(), _recipient); //should work for directly calling it (msg.sender), as well as with a meta transaction with a signed message
-    }
-
-    function claim(IERC1271 _holder, bytes32 _hash, bytes memory _signature, address _recipient) external {
-        require(_holder.isValidSignature(_hash, _signature) == 0x1626ba7e);
-        _claim(address(_holder), _recipient);
     }
 
     function _claim(address _holder, address _recipient) internal {

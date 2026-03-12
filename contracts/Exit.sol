@@ -4,7 +4,6 @@ pragma solidity 0.8.23;
 
 import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
-import "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -77,17 +76,6 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
 
     function claim(uint256 _tokenAmount, address _recipient) external {
         _claim(_msgSender(), _tokenAmount, _recipient);
-    }
-
-    function claim(
-        IERC1271 _holder,
-        bytes32 _hash,
-        bytes memory _signature,
-        uint256 _tokenAmount,
-        address _recipient
-    ) external {
-        require(_holder.isValidSignature(_hash, _signature) == 0x1626ba7e);
-        _claim(address(_holder), _tokenAmount, _recipient);
     }
 
     function drain(address _recipient) external onlyOwner {

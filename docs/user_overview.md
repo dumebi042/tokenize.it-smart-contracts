@@ -110,7 +110,6 @@ After a company earns revenue or undergoes a liquidation event, it can distribut
 2. The company (or platform on its behalf) clones a Distribution contract, funding it with the total payout amount in currency. A platform fee (using `privateOfferFee`) is deducted from the funded amount at initialization.
 3. Token holders call `claim()` to receive their proportional share: `totalCurrencyAmount * balanceAtSnapshot / totalSupplyAtSnapshot`.
 4. If a holder cannot claim (e.g. lost key, or a smart contract), the contract owner can call `reassign()` after the configured `reassignAfter` timestamp to redirect that share to another address. All reassignments are recorded on-chain for auditability.
-5. Claims are also possible for smart contract holders that implement ERC-1271 (via the overloaded `claim(IERC1271, ...)` function).
 
 ### Exit proceeds
 

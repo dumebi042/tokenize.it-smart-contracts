@@ -2,25 +2,11 @@
 pragma solidity 0.8.23;
 
 import "../lib/forge-std/src/Test.sol";
-import "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/factories/ExitCloneFactory.sol";
 import "../contracts/Exit.sol";
 import "./resources/FakePaymentToken.sol";
 import "./resources/CloneCreators.sol";
-
-/// @dev Minimal ERC1271 mock returning valid or invalid magic value
-contract MockERC1271 is IERC1271 {
-    bool public valid;
-
-    constructor(bool _valid) {
-        valid = _valid;
-    }
-
-    function isValidSignature(bytes32, bytes memory) external view returns (bytes4) {
-        return valid ? bytes4(0x1626ba7e) : bytes4(0);
-    }
-}
 
 contract ExitTest is Test {
     address public constant admin = 0x0109709eCFa91a80626FF3989D68f67f5b1dD120;
@@ -399,49 +385,6 @@ contract ExitTest is Test {
         vm.expectRevert("ERC20: transfer amount exceeds balance");
         vm.prank(extra);
         exitContract.claim(1e18, extra);
-    }
-
-    // ========== E4. claim(IERC1271, ...) — ERC1271 Signature Claim ==========
-
-    function testERC1271ValidSignatureClaims() public {
-        vm.warp(claimStart);
-        MockERC1271 wallet = new MockERC1271(true);
-        vm.prank(admin);
-        token.mint(address(wallet), 10e18);
-        vm.prank(address(wallet));
-        token.approve(address(exitContract), 10e18);
-
-        uint256 expected = (10e18 * PRICE_PER_TOKEN) / 1e18;
-        assertEq(currency.balanceOf(recipient), 0, "recipient currency balance should be zero before claim");
-        assertEq(token.balanceOf(address(exitContract)), 0, "exitContract token balance should be zero before claim");
-        exitContract.claim(IERC1271(address(wallet)), bytes32(0), "", 10e18, recipient);
-        assertEq(currency.balanceOf(recipient), expected, "recipient should receive correct currency amount");
-        assertEq(token.balanceOf(address(exitContract)), 10e18, "exitContract should hold claimed tokens");
-    }
-
-    function testERC1271InvalidSignatureReverts() public {
-        vm.warp(claimStart);
-        MockERC1271 wallet = new MockERC1271(false);
-        vm.expectRevert();
-        exitContract.claim(IERC1271(address(wallet)), bytes32(0), "", 1e18, recipient);
-        // A wallet with a valid signature does not revert (proves signature check is the gating factor)
-        MockERC1271 validWallet = new MockERC1271(true);
-        exitContract.claim(IERC1271(address(validWallet)), bytes32(0), "", 0, recipient);
-    }
-
-    function testERC1271CurrencyGoesToRecipientNotHolder() public {
-        vm.warp(claimStart);
-        MockERC1271 wallet = new MockERC1271(true);
-        vm.prank(admin);
-        token.mint(address(wallet), 10e18);
-        vm.prank(address(wallet));
-        token.approve(address(exitContract), 10e18);
-
-        assertEq(currency.balanceOf(address(wallet)), 0, "wallet currency balance should be zero before claim");
-        assertEq(currency.balanceOf(recipient), 0, "recipient currency balance should be zero before claim");
-        exitContract.claim(IERC1271(address(wallet)), bytes32(0), "", 10e18, recipient);
-        assertEq(currency.balanceOf(address(wallet)), 0, "wallet should not receive any currency");
-        assertGt(currency.balanceOf(recipient), 0, "recipient should have received currency");
     }
 
     // ========== E6. drain() ==========

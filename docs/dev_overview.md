@@ -118,7 +118,6 @@ Automated exit redemption: holders send tokens and receive a fixed currency payo
 - At initialization, the contract is funded with the full payout amount in currency (no fee deducted at init; per-claim fee is deducted at `claim()` time using `privateOfferFee`).
 - Currency must have both `TRUSTED_CURRENCY` and `EURO_CURRENCY` attributes on the token's AllowList.
 - `claim(tokenAmount, recipient)` is valid only between `claimStart` and `drainStart`. It transfers tokens from the caller to the Exit contract (tokens are held, not burned) and sends `tokenAmount * pricePerToken / 10**token.decimals() - fee` currency to the recipient.
-- An overloaded `claim(IERC1271 holder, ...)` supports smart contract holders.
 - `drain(recipient)` can be called by the owner after `drainStart` to recover unclaimed currency.
 
 ### CoinvestedPosition (CoinvestedPosition.sol)

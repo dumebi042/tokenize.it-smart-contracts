@@ -17,7 +17,7 @@ Token holders can receive dividend payouts proportional to their token balance a
 
    At initialization, the platform fee (`privateOfferFee`) is deducted from `totalCurrencyAmount` and sent to the fee collector. Only the net remainder is available for claims.
 
-3. **Holders claim**: Any holder at snapshot time calls `Distribution.claim(recipient)`. Their share is `netAmount * balanceAtSnapshot / totalSupplyAtSnapshot`. Smart contract holders (e.g. Gnosis Safe, CoinvestedPosition) can use the ERC-1271 variant.
+3. **Holders claim**: Any holder at snapshot time calls `Distribution.claim(recipient)`. Their share is `netAmount * balanceAtSnapshot / totalSupplyAtSnapshot`. Smart contract holders (e.g. CoinvestedPosition) can call `claim()` directly or have the owner use `reassign()` to redirect their share.
 
 4. **Reassignment** (recovery): If a holder cannot claim (lost key, broken smart contract), the owner can call `reassign(from, to, amount)` after `reassignAfter` to redirect that share. Every reassignment is recorded on-chain via the `Reassigned` event.
 

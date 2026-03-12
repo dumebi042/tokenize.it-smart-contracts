@@ -20,7 +20,7 @@ Abstract base extracted from duplicated logic in `TokenSwap` and `CoinvestedPosi
 
 ### New contract: `Distribution`
 
-Distributes a fixed currency amount among token holders proportional to their balance at a given snapshot. Supports direct claims, ERC-1271 smart-contract holders, and vesting contracts. An owner-only `reassign` function (available after a configurable delay post-deployment) handles recovery cases. Deployed via an atomic clone-and-fund factory.
+Distributes a fixed currency amount among token holders proportional to their balance at a given snapshot. Supports direct claims and timelock contracts. An owner-only `reassign` function (available after a configurable delay post-deployment) handles recovery cases. Deployed via an atomic clone-and-fund factory.
 
 ## Fee collection
 
