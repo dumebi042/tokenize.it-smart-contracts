@@ -92,7 +92,7 @@
     "test": "forge test --no-match-test Mainnet",
     "coverage": "forge coverage --report lcov && genhtml lcov.info --branch-coverage --output-directory=./coverage",
     "clean": "yarn hardhat clean && forge clean && rm -rf ./dist ./coverage ./cache",
-    "prettier": "prettier --write 'contracts/**/*.sol' 'test/**/*.sol'"
+    "prettier": "prettier --write 'contracts/**/*.sol' 'test/**/*.sol' '**/*.md'"
   },
   "prettier": {
     "singleQuote": true,
