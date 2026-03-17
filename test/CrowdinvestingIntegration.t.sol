@@ -115,17 +115,20 @@ contract CrowdinvestingTest is Test {
     */
     function feeCalculation(uint32 tokenFeeNumerator, uint32 crowdinvestingFeeNumerator) public {
         // apply fees for test
-        Fees memory fees = Fees(
-            tokenFeeNumerator,
-            crowdinvestingFeeNumerator,
-            crowdinvestingFeeNumerator,
-            uint64(block.timestamp + 13 weeks)
-        );
+        uint64 activationDate = uint64(block.timestamp + 13 weeks);
         vm.prank(platformAdmin);
-        feeSettings.planFeeChange(fees);
-        vm.warp(fees.validityDate + 1 seconds);
+        feeSettings.planFeeChange(FeeTypes.TOKEN_FEE, tokenFeeNumerator, activationDate);
         vm.prank(platformAdmin);
-        feeSettings.executeFeeChange();
+        feeSettings.planFeeChange(FeeTypes.CROWDINVESTING_FEE, crowdinvestingFeeNumerator, activationDate);
+        vm.prank(platformAdmin);
+        feeSettings.planFeeChange(FeeTypes.PRIVATE_OFFER_FEE, crowdinvestingFeeNumerator, activationDate);
+        vm.warp(activationDate + 1 seconds);
+        vm.prank(platformAdmin);
+        feeSettings.executeFeeChange(FeeTypes.TOKEN_FEE);
+        vm.prank(platformAdmin);
+        feeSettings.executeFeeChange(FeeTypes.CROWDINVESTING_FEE);
+        vm.prank(platformAdmin);
+        feeSettings.executeFeeChange(FeeTypes.PRIVATE_OFFER_FEE);
 
         uint8 _paymentTokenDecimals = 6;
         // uint8 _maxDecimals = 25;

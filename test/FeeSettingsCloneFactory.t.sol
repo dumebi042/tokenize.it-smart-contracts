@@ -228,12 +228,9 @@ contract tokenTest is Test {
             "privateOfferFeeCollector not set"
         );
 
-        (
-            uint32 _tokenFeeNumerator,
-            uint32 _crowdinvestingFeeNumerator,
-            uint32 _privateOfferFeeNumerator,
-
-        ) = feeSettings.fees(address(0));
+        (, uint32 _tokenFeeNumerator) = feeSettings.feeTypeConfigs(FeeTypes.TOKEN_FEE);
+        (, uint32 _crowdinvestingFeeNumerator) = feeSettings.feeTypeConfigs(FeeTypes.CROWDINVESTING_FEE);
+        (, uint32 _privateOfferFeeNumerator) = feeSettings.feeTypeConfigs(FeeTypes.PRIVATE_OFFER_FEE);
 
         assertEq(_tokenFeeNumerator, exampleFees1.tokenFeeNumerator, "defaultTokenFeeNumerator not set");
 

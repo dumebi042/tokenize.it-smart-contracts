@@ -7,6 +7,7 @@ import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/PrivateOffer.sol";
 import "../contracts/factories/PrivateOfferFactory.sol";
 import "./resources/CloneCreators.sol";
+import "../contracts/interfaces/IFeeSettings.sol";
 import "./resources/FakePaymentToken.sol";
 
 contract PrivateOfferTest is Test {
@@ -313,9 +314,13 @@ contract PrivateOfferTest is Test {
         address expectedAddress = factory.predictPrivateOfferAddress(salt, arguments);
 
         // set fees to 0, otherwise extra tokens are minted which causes an overflow
-        Fees memory fees = Fees(0, 0, 0, 0);
-        FeeSettings(address(token.feeSettings())).planFeeChange(fees);
-        FeeSettings(address(token.feeSettings())).executeFeeChange();
+        FeeSettings _feeSettings = FeeSettings(address(token.feeSettings()));
+        _feeSettings.planFeeChange(FeeTypes.CROWDINVESTING_FEE, 0, uint64(block.timestamp));
+        _feeSettings.planFeeChange(FeeTypes.PRIVATE_OFFER_FEE, 0, uint64(block.timestamp));
+        _feeSettings.planFeeChange(FeeTypes.TOKEN_FEE, 0, uint64(block.timestamp));
+        _feeSettings.executeFeeChange(FeeTypes.TOKEN_FEE);
+        _feeSettings.executeFeeChange(FeeTypes.CROWDINVESTING_FEE);
+        _feeSettings.executeFeeChange(FeeTypes.PRIVATE_OFFER_FEE);
 
         vm.prank(admin);
         token.increaseMintingAllowance(expectedAddress, _tokenBuyAmount);

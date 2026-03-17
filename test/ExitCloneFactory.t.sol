@@ -179,16 +179,16 @@ contract ExitCloneFactoryTest is Test {
 
     // ========== F3-E. _currencyProvider Is Not in the Salt ==========
 
-    function testCurrencyProviderDoesNotAffectAddress(address currencyProvider) public {
-        vm.assume(currencyProvider != address(0));
+    function testCurrencyProviderDoesNotAffectAddress(address _currencyProvider) public {
+        vm.assume(_currencyProvider != address(0));
         ExitInitializerArguments memory args = _baseArgs();
         address predicted = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
 
         // Provider 1 deploys
-        currency.mint(currencyProvider, args.totalCurrencyAmount);
-        vm.prank(currencyProvider);
+        currency.mint(_currencyProvider, args.totalCurrencyAmount);
+        vm.prank(_currencyProvider);
         currency.approve(predicted, args.totalCurrencyAmount);
-        address actual = factory.createExitClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args);
+        address actual = factory.createExitClone(EXAMPLE_SALT, trustedForwarder, _currencyProvider, args);
         assertEq(predicted, actual);
     }
 

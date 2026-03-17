@@ -5,6 +5,7 @@ import "../lib/forge-std/src/Test.sol";
 import "../lib/forge-std/src/console.sol";
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/FeeSettings.sol";
+import "../contracts/interfaces/IFeeSettings.sol";
 import "./resources/WrongFeeSettings.sol";
 import "./resources/CloneCreators.sol";
 
@@ -120,12 +121,9 @@ contract tokenTest is Test {
             newCollector
         );
 
-        (
-            uint32 _oldTokenFeeNumerator,
-            uint32 _oldCrowdinvestingFeeNumerator,
-            uint32 _oldPrivateOfferFeeNumerator,
-
-        ) = FeeSettings(address(token.feeSettings())).fees(address(0));
+        (, uint32 _oldTokenFeeNumerator) = FeeSettings(address(token.feeSettings())).feeTypeConfigs(FeeTypes.TOKEN_FEE);
+        (, uint32 _oldCrowdinvestingFeeNumerator) = FeeSettings(address(token.feeSettings())).feeTypeConfigs(FeeTypes.CROWDINVESTING_FEE);
+        (, uint32 _oldPrivateOfferFeeNumerator) = FeeSettings(address(token.feeSettings())).feeTypeConfigs(FeeTypes.PRIVATE_OFFER_FEE);
 
         vm.expectEmit(true, true, true, true, address(token));
         emit NewFeeSettingsSuggested(newFeeSettings);
@@ -133,12 +131,9 @@ contract tokenTest is Test {
         token.suggestNewFeeSettings(newFeeSettings);
 
         // make sure old fees are still in effect
-        (
-            uint32 _newTokenFeeNumerator,
-            uint32 _newCrowdinvestingFeeNumerator,
-            uint32 _newPrivateOfferFeeNumerator,
-
-        ) = FeeSettings(address(token.feeSettings())).fees(address(0));
+        (, uint32 _newTokenFeeNumerator) = FeeSettings(address(token.feeSettings())).feeTypeConfigs(FeeTypes.TOKEN_FEE);
+        (, uint32 _newCrowdinvestingFeeNumerator) = FeeSettings(address(token.feeSettings())).feeTypeConfigs(FeeTypes.CROWDINVESTING_FEE);
+        (, uint32 _newPrivateOfferFeeNumerator) = FeeSettings(address(token.feeSettings())).feeTypeConfigs(FeeTypes.PRIVATE_OFFER_FEE);
 
         assertTrue(_oldTokenFeeNumerator == _newTokenFeeNumerator, "token fee numerator changed!");
         assertTrue(
@@ -162,9 +157,8 @@ contract tokenTest is Test {
             newCollector,
             newCollector
         );
-        (uint32 _oldTokenFeeNumerator, uint32 _oldCrowdinvestingFeeNumerator, , ) = FeeSettings(
-            address(token.feeSettings())
-        ).fees(address(0));
+        (, uint32 _oldTokenFeeNumerator) = FeeSettings(address(token.feeSettings())).feeTypeConfigs(FeeTypes.TOKEN_FEE);
+        (, uint32 _oldCrowdinvestingFeeNumerator) = FeeSettings(address(token.feeSettings())).feeTypeConfigs(FeeTypes.CROWDINVESTING_FEE);
 
         vm.prank(feeSettings.owner());
         token.suggestNewFeeSettings(newFeeSettings);
@@ -175,9 +169,8 @@ contract tokenTest is Test {
         vm.prank(admin);
         token.acceptNewFeeSettings(newFeeSettings);
 
-        (uint32 _newTokenFeeNumerator, uint32 _newCrowdinvestingFeeNumerator, , ) = FeeSettings(
-            address(token.feeSettings())
-        ).fees(address(0));
+        (, uint32 _newTokenFeeNumerator) = FeeSettings(address(token.feeSettings())).feeTypeConfigs(FeeTypes.TOKEN_FEE);
+        (, uint32 _newCrowdinvestingFeeNumerator) = FeeSettings(address(token.feeSettings())).feeTypeConfigs(FeeTypes.CROWDINVESTING_FEE);
         assertTrue(FeeSettings(address(token.feeSettings())) == newFeeSettings, "fee settings not changed!");
         assertEq(FeeSettings(address(token.feeSettings())).feeCollector(), newCollector, "Wrong feeCollector");
         assertTrue(

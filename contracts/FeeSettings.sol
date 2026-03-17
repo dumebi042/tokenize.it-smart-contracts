@@ -133,9 +133,8 @@ contract FeeSettings is
     }
 
     /**
-     * @notice Initializes a new FeeSettings clone with the three V2-era fee types.
-     *      Additional fee types (e.g. SECONDARY_MARKET_FEE) must be registered afterwards
-     *      via registerFeeType / setDefaultFeeCollector.
+     * @notice Initializes a new FeeSettings clone with the four standard fee types.
+     *      SECONDARY_MARKET_FEE is initialized with the same numerator and collector as PRIVATE_OFFER_FEE.
      * @param _owner                      Owner of this clone
      * @param _fees                       Initial fee numerators for the three fee types
      * @param _tokenFeeCollector          Default collector for token fees
@@ -163,6 +162,7 @@ contract FeeSettings is
         _registerFeeType(FeeTypes.TOKEN_FEE, MAX_TOKEN_FEE_NUMERATOR, _fees.tokenFeeNumerator);
         _registerFeeType(FeeTypes.CROWDINVESTING_FEE, MAX_CROWDINVESTING_FEE_NUMERATOR, _fees.crowdinvestingFeeNumerator);
         _registerFeeType(FeeTypes.PRIVATE_OFFER_FEE, MAX_PRIVATE_OFFER_FEE_NUMERATOR, _fees.privateOfferFeeNumerator);
+        _registerFeeType(FeeTypes.SECONDARY_MARKET_FEE, MAX_PRIVATE_OFFER_FEE_NUMERATOR, _fees.privateOfferFeeNumerator);
 
         require(_tokenFeeCollector != address(0), "Fee collector cannot be 0x0");
         feeCollectors[FeeTypes.TOKEN_FEE][address(0)] = _tokenFeeCollector;
@@ -172,6 +172,7 @@ contract FeeSettings is
 
         require(_privateOfferFeeCollector != address(0), "Fee collector cannot be 0x0");
         feeCollectors[FeeTypes.PRIVATE_OFFER_FEE][address(0)] = _privateOfferFeeCollector;
+        feeCollectors[FeeTypes.SECONDARY_MARKET_FEE][address(0)] = _privateOfferFeeCollector;
     }
 
     // -------------------------------------------------------------------------
@@ -235,6 +236,10 @@ contract FeeSettings is
         require(_numerator <= config.maxNumerator, "exceeds max numerator");
         if (_numerator > config.defaultNumerator) {
             require(_activationDate > block.timestamp + 12 weeks, "fee increase needs 12 week delay");
+        }
+        // activationDate=0 means "immediately" — store block.timestamp so executeFeeChange sentinel works
+        if (_activationDate == 0) {
+            _activationDate = uint64(block.timestamp);
         }
         proposedFeeChanges[_feeType] = ProposedFeeChange({numerator: _numerator, activationDate: _activationDate});
         emit FeeChangeProposed(_feeType, _numerator, _activationDate);

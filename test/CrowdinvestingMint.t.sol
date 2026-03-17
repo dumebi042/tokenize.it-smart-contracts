@@ -1305,10 +1305,13 @@ contract CrowdinvestingTest is Test {
         vm.prank(owner);
         crowdinvesting = Crowdinvesting(factory.createCrowdinvestingClone(0, trustedForwarder, arguments));
 
-        // set fees to 0, otherwise extra currency is minted which causes an overflow
-        Fees memory fees = Fees(0, 0, 0, 0);
-        FeeSettings(address(token.feeSettings())).planFeeChange(fees);
-        FeeSettings(address(token.feeSettings())).executeFeeChange();
+        // set fees to 0, otherwise extra tokens/currency are minted which causes an overflow
+        FeeSettings _feeSettings = FeeSettings(address(token.feeSettings()));
+        _feeSettings.planFeeChange(FeeTypes.TOKEN_FEE, 0, 1);
+        _feeSettings.planFeeChange(FeeTypes.CROWDINVESTING_FEE, 0, 1);
+        vm.warp(1);
+        _feeSettings.executeFeeChange(FeeTypes.TOKEN_FEE);
+        _feeSettings.executeFeeChange(FeeTypes.CROWDINVESTING_FEE);
 
         // grant allowances
         vm.prank(mintAllower);

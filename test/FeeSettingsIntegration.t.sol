@@ -5,6 +5,7 @@ import "../lib/forge-std/src/Test.sol";
 import "../lib/forge-std/src/console.sol";
 import "../contracts/Token.sol";
 import "../contracts/factories/FeeSettingsCloneFactory.sol";
+import "../contracts/interfaces/IFeeSettings.sol";
 import "../contracts/factories/CrowdinvestingCloneFactory.sol";
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/factories/PrivateOfferFactory.sol";
@@ -98,8 +99,8 @@ contract FeeSettingsIntegrationTest is Test {
         assertEq(token.balanceOf(_customFeeCollector), 0, "token.balanceOf(customFeeCollector) != 0 before");
 
         vm.startPrank(platformAdmin);
-        feeSettings.setCustomFee(address(token), customFees);
-        feeSettings.setCustomTokenFeeCollector(address(token), _customFeeCollector);
+        feeSettings.setCustomFee(FeeTypes.TOKEN_FEE, address(token), customFees.tokenFeeNumerator, customFees.validityDate);
+        feeSettings.setCustomFeeCollector(FeeTypes.TOKEN_FEE, address(token), _customFeeCollector);
         vm.stopPrank();
         vm.prank(companyAdmin);
         token.mint(investor, tokenAmount);
@@ -120,8 +121,9 @@ contract FeeSettingsIntegrationTest is Test {
         vm.warp(100 * 365 days);
 
         vm.startPrank(platformAdmin);
-        feeSettings.setCustomFee(address(token), customFees);
-        feeSettings.setCustomPrivateOfferFeeCollector(address(token), _customFeeCollector);
+        feeSettings.setCustomFee(FeeTypes.TOKEN_FEE, address(token), customFees.tokenFeeNumerator, customFees.validityDate);
+        feeSettings.setCustomFee(FeeTypes.PRIVATE_OFFER_FEE, address(token), customFees.privateOfferFeeNumerator, customFees.validityDate);
+        feeSettings.setCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE, address(token), _customFeeCollector);
         vm.stopPrank();
 
         assertEq(token.balanceOf(investor), 0, "token.balanceOf(investor) != 0 before");
@@ -196,8 +198,9 @@ contract FeeSettingsIntegrationTest is Test {
         vm.warp(100 * 365 days);
 
         vm.startPrank(platformAdmin);
-        feeSettings.setCustomFee(address(token), customFees);
-        feeSettings.setCustomCrowdinvestingFeeCollector(address(token), _customFeeCollector);
+        feeSettings.setCustomFee(FeeTypes.TOKEN_FEE, address(token), customFees.tokenFeeNumerator, customFees.validityDate);
+        feeSettings.setCustomFee(FeeTypes.CROWDINVESTING_FEE, address(token), customFees.crowdinvestingFeeNumerator, customFees.validityDate);
+        feeSettings.setCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE, address(token), _customFeeCollector);
         vm.stopPrank();
 
         assertEq(token.balanceOf(investor), 0, "token.balanceOf(investor) != 0 before");
