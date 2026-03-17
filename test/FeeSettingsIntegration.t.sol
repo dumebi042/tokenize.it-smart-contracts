@@ -42,18 +42,14 @@ contract FeeSettingsIntegrationTest is Test {
         FeeSettings feeSettingsLogic = new FeeSettings(trustedForwarder);
         FeeSettingsCloneFactory feeSettingsCloneFactory = new FeeSettingsCloneFactory(address(feeSettingsLogic));
         customFees = Fees(10, 20, 30, 101 * 365 days);
-        Fees memory fees = Fees(101, 102, 103, 0);
+        FeeSettings.FeeTypeInit[] memory feeTypes = new FeeSettings.FeeTypeInit[](4);
+        feeTypes[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN_FEE, 500, 101, platformAdmin);
+        feeTypes[1] = FeeSettings.FeeTypeInit(FeeTypes.CROWDINVESTING_FEE, 1000, 102, platformAdmin);
+        feeTypes[2] = FeeSettings.FeeTypeInit(FeeTypes.PRIVATE_OFFER_FEE, 500, 103, platformAdmin);
+        feeTypes[3] = FeeSettings.FeeTypeInit(FeeTypes.SECONDARY_MARKET_FEE, 500, 0, platformAdmin);
         vm.prank(platformAdmin);
         feeSettings = FeeSettings(
-            feeSettingsCloneFactory.createFeeSettingsClone(
-                "salt",
-                trustedForwarder,
-                platformAdmin,
-                fees,
-                platformAdmin,
-                platformAdmin,
-                platformAdmin
-            )
+            feeSettingsCloneFactory.createFeeSettingsClone("salt", trustedForwarder, platformAdmin, feeTypes)
         );
 
         vm.startPrank(paymentTokenProvider);

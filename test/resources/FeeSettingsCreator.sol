@@ -12,19 +12,30 @@ function createFeeSettings(
     address _crowdinvestingFeeCollector,
     address _privateOfferFeeCollector
 ) returns (FeeSettings) {
+    FeeSettings.FeeTypeInit[] memory feeTypes = new FeeSettings.FeeTypeInit[](4);
+    feeTypes[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN_FEE, 500, _fees.tokenFeeNumerator, _tokenFeeCollector);
+    feeTypes[1] = FeeSettings.FeeTypeInit(
+        FeeTypes.CROWDINVESTING_FEE,
+        1000,
+        _fees.crowdinvestingFeeNumerator,
+        _crowdinvestingFeeCollector
+    );
+    feeTypes[2] = FeeSettings.FeeTypeInit(
+        FeeTypes.PRIVATE_OFFER_FEE,
+        500,
+        _fees.privateOfferFeeNumerator,
+        _privateOfferFeeCollector
+    );
+    feeTypes[3] = FeeSettings.FeeTypeInit(
+        FeeTypes.SECONDARY_MARKET_FEE,
+        500,
+        _fees.privateOfferFeeNumerator,
+        _privateOfferFeeCollector
+    );
+
     FeeSettings logicContract = new FeeSettings(_trustedForwarder);
     FeeSettingsCloneFactory factory = new FeeSettingsCloneFactory(address(logicContract));
-    FeeSettings clone = FeeSettings(
-        factory.createFeeSettingsClone(
-            "someSalt",
-            _trustedForwarder,
-            _owner,
-            _fees,
-            _tokenFeeCollector,
-            _crowdinvestingFeeCollector,
-            _privateOfferFeeCollector
-        )
-    );
+    FeeSettings clone = FeeSettings(factory.createFeeSettingsClone("someSalt", _trustedForwarder, _owner, feeTypes));
 
     return clone;
 }

@@ -5,6 +5,7 @@ import "../lib/forge-std/src/Test.sol";
 import "../lib/forge-std/src/console.sol";
 import "../contracts/Token.sol";
 import "../contracts/factories/FeeSettingsCloneFactory.sol";
+import "../contracts/interfaces/IFeeSettings.sol";
 
 contract FeeSettingsTest is Test {
     uint32 constant MAX_TOKEN_FEE = 500;
@@ -42,6 +43,37 @@ contract FeeSettingsTest is Test {
 
     address public constant exampleTokenAddress = address(74);
 
+    function _buildFeeTypes(address collector) internal pure returns (FeeSettings.FeeTypeInit[] memory) {
+        FeeSettings.FeeTypeInit[] memory feeTypes = new FeeSettings.FeeTypeInit[](4);
+        feeTypes[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN_FEE, 500, 1, collector);
+        feeTypes[1] = FeeSettings.FeeTypeInit(FeeTypes.CROWDINVESTING_FEE, 1000, 2, collector);
+        feeTypes[2] = FeeSettings.FeeTypeInit(FeeTypes.PRIVATE_OFFER_FEE, 500, 3, collector);
+        feeTypes[3] = FeeSettings.FeeTypeInit(FeeTypes.SECONDARY_MARKET_FEE, 500, 0, collector);
+        return feeTypes;
+    }
+
+    function _buildFeeTypesFromFees(
+        Fees memory _fees,
+        address collector
+    ) internal pure returns (FeeSettings.FeeTypeInit[] memory) {
+        FeeSettings.FeeTypeInit[] memory feeTypes = new FeeSettings.FeeTypeInit[](4);
+        feeTypes[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN_FEE, 500, _fees.tokenFeeNumerator, collector);
+        feeTypes[1] = FeeSettings.FeeTypeInit(
+            FeeTypes.CROWDINVESTING_FEE,
+            1000,
+            _fees.crowdinvestingFeeNumerator,
+            collector
+        );
+        feeTypes[2] = FeeSettings.FeeTypeInit(
+            FeeTypes.PRIVATE_OFFER_FEE,
+            500,
+            _fees.privateOfferFeeNumerator,
+            collector
+        );
+        feeTypes[3] = FeeSettings.FeeTypeInit(FeeTypes.SECONDARY_MARKET_FEE, 500, 0, collector);
+        return feeTypes;
+    }
+
     function setUp() public {
         FeeSettings logic = new FeeSettings(trustedForwarder);
         feeSettingsCloneFactory = new FeeSettingsCloneFactory(address(logic));
@@ -49,14 +81,14 @@ contract FeeSettingsTest is Test {
         fees = Fees(1, 2, 3, 0);
         vm.prank(admin);
         feeSettings = FeeSettings(
-            feeSettingsCloneFactory.createFeeSettingsClone("salt", trustedForwarder, admin, fees, admin, admin, admin)
+            feeSettingsCloneFactory.createFeeSettingsClone("salt", trustedForwarder, admin, _buildFeeTypes(admin))
         );
     }
 
     function testLogicContractCannotBeInitialized() public {
         FeeSettings logic = new FeeSettings(trustedForwarder);
         vm.expectRevert("Initializable: contract is already initialized");
-        logic.initialize(admin, fees, admin, admin, admin);
+        logic.initialize(admin, _buildFeeTypes(admin));
 
         assertEq(logic.owner(), address(0), "Owner should be 0");
     }
@@ -64,27 +96,35 @@ contract FeeSettingsTest is Test {
     function testEnforceFeeRangeInInitializer(uint32 numerator, uint32 denominator) public {
         vm.assume(denominator > 0);
         vm.assume(!tokenOrPrivateOfferFeeInValidRange(numerator));
-        Fees memory _fees;
 
         console.log("Testing token fee");
-        _fees = Fees(numerator, 1, 1, 0);
-        vm.expectRevert("Token fee must be <= 5%");
-        feeSettingsCloneFactory.createFeeSettingsClone("salt", trustedForwarder, admin, _fees, admin, admin, admin);
+        {
+            FeeSettings.FeeTypeInit[] memory feeType= new FeeSettings.FeeTypeInit[](1);
+            feeType[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN_FEE, 500, numerator, admin);
+            vm.expectRevert("default exceeds max");
+            feeSettingsCloneFactory.createFeeSettingsClone("salt", trustedForwarder, admin, feeType);
+        }
 
         console.log("Testing Crowdinvesting fee");
-        _fees = Fees(1, numerator, 1, 0);
-        if (!crowdinvestingFeeInValidRange(numerator)) {
-            vm.expectRevert("Crowdinvesting fee must be <= 10%");
-            feeSettingsCloneFactory.createFeeSettingsClone("salt", trustedForwarder, admin, _fees, admin, admin, admin);
-        } else {
-            // this should not revert, as the fee is in valid range for crowdinvesting
-            feeSettingsCloneFactory.createFeeSettingsClone("salt", trustedForwarder, admin, _fees, admin, admin, admin);
+        {
+            FeeSettings.FeeTypeInit[] memory feeType= new FeeSettings.FeeTypeInit[](1);
+            feeType[0] = FeeSettings.FeeTypeInit(FeeTypes.CROWDINVESTING_FEE, 1000, numerator, admin);
+            if (!crowdinvestingFeeInValidRange(numerator)) {
+                vm.expectRevert("default exceeds max");
+                feeSettingsCloneFactory.createFeeSettingsClone("salt", trustedForwarder, admin, feeType);
+            } else {
+                // this should not revert, as the fee is in valid range for crowdinvesting
+                feeSettingsCloneFactory.createFeeSettingsClone("salt", trustedForwarder, admin, feeType);
+            }
         }
 
         console.log("Testing PrivateOffer fee");
-        _fees = Fees(1, 1, numerator, 0);
-        vm.expectRevert("PrivateOffer fee must be <= 5%");
-        feeSettingsCloneFactory.createFeeSettingsClone("salt", trustedForwarder, admin, _fees, admin, admin, admin);
+        {
+            FeeSettings.FeeTypeInit[] memory feeType= new FeeSettings.FeeTypeInit[](1);
+            feeType[0] = FeeSettings.FeeTypeInit(FeeTypes.PRIVATE_OFFER_FEE, 500, numerator, admin);
+            vm.expectRevert("default exceeds max");
+            feeSettingsCloneFactory.createFeeSettingsClone("salt", trustedForwarder, admin, feeType);
+        }
     }
 
     function testEnforceTokenFeeRangeInFeeChanger(uint32 numerator, uint32 denominator) public {
@@ -120,7 +160,12 @@ contract FeeSettingsTest is Test {
         vm.assume(newNumerator > startNumerator);
         Fees memory _fees = Fees(startNumerator, startNumerator, startNumerator, 0);
         FeeSettings _feeSettings = FeeSettings(
-            feeSettingsCloneFactory.createFeeSettingsClone("salt", trustedForwarder, admin, _fees, admin, admin, admin)
+            feeSettingsCloneFactory.createFeeSettingsClone(
+                "salt",
+                trustedForwarder,
+                admin,
+                _buildFeeTypesFromFees(_fees, admin)
+            )
         );
 
         vm.prank(admin);
@@ -241,7 +286,12 @@ contract FeeSettingsTest is Test {
         Fees memory _fees = Fees(0, 0, 0, 0);
         vm.prank(admin);
         FeeSettings _feeSettings = FeeSettings(
-            feeSettingsCloneFactory.createFeeSettingsClone("salt", trustedForwarder, admin, _fees, admin, admin, admin)
+            feeSettingsCloneFactory.createFeeSettingsClone(
+                "salt",
+                trustedForwarder,
+                admin,
+                _buildFeeTypesFromFees(_fees, admin)
+            )
         );
 
         (, uint32 _tokenFeeNumerator) = _feeSettings.feeTypeConfigs(FeeTypes.TOKEN_FEE);
@@ -265,7 +315,12 @@ contract FeeSettingsTest is Test {
         // create new fee settings with max fee
         Fees memory maxFee = Fees(MAX_TOKEN_FEE, MAX_CROWDINVESTING_FEE, MAX_PRIVATE_OFFER_FEE, 0);
         feeSettings = FeeSettings(
-            feeSettingsCloneFactory.createFeeSettingsClone("salt", trustedForwarder, admin, maxFee, admin, admin, admin)
+            feeSettingsCloneFactory.createFeeSettingsClone(
+                "salt",
+                trustedForwarder,
+                admin,
+                _buildFeeTypesFromFees(maxFee, admin)
+            )
         );
 
         (, uint32 _tokenFeeNumerator) = feeSettings.feeTypeConfigs(FeeTypes.TOKEN_FEE);
@@ -313,7 +368,12 @@ contract FeeSettingsTest is Test {
         FeeSettings _feeSettings;
         Fees memory _fees = Fees(tokenFeeNumerator, crowdinvestingFeeNumerator, privateOfferFeeNumerator, 0);
         _feeSettings = FeeSettings(
-            feeSettingsCloneFactory.createFeeSettingsClone("salt2", trustedForwarder, admin, _fees, admin, admin, admin)
+            feeSettingsCloneFactory.createFeeSettingsClone(
+                "salt2",
+                trustedForwarder,
+                admin,
+                _buildFeeTypesFromFees(_fees, admin)
+            )
         );
 
         (, uint32 _tokenFeeNumerator) = _feeSettings.feeTypeConfigs(FeeTypes.TOKEN_FEE);
@@ -328,49 +388,42 @@ contract FeeSettingsTest is Test {
     function testFeeCollector0FailsInInitializer() public {
         FeeSettings _feeSettings;
 
-        vm.expectRevert("Fee collector cannot be 0x0");
-        _feeSettings = FeeSettings(
-            feeSettingsCloneFactory.createFeeSettingsClone(
-                "salt",
-                trustedForwarder,
-                admin,
-                fees,
-                address(0),
-                admin,
-                admin
-            )
-        );
+        {
+            FeeSettings.FeeTypeInit[] memory feeType= new FeeSettings.FeeTypeInit[](1);
+            feeType[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN_FEE, 500, fees.tokenFeeNumerator, address(0));
+            vm.expectRevert("Fee collector cannot be 0x0");
+            _feeSettings = FeeSettings(
+                feeSettingsCloneFactory.createFeeSettingsClone("salt", trustedForwarder, admin, feeType)
+            );
+        }
 
-        vm.expectRevert("Fee collector cannot be 0x0");
-        _feeSettings = FeeSettings(
-            feeSettingsCloneFactory.createFeeSettingsClone(
-                "salt",
-                trustedForwarder,
-                admin,
-                fees,
-                admin,
-                address(0),
-                admin
-            )
-        );
-
-        vm.expectRevert("Fee collector cannot be 0x0");
-        _feeSettings = FeeSettings(
-            feeSettingsCloneFactory.createFeeSettingsClone(
-                "salt",
-                trustedForwarder,
-                admin,
-                fees,
-                admin,
-                admin,
+        {
+            FeeSettings.FeeTypeInit[] memory feeType= new FeeSettings.FeeTypeInit[](1);
+            feeType[0] = FeeSettings.FeeTypeInit(
+                FeeTypes.CROWDINVESTING_FEE,
+                1000,
+                fees.crowdinvestingFeeNumerator,
                 address(0)
-            )
-        );
+            );
+            vm.expectRevert("Fee collector cannot be 0x0");
+            _feeSettings = FeeSettings(
+                feeSettingsCloneFactory.createFeeSettingsClone("salt", trustedForwarder, admin, feeType)
+            );
+        }
+
+        {
+            FeeSettings.FeeTypeInit[] memory feeType= new FeeSettings.FeeTypeInit[](1);
+            feeType[0] = FeeSettings.FeeTypeInit(FeeTypes.PRIVATE_OFFER_FEE, 500, fees.privateOfferFeeNumerator, address(0));
+            vm.expectRevert("Fee collector cannot be 0x0");
+            _feeSettings = FeeSettings(
+                feeSettingsCloneFactory.createFeeSettingsClone("salt", trustedForwarder, admin, feeType)
+            );
+        }
     }
 
     function testOwner0FailsInInitializer() public {
         vm.expectRevert("owner can not be zero address");
-        feeSettingsCloneFactory.createFeeSettingsClone("salt", trustedForwarder, address(0), fees, admin, admin, admin);
+        feeSettingsCloneFactory.createFeeSettingsClone("salt", trustedForwarder, address(0), _buildFeeTypes(admin));
     }
 
     function testFeeCollector0FailsInSetter() public {
@@ -426,7 +479,12 @@ contract FeeSettingsTest is Test {
 
         Fees memory _fees = Fees(tokenFeeNumerator, crowdinvestingFeeNumerator, privateOfferFeeNumerator, 0);
         FeeSettings _feeSettings = FeeSettings(
-            feeSettingsCloneFactory.createFeeSettingsClone("salt5", trustedForwarder, admin, _fees, admin, admin, admin)
+            feeSettingsCloneFactory.createFeeSettingsClone(
+                "salt5",
+                trustedForwarder,
+                admin,
+                _buildFeeTypesFromFees(_fees, admin)
+            )
         );
 
         assertEq(
@@ -461,7 +519,12 @@ contract FeeSettingsTest is Test {
 
         Fees memory _fees = Fees(0, crowdinvestingFeeNumerator, privateOfferFeeNumerator, 0);
         FeeSettings _feeSettings = FeeSettings(
-            feeSettingsCloneFactory.createFeeSettingsClone("salt4", trustedForwarder, admin, _fees, admin, admin, admin)
+            feeSettingsCloneFactory.createFeeSettingsClone(
+                "salt4",
+                trustedForwarder,
+                admin,
+                _buildFeeTypesFromFees(_fees, admin)
+            )
         );
 
         assertEq(_feeSettings.tokenFee(amount, address(0)), 0, "Token fee mismatch");
@@ -480,7 +543,12 @@ contract FeeSettingsTest is Test {
 
         _fees = Fees(tokenFeeNumerator, 0, privateOfferFeeNumerator, 0);
         _feeSettings = FeeSettings(
-            feeSettingsCloneFactory.createFeeSettingsClone("salt3", trustedForwarder, admin, _fees, admin, admin, admin)
+            feeSettingsCloneFactory.createFeeSettingsClone(
+                "salt3",
+                trustedForwarder,
+                admin,
+                _buildFeeTypesFromFees(_fees, admin)
+            )
         );
         assertEq(
             _feeSettings.tokenFee(amount, address(0)),
@@ -498,7 +566,12 @@ contract FeeSettingsTest is Test {
 
         _fees = Fees(tokenFeeNumerator, crowdinvestingFeeNumerator, 0, 0);
         _feeSettings = FeeSettings(
-            feeSettingsCloneFactory.createFeeSettingsClone("salt2", trustedForwarder, admin, _fees, admin, admin, admin)
+            feeSettingsCloneFactory.createFeeSettingsClone(
+                "salt2",
+                trustedForwarder,
+                admin,
+                _buildFeeTypesFromFees(_fees, admin)
+            )
         );
         assertEq(
             _feeSettings.tokenFee(amount, address(0)),
@@ -563,10 +636,7 @@ contract FeeSettingsTest is Test {
                 "salt",
                 trustedForwarder,
                 address(this),
-                _fees,
-                address(this),
-                address(this),
-                address(this)
+                _buildFeeTypesFromFees(_fees, address(this))
             )
         );
         // check there is no entry for this token address
@@ -637,10 +707,7 @@ contract FeeSettingsTest is Test {
                 "salt",
                 trustedForwarder,
                 address(this),
-                _fees,
-                admin,
-                admin,
-                admin
+                _buildFeeTypesFromFees(_fees, admin)
             )
         );
         // add custom fee entry for this token address
@@ -663,10 +730,7 @@ contract FeeSettingsTest is Test {
                 "salt",
                 trustedForwarder,
                 address(this),
-                _fees,
-                admin,
-                admin,
-                admin
+                _buildFeeTypesFromFees(_fees, admin)
             )
         );
 
@@ -707,10 +771,7 @@ contract FeeSettingsTest is Test {
                 "salt",
                 trustedForwarder,
                 address(this),
-                _fees,
-                admin,
-                admin,
-                admin
+                _buildFeeTypesFromFees(_fees, admin)
             )
         );
         // add custom fee entry for this token address

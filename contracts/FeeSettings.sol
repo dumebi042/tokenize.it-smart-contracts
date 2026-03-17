@@ -43,11 +43,24 @@ contract FeeSettings is
      * @notice Configuration for a registered fee type.
      * @param maxNumerator     Hard cap — fees above this are rejected.
      * @param defaultNumerator The default numerator used when no active custom fee applies.
-     * @param exists           Guards against reads on unregistered keys.
      */
     struct FeeTypeConfig {
         uint32 maxNumerator;
         uint32 defaultNumerator;
+    }
+
+    /**
+     * @notice Initialization data for a single fee type, used in initialize().
+     * @param feeType          bytes32 identifier (e.g. FeeTypes.TOKEN_FEE)
+     * @param maxNumerator     Hard cap for this fee type
+     * @param defaultNumerator Initial default numerator; must be <= maxNumerator
+     * @param collector        Default fee collector address for this type
+     */
+    struct FeeTypeInit {
+        bytes32 feeType;
+        uint32 maxNumerator;
+        uint32 defaultNumerator;
+        address collector;
     }
 
     /**
@@ -99,7 +112,7 @@ contract FeeSettings is
     /// @notice A manager has been removed
     event ManagerRemoved(address indexed manager);
 
-    /// @notice A new fee type has been registered (or its max cap raised)
+    /// @notice A new fee type has been registered
     event FeeTypeRegistered(bytes32 indexed feeType, uint32 maxNumerator, uint32 defaultNumerator);
 
     /// @notice A default fee change has been proposed
@@ -133,54 +146,21 @@ contract FeeSettings is
     }
 
     /**
-     * @notice Initializes a new FeeSettings clone with the four standard fee types.
-     *      SECONDARY_MARKET_FEE is initialized with the same numerator and collector as PRIVATE_OFFER_FEE.
-     * @param _owner                      Owner of this clone
-     * @param _fees                       Initial fee numerators for the three fee types
-     * @param _tokenFeeCollector          Default collector for token fees
-     * @param _crowdinvestingFeeCollector Default collector for crowdinvesting fees
-     * @param _privateOfferFeeCollector   Default collector for private offer fees
+     * @notice Initializes a new FeeSettings clone with an arbitrary set of fee types.
+     * @param _owner     Owner of this clone
+     * @param _feeTypes  Array of fee type configurations to register on deployment
      */
-    function initialize(
-        address _owner,
-        Fees memory _fees,
-        address _tokenFeeCollector,
-        address _crowdinvestingFeeCollector,
-        address _privateOfferFeeCollector
-    ) external initializer {
+    function initialize(address _owner, FeeTypeInit[] memory _feeTypes) external initializer {
         require(_owner != address(0), "owner can not be zero address");
         managers[_owner] = true;
         _transferOwnership(_owner);
 
-        require(_fees.tokenFeeNumerator <= MAX_TOKEN_FEE_NUMERATOR, "Token fee must be <= 5%");
-        require(
-            _fees.crowdinvestingFeeNumerator <= MAX_CROWDINVESTING_FEE_NUMERATOR,
-            "Crowdinvesting fee must be <= 10%"
-        );
-        require(_fees.privateOfferFeeNumerator <= MAX_PRIVATE_OFFER_FEE_NUMERATOR, "PrivateOffer fee must be <= 5%");
-
-        _registerFeeType(FeeTypes.TOKEN_FEE, MAX_TOKEN_FEE_NUMERATOR, _fees.tokenFeeNumerator);
-        _registerFeeType(
-            FeeTypes.CROWDINVESTING_FEE,
-            MAX_CROWDINVESTING_FEE_NUMERATOR,
-            _fees.crowdinvestingFeeNumerator
-        );
-        _registerFeeType(FeeTypes.PRIVATE_OFFER_FEE, MAX_PRIVATE_OFFER_FEE_NUMERATOR, _fees.privateOfferFeeNumerator);
-        _registerFeeType(
-            FeeTypes.SECONDARY_MARKET_FEE,
-            MAX_PRIVATE_OFFER_FEE_NUMERATOR,
-            _fees.privateOfferFeeNumerator
-        );
-
-        require(_tokenFeeCollector != address(0), "Fee collector cannot be 0x0");
-        feeCollectors[FeeTypes.TOKEN_FEE][address(0)] = _tokenFeeCollector;
-
-        require(_crowdinvestingFeeCollector != address(0), "Fee collector cannot be 0x0");
-        feeCollectors[FeeTypes.CROWDINVESTING_FEE][address(0)] = _crowdinvestingFeeCollector;
-
-        require(_privateOfferFeeCollector != address(0), "Fee collector cannot be 0x0");
-        feeCollectors[FeeTypes.PRIVATE_OFFER_FEE][address(0)] = _privateOfferFeeCollector;
-        feeCollectors[FeeTypes.SECONDARY_MARKET_FEE][address(0)] = _privateOfferFeeCollector;
+        for (uint256 i = 0; i < _feeTypes.length; i++) {
+            FeeTypeInit memory feeType = _feeTypes[i];
+            require(feeType.collector != address(0), "Fee collector cannot be 0x0");
+            _registerFeeType(feeType.feeType, feeType.maxNumerator, feeType.defaultNumerator);
+            feeCollectors[feeType.feeType][address(0)] = feeType.collector;
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -216,13 +196,14 @@ contract FeeSettings is
      * @param _defaultNumerator Initial default numerator; must be <= _maxNumerator
      */
     function registerFeeType(bytes32 _feeType, uint32 _maxNumerator, uint32 _defaultNumerator) external onlyOwner {
-        require(_feeType != bytes32(0), "feeType cannot be 0");
-        require(feeTypeConfigs[_feeType].maxNumerator == 0, "fee type already registered");
-        require(_defaultNumerator <= _maxNumerator, "default exceeds max");
         _registerFeeType(_feeType, _maxNumerator, _defaultNumerator);
     }
 
     function _registerFeeType(bytes32 _feeType, uint32 _maxNumerator, uint32 _defaultNumerator) internal {
+        require(_feeType != bytes32(0), "feeType cannot be 0");
+        require(_maxNumerator > 0, "maxNumerator cannot be 0");
+        require(feeTypeConfigs[_feeType].maxNumerator == 0, "fee type already registered");
+        require(_defaultNumerator <= _maxNumerator, "default exceeds max");
         feeTypeConfigs[_feeType] = FeeTypeConfig({maxNumerator: _maxNumerator, defaultNumerator: _defaultNumerator});
         emit FeeTypeRegistered(_feeType, _maxNumerator, _defaultNumerator);
     }
