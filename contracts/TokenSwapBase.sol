@@ -104,15 +104,25 @@ abstract contract TokenSwapBase is
 
     /**
      * @notice Retrieves the fee amount and the fee receiver for a token swap transaction.
+     * @dev Uses IFeeSettingsV3.fee(FeeTypes.SECONDARY_MARKET_FEE, ...) when the fee settings
+     *      contract supports V3; falls back to privateOfferFee for V2-only deployments.
      * @param _currencyAmount The total currency amount involved in the swap transaction, in bits (smallest subunit of currency)
-     * @return fee The fee amount to be collected, in bits (smallest subunit of currency)
-     * @return feeCollector The address that will receive the collected fees
+     * @return The fee amount to be collected, in bits (smallest subunit of currency)
+     * @return The address that will receive the collected fees
      */
     function _getFeeAndFeeReceiver(uint256 _currencyAmount) internal view returns (uint256, address) {
-        IFeeSettingsV2 feeSettings = token.feeSettings();
+        IFeeSettingsV2 feeSettingsV2 = token.feeSettings();
+        if (feeSettingsV2.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
+            IFeeSettingsV3 feeSettingsV3 = IFeeSettingsV3(address(feeSettingsV2));
+            return (
+                feeSettingsV3.fee(FeeTypes.SECONDARY_MARKET_FEE, _currencyAmount, address(token)),
+                feeSettingsV3.feeCollector(FeeTypes.SECONDARY_MARKET_FEE, address(token))
+            );
+        }
+        // V2 fallback: use privateOfferFee until the fee settings contract is upgraded
         return (
-            feeSettings.privateOfferFee(_currencyAmount, address(token)),
-            feeSettings.privateOfferFeeCollector(address(token))
+            feeSettingsV2.privateOfferFee(_currencyAmount, address(token)),
+            feeSettingsV2.privateOfferFeeCollector(address(token))
         );
     }
 

@@ -99,10 +99,19 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         require(block.timestamp >= claimStart, "exit not yet started");
         IERC20(address(token)).safeTransferFrom(_holder, address(this), _tokenAmount);
         uint256 currencyAmount = (_tokenAmount * pricePerToken) / 10 ** token.decimals();
-        IFeeSettingsV2 feeSettings = token.feeSettings();
-        uint256 fee = feeSettings.privateOfferFee(currencyAmount, address(token));
+        IFeeSettingsV2 feeSettingsV2 = token.feeSettings();
+        uint256 fee;
+        address feeCollector;
+        if (feeSettingsV2.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
+            IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(feeSettingsV2));
+            fee = feeSettings.fee(FeeTypes.PRIVATE_OFFER_FEE, currencyAmount, address(token));
+            feeCollector = feeSettings.feeCollector(FeeTypes.PRIVATE_OFFER_FEE, address(token));
+        } else {
+            fee = feeSettingsV2.privateOfferFee(currencyAmount, address(token));
+            feeCollector = feeSettingsV2.privateOfferFeeCollector(address(token));
+        }
         if (fee != 0) {
-            currency.safeTransfer(feeSettings.privateOfferFeeCollector(address(token)), fee);
+            currency.safeTransfer(feeCollector, fee);
         }
         currency.safeTransfer(_recipient, currencyAmount - fee);
     }

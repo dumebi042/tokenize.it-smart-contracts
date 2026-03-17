@@ -71,14 +71,19 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
             token.allowList().map(address(_arguments.currency)) & TRUSTED_CURRENCY == TRUSTED_CURRENCY,
             "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
         );
-        IFeeSettingsV2 feeSettings = _arguments.token.feeSettings();
-        uint256 fee = feeSettings.privateOfferFee(_arguments.totalCurrencyAmount, address(_arguments.token));
+        IFeeSettingsV2 feeSettingsV2 = _arguments.token.feeSettings();
+        uint256 fee;
+        address feeCollector;
+        if (feeSettingsV2.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
+            IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(feeSettingsV2));
+            fee = feeSettings.fee(FeeTypes.PRIVATE_OFFER_FEE, _arguments.totalCurrencyAmount, address(_arguments.token));
+            feeCollector = feeSettings.feeCollector(FeeTypes.PRIVATE_OFFER_FEE, address(_arguments.token));
+        } else {
+            fee = feeSettingsV2.privateOfferFee(_arguments.totalCurrencyAmount, address(_arguments.token));
+            feeCollector = feeSettingsV2.privateOfferFeeCollector(address(_arguments.token));
+        }
         if (fee != 0) {
-            _arguments.currency.safeTransferFrom(
-                _currencyProvider,
-                feeSettings.privateOfferFeeCollector(address(_arguments.token)),
-                fee
-            );
+            _arguments.currency.safeTransferFrom(_currencyProvider, feeCollector, fee);
         }
         totalCurrencyAmount = _arguments.totalCurrencyAmount - fee;
         reassignAfter = _arguments.reassignAfter;
