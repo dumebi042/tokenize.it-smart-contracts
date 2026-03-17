@@ -160,9 +160,17 @@ contract FeeSettings is
         require(_fees.privateOfferFeeNumerator <= MAX_PRIVATE_OFFER_FEE_NUMERATOR, "PrivateOffer fee must be <= 5%");
 
         _registerFeeType(FeeTypes.TOKEN_FEE, MAX_TOKEN_FEE_NUMERATOR, _fees.tokenFeeNumerator);
-        _registerFeeType(FeeTypes.CROWDINVESTING_FEE, MAX_CROWDINVESTING_FEE_NUMERATOR, _fees.crowdinvestingFeeNumerator);
+        _registerFeeType(
+            FeeTypes.CROWDINVESTING_FEE,
+            MAX_CROWDINVESTING_FEE_NUMERATOR,
+            _fees.crowdinvestingFeeNumerator
+        );
         _registerFeeType(FeeTypes.PRIVATE_OFFER_FEE, MAX_PRIVATE_OFFER_FEE_NUMERATOR, _fees.privateOfferFeeNumerator);
-        _registerFeeType(FeeTypes.SECONDARY_MARKET_FEE, MAX_PRIVATE_OFFER_FEE_NUMERATOR, _fees.privateOfferFeeNumerator);
+        _registerFeeType(
+            FeeTypes.SECONDARY_MARKET_FEE,
+            MAX_PRIVATE_OFFER_FEE_NUMERATOR,
+            _fees.privateOfferFeeNumerator
+        );
 
         require(_tokenFeeCollector != address(0), "Fee collector cannot be 0x0");
         feeCollectors[FeeTypes.TOKEN_FEE][address(0)] = _tokenFeeCollector;

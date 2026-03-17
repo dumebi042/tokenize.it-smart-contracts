@@ -99,7 +99,12 @@ contract FeeSettingsIntegrationTest is Test {
         assertEq(token.balanceOf(_customFeeCollector), 0, "token.balanceOf(customFeeCollector) != 0 before");
 
         vm.startPrank(platformAdmin);
-        feeSettings.setCustomFee(FeeTypes.TOKEN_FEE, address(token), customFees.tokenFeeNumerator, customFees.validityDate);
+        feeSettings.setCustomFee(
+            FeeTypes.TOKEN_FEE,
+            address(token),
+            customFees.tokenFeeNumerator,
+            customFees.validityDate
+        );
         feeSettings.setCustomFeeCollector(FeeTypes.TOKEN_FEE, address(token), _customFeeCollector);
         vm.stopPrank();
         vm.prank(companyAdmin);
@@ -121,8 +126,18 @@ contract FeeSettingsIntegrationTest is Test {
         vm.warp(100 * 365 days);
 
         vm.startPrank(platformAdmin);
-        feeSettings.setCustomFee(FeeTypes.TOKEN_FEE, address(token), customFees.tokenFeeNumerator, customFees.validityDate);
-        feeSettings.setCustomFee(FeeTypes.PRIVATE_OFFER_FEE, address(token), customFees.privateOfferFeeNumerator, customFees.validityDate);
+        feeSettings.setCustomFee(
+            FeeTypes.TOKEN_FEE,
+            address(token),
+            customFees.tokenFeeNumerator,
+            customFees.validityDate
+        );
+        feeSettings.setCustomFee(
+            FeeTypes.PRIVATE_OFFER_FEE,
+            address(token),
+            customFees.privateOfferFeeNumerator,
+            customFees.validityDate
+        );
         feeSettings.setCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE, address(token), _customFeeCollector);
         vm.stopPrank();
 
@@ -198,8 +213,18 @@ contract FeeSettingsIntegrationTest is Test {
         vm.warp(100 * 365 days);
 
         vm.startPrank(platformAdmin);
-        feeSettings.setCustomFee(FeeTypes.TOKEN_FEE, address(token), customFees.tokenFeeNumerator, customFees.validityDate);
-        feeSettings.setCustomFee(FeeTypes.CROWDINVESTING_FEE, address(token), customFees.crowdinvestingFeeNumerator, customFees.validityDate);
+        feeSettings.setCustomFee(
+            FeeTypes.TOKEN_FEE,
+            address(token),
+            customFees.tokenFeeNumerator,
+            customFees.validityDate
+        );
+        feeSettings.setCustomFee(
+            FeeTypes.CROWDINVESTING_FEE,
+            address(token),
+            customFees.crowdinvestingFeeNumerator,
+            customFees.validityDate
+        );
         feeSettings.setCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE, address(token), _customFeeCollector);
         vm.stopPrank();
 

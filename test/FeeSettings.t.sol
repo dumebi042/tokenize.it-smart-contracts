@@ -601,8 +601,8 @@ contract FeeSettingsTest is Test {
         // check the custom fee entry is as expected
         {
             (uint32 tokenNum, uint64 tokenValidity) = _feeSettings.customFees(FeeTypes.TOKEN_FEE, _someTokenAddress);
-            (uint32 ciNum,) = _feeSettings.customFees(FeeTypes.CROWDINVESTING_FEE, _someTokenAddress);
-            (uint32 poNum,) = _feeSettings.customFees(FeeTypes.PRIVATE_OFFER_FEE, _someTokenAddress);
+            (uint32 ciNum, ) = _feeSettings.customFees(FeeTypes.CROWDINVESTING_FEE, _someTokenAddress);
+            (uint32 poNum, ) = _feeSettings.customFees(FeeTypes.PRIVATE_OFFER_FEE, _someTokenAddress);
             assertEq(tokenNum, 3, "Token fee numerator should be 3");
             assertEq(ciNum, 4, "Crowdinvesting fee numerator should be 4");
             assertEq(poNum, 2, "Private offer fee numerator should be 2");
@@ -799,7 +799,7 @@ contract FeeSettingsTest is Test {
         vm.assume(_feeCollector != admin);
 
         assertEq(
-            feeSettings.feeCollectors(FeeTypes.TOKEN_FEE,exampleTokenAddress),
+            feeSettings.feeCollectors(FeeTypes.TOKEN_FEE, exampleTokenAddress),
             address(0),
             "Should not be custom fee collector yet"
         );
@@ -812,9 +812,13 @@ contract FeeSettingsTest is Test {
         assertEq(feeSettings.tokenFeeCollector(exampleTokenAddress), admin, "Fee collector not admin address");
 
         vm.prank(admin);
-        feeSettings.setCustomFeeCollector(FeeTypes.TOKEN_FEE,exampleTokenAddress, _feeCollector);
+        feeSettings.setCustomFeeCollector(FeeTypes.TOKEN_FEE, exampleTokenAddress, _feeCollector);
 
-        assertEq(feeSettings.feeCollectors(FeeTypes.TOKEN_FEE,exampleTokenAddress), _feeCollector, "Custom fee collector wrong");
+        assertEq(
+            feeSettings.feeCollectors(FeeTypes.TOKEN_FEE, exampleTokenAddress),
+            _feeCollector,
+            "Custom fee collector wrong"
+        );
         assertEq(
             feeSettings.tokenFeeCollector(exampleTokenAddress),
             _feeCollector,
@@ -828,7 +832,7 @@ contract FeeSettingsTest is Test {
         vm.assume(_feeCollector != admin);
 
         vm.prank(admin);
-        feeSettings.setCustomFeeCollector(FeeTypes.TOKEN_FEE,exampleTokenAddress, _feeCollector);
+        feeSettings.setCustomFeeCollector(FeeTypes.TOKEN_FEE, exampleTokenAddress, _feeCollector);
 
         assertEq(
             feeSettings.tokenFeeCollector(exampleTokenAddress),
@@ -837,10 +841,10 @@ contract FeeSettingsTest is Test {
         );
 
         vm.prank(admin);
-        feeSettings.removeCustomFeeCollector(FeeTypes.TOKEN_FEE,exampleTokenAddress);
+        feeSettings.removeCustomFeeCollector(FeeTypes.TOKEN_FEE, exampleTokenAddress);
 
         assertEq(
-            feeSettings.feeCollectors(FeeTypes.TOKEN_FEE,exampleTokenAddress),
+            feeSettings.feeCollectors(FeeTypes.TOKEN_FEE, exampleTokenAddress),
             address(0),
             "Should not be custom fee collector yet"
         );
@@ -858,7 +862,7 @@ contract FeeSettingsTest is Test {
         vm.assume(_feeCollector != admin);
 
         assertEq(
-            feeSettings.feeCollectors(FeeTypes.CROWDINVESTING_FEE,exampleTokenAddress),
+            feeSettings.feeCollectors(FeeTypes.CROWDINVESTING_FEE, exampleTokenAddress),
             address(0),
             "Should not be custom fee collector yet"
         );
@@ -866,10 +870,10 @@ contract FeeSettingsTest is Test {
         assertEq(feeSettings.crowdinvestingFeeCollector(exampleTokenAddress), admin, "Fee collector not admin address");
 
         vm.prank(admin);
-        feeSettings.setCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE,exampleTokenAddress, _feeCollector);
+        feeSettings.setCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE, exampleTokenAddress, _feeCollector);
 
         assertEq(
-            feeSettings.feeCollectors(FeeTypes.CROWDINVESTING_FEE,exampleTokenAddress),
+            feeSettings.feeCollectors(FeeTypes.CROWDINVESTING_FEE, exampleTokenAddress),
             _feeCollector,
             "Custom fee collector wrong"
         );
@@ -885,7 +889,7 @@ contract FeeSettingsTest is Test {
         vm.assume(_feeCollector != admin);
 
         vm.prank(admin);
-        feeSettings.setCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE,exampleTokenAddress, _feeCollector);
+        feeSettings.setCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE, exampleTokenAddress, _feeCollector);
 
         assertEq(
             feeSettings.crowdinvestingFeeCollector(exampleTokenAddress),
@@ -894,10 +898,10 @@ contract FeeSettingsTest is Test {
         );
 
         vm.prank(admin);
-        feeSettings.removeCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE,exampleTokenAddress);
+        feeSettings.removeCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE, exampleTokenAddress);
 
         assertEq(
-            feeSettings.feeCollectors(FeeTypes.CROWDINVESTING_FEE,exampleTokenAddress),
+            feeSettings.feeCollectors(FeeTypes.CROWDINVESTING_FEE, exampleTokenAddress),
             address(0),
             "Should not be custom fee collector yet"
         );
@@ -910,7 +914,7 @@ contract FeeSettingsTest is Test {
         vm.assume(_feeCollector != admin);
 
         assertEq(
-            feeSettings.feeCollectors(FeeTypes.PRIVATE_OFFER_FEE,exampleTokenAddress),
+            feeSettings.feeCollectors(FeeTypes.PRIVATE_OFFER_FEE, exampleTokenAddress),
             address(0),
             "Should not be custom fee collector yet"
         );
@@ -918,10 +922,10 @@ contract FeeSettingsTest is Test {
         assertEq(feeSettings.privateOfferFeeCollector(exampleTokenAddress), admin, "Fee collector not admin address");
 
         vm.prank(admin);
-        feeSettings.setCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE,exampleTokenAddress, _feeCollector);
+        feeSettings.setCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE, exampleTokenAddress, _feeCollector);
 
         assertEq(
-            feeSettings.feeCollectors(FeeTypes.PRIVATE_OFFER_FEE,exampleTokenAddress),
+            feeSettings.feeCollectors(FeeTypes.PRIVATE_OFFER_FEE, exampleTokenAddress),
             _feeCollector,
             "Custom fee collector wrong"
         );
@@ -937,7 +941,7 @@ contract FeeSettingsTest is Test {
         vm.assume(_feeCollector != admin);
 
         vm.prank(admin);
-        feeSettings.setCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE,exampleTokenAddress, _feeCollector);
+        feeSettings.setCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE, exampleTokenAddress, _feeCollector);
 
         assertEq(
             feeSettings.privateOfferFeeCollector(exampleTokenAddress),
@@ -946,10 +950,10 @@ contract FeeSettingsTest is Test {
         );
 
         vm.prank(admin);
-        feeSettings.removeCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE,exampleTokenAddress);
+        feeSettings.removeCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE, exampleTokenAddress);
 
         assertEq(
-            feeSettings.feeCollectors(FeeTypes.PRIVATE_OFFER_FEE,exampleTokenAddress),
+            feeSettings.feeCollectors(FeeTypes.PRIVATE_OFFER_FEE, exampleTokenAddress),
             address(0),
             "Should not be custom fee collector yet"
         );
@@ -968,61 +972,61 @@ contract FeeSettingsTest is Test {
         feeSettings.addManager(_manager);
 
         assertEq(
-            feeSettings.feeCollectors(FeeTypes.TOKEN_FEE,exampleTokenAddress),
+            feeSettings.feeCollectors(FeeTypes.TOKEN_FEE, exampleTokenAddress),
             address(0),
             "Should not be custom fee collector yet"
         );
         assertEq(
-            feeSettings.feeCollectors(FeeTypes.CROWDINVESTING_FEE,exampleTokenAddress),
+            feeSettings.feeCollectors(FeeTypes.CROWDINVESTING_FEE, exampleTokenAddress),
             address(0),
             "Should not be custom fee collector yet"
         );
         assertEq(
-            feeSettings.feeCollectors(FeeTypes.PRIVATE_OFFER_FEE,exampleTokenAddress),
+            feeSettings.feeCollectors(FeeTypes.PRIVATE_OFFER_FEE, exampleTokenAddress),
             address(0),
             "Should not be custom fee collector yet"
         );
 
         vm.startPrank(_manager);
-        feeSettings.setCustomFeeCollector(FeeTypes.TOKEN_FEE,exampleTokenAddress, _customFeeCollector);
-        feeSettings.setCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE,exampleTokenAddress, _customFeeCollector);
-        feeSettings.setCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE,exampleTokenAddress, _customFeeCollector);
+        feeSettings.setCustomFeeCollector(FeeTypes.TOKEN_FEE, exampleTokenAddress, _customFeeCollector);
+        feeSettings.setCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE, exampleTokenAddress, _customFeeCollector);
+        feeSettings.setCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE, exampleTokenAddress, _customFeeCollector);
         vm.stopPrank();
 
         assertEq(
-            feeSettings.feeCollectors(FeeTypes.TOKEN_FEE,exampleTokenAddress),
+            feeSettings.feeCollectors(FeeTypes.TOKEN_FEE, exampleTokenAddress),
             _customFeeCollector,
             "Custom fee collector wrong"
         );
         assertEq(
-            feeSettings.feeCollectors(FeeTypes.CROWDINVESTING_FEE,exampleTokenAddress),
+            feeSettings.feeCollectors(FeeTypes.CROWDINVESTING_FEE, exampleTokenAddress),
             _customFeeCollector,
             "Custom fee collector wrong"
         );
         assertEq(
-            feeSettings.feeCollectors(FeeTypes.PRIVATE_OFFER_FEE,exampleTokenAddress),
+            feeSettings.feeCollectors(FeeTypes.PRIVATE_OFFER_FEE, exampleTokenAddress),
             _customFeeCollector,
             "Custom fee collector wrong"
         );
 
         vm.startPrank(_manager);
-        feeSettings.removeCustomFeeCollector(FeeTypes.TOKEN_FEE,exampleTokenAddress);
-        feeSettings.removeCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE,exampleTokenAddress);
-        feeSettings.removeCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE,exampleTokenAddress);
+        feeSettings.removeCustomFeeCollector(FeeTypes.TOKEN_FEE, exampleTokenAddress);
+        feeSettings.removeCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE, exampleTokenAddress);
+        feeSettings.removeCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE, exampleTokenAddress);
         vm.stopPrank();
 
         assertEq(
-            feeSettings.feeCollectors(FeeTypes.TOKEN_FEE,exampleTokenAddress),
+            feeSettings.feeCollectors(FeeTypes.TOKEN_FEE, exampleTokenAddress),
             address(0),
             "Should not be custom fee collector yet"
         );
         assertEq(
-            feeSettings.feeCollectors(FeeTypes.CROWDINVESTING_FEE,exampleTokenAddress),
+            feeSettings.feeCollectors(FeeTypes.CROWDINVESTING_FEE, exampleTokenAddress),
             address(0),
             "Should not be custom fee collector yet"
         );
         assertEq(
-            feeSettings.feeCollectors(FeeTypes.PRIVATE_OFFER_FEE,exampleTokenAddress),
+            feeSettings.feeCollectors(FeeTypes.PRIVATE_OFFER_FEE, exampleTokenAddress),
             address(0),
             "Should not be custom fee collector yet"
         );
@@ -1036,41 +1040,41 @@ contract FeeSettingsTest is Test {
 
         vm.expectRevert("Only managers can call this function");
         vm.prank(_rando);
-        feeSettings.setCustomFeeCollector(FeeTypes.TOKEN_FEE,exampleTokenAddress, _customFeeCollector);
+        feeSettings.setCustomFeeCollector(FeeTypes.TOKEN_FEE, exampleTokenAddress, _customFeeCollector);
 
         vm.expectRevert("Only managers can call this function");
         vm.prank(_rando);
-        feeSettings.setCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE,exampleTokenAddress, _customFeeCollector);
+        feeSettings.setCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE, exampleTokenAddress, _customFeeCollector);
 
         vm.expectRevert("Only managers can call this function");
         vm.prank(_rando);
-        feeSettings.setCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE,exampleTokenAddress, _customFeeCollector);
+        feeSettings.setCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE, exampleTokenAddress, _customFeeCollector);
 
         vm.expectRevert("Only managers can call this function");
         vm.prank(_rando);
-        feeSettings.removeCustomFeeCollector(FeeTypes.TOKEN_FEE,exampleTokenAddress);
+        feeSettings.removeCustomFeeCollector(FeeTypes.TOKEN_FEE, exampleTokenAddress);
 
         vm.expectRevert("Only managers can call this function");
         vm.prank(_rando);
-        feeSettings.removeCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE,exampleTokenAddress);
+        feeSettings.removeCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE, exampleTokenAddress);
 
         vm.expectRevert("Only managers can call this function");
         vm.prank(_rando);
-        feeSettings.removeCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE,exampleTokenAddress);
+        feeSettings.removeCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE, exampleTokenAddress);
     }
 
     function testSettingCustomFeeCollectorFor0AddressReverts() public {
         vm.expectRevert("collector cannot be 0x0");
         vm.prank(admin);
-        feeSettings.setCustomFeeCollector(FeeTypes.TOKEN_FEE,exampleTokenAddress, address(0));
+        feeSettings.setCustomFeeCollector(FeeTypes.TOKEN_FEE, exampleTokenAddress, address(0));
 
         vm.expectRevert("collector cannot be 0x0");
         vm.prank(admin);
-        feeSettings.setCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE,exampleTokenAddress, address(0));
+        feeSettings.setCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE, exampleTokenAddress, address(0));
 
         vm.expectRevert("collector cannot be 0x0");
         vm.prank(admin);
-        feeSettings.setCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE,exampleTokenAddress, address(0));
+        feeSettings.setCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE, exampleTokenAddress, address(0));
     }
 
     function testSettingCustomFeesFor0AddressReverts() public {
@@ -1089,7 +1093,7 @@ contract FeeSettingsTest is Test {
         vm.startPrank(admin);
 
         // check token fee collector
-        feeSettings.setCustomFeeCollector(FeeTypes.TOKEN_FEE,specifiedAddress, customFeeCollector);
+        feeSettings.setCustomFeeCollector(FeeTypes.TOKEN_FEE, specifiedAddress, customFeeCollector);
         assertEq(
             feeSettings.tokenFeeCollector(specifiedAddress),
             customFeeCollector,
@@ -1110,10 +1114,10 @@ contract FeeSettingsTest is Test {
         assertEq(feeSettings.crowdinvestingFeeCollector(someAddress), admin, "Crowdinvesting fee collector wrong");
         assertEq(feeSettings.privateOfferFeeCollector(someAddress), admin, "Private offer fee collector wrong");
 
-        feeSettings.removeCustomFeeCollector(FeeTypes.TOKEN_FEE,specifiedAddress);
+        feeSettings.removeCustomFeeCollector(FeeTypes.TOKEN_FEE, specifiedAddress);
 
         // test crowdinvesting fee collector
-        feeSettings.setCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE,specifiedAddress, customFeeCollector);
+        feeSettings.setCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE, specifiedAddress, customFeeCollector);
         assertEq(
             feeSettings.tokenFeeCollector(specifiedAddress),
             admin,
@@ -1134,10 +1138,10 @@ contract FeeSettingsTest is Test {
         assertEq(feeSettings.crowdinvestingFeeCollector(someAddress), admin, "Crowdinvesting fee collector wrong");
         assertEq(feeSettings.privateOfferFeeCollector(someAddress), admin, "Private offer fee collector wrong");
 
-        feeSettings.removeCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE,specifiedAddress);
+        feeSettings.removeCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE, specifiedAddress);
 
         // test private offer fee collector
-        feeSettings.setCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE,specifiedAddress, customFeeCollector);
+        feeSettings.setCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE, specifiedAddress, customFeeCollector);
         assertEq(
             feeSettings.tokenFeeCollector(specifiedAddress),
             admin,
@@ -1168,14 +1172,14 @@ contract FeeSettingsTest is Test {
     function testRemovingCustomFeeCollectorsFor0AddressReverts() public {
         vm.expectRevert("token cannot be 0x0");
         vm.prank(admin);
-        feeSettings.removeCustomFeeCollector(FeeTypes.TOKEN_FEE,address(0));
+        feeSettings.removeCustomFeeCollector(FeeTypes.TOKEN_FEE, address(0));
 
         vm.expectRevert("token cannot be 0x0");
         vm.prank(admin);
-        feeSettings.removeCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE,address(0));
+        feeSettings.removeCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE, address(0));
 
         vm.expectRevert("token cannot be 0x0");
         vm.prank(admin);
-        feeSettings.removeCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE,address(0));
+        feeSettings.removeCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE, address(0));
     }
 }
