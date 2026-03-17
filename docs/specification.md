@@ -221,8 +221,8 @@ The following statements about the smart contracts should always be true
 - As long as an allowance remains, the limit order can be executed repeatedly.
 - The maximum amount of tokens to buy or sell is determined by the allowance granted.
 - Fees are deducted from the currency transferred during the swap.
-- Fee amount is determined by the token's fee settings' CrowdinvestingFee.
-- Fee receiver is determined by the token's fee settings' CrowdinvestingFeeCollector.
+- Fee amount is determined by the token's fee settings' SecondaryMarketFee (FeeSettingsV3) or PrivateOfferFee (FeeSettingsV2 fallback).
+- Fee receiver is determined by the token's fee settings' SecondaryMarketFeeCollector (FeeSettingsV3) or PrivateOfferFeeCollector (FeeSettingsV2 fallback).
 - No fees are deducted from the tokens transferred during the swap.
 - The buyer calling the buy function will pay no more than maxCurrencyAmount, protecting them from frontrunning or other unexpected influences.
 - The seller calling the sell function will receive no less than minCurrencyAmount, protecting them from frontrunning or other unexpected influences.
