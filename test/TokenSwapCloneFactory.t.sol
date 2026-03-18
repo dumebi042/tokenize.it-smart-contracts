@@ -53,10 +53,10 @@ contract TokenSwapCloneFactoryTest is Test {
         );
         {
             FeeSettings.FeeTypeInit[] memory feeTypes = new FeeSettings.FeeTypeInit[](4);
-            feeTypes[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN_FEE, 500, 100, feeSettingsAndAllowListOwner);
-            feeTypes[1] = FeeSettings.FeeTypeInit(FeeTypes.CROWDINVESTING_FEE, 1000, 100, feeSettingsAndAllowListOwner);
-            feeTypes[2] = FeeSettings.FeeTypeInit(FeeTypes.PRIVATE_OFFER_FEE, 500, 100, feeSettingsAndAllowListOwner);
-            feeTypes[3] = FeeSettings.FeeTypeInit(FeeTypes.SECONDARY_MARKET_FEE, 500, 0, feeSettingsAndAllowListOwner);
+            feeTypes[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN, 500, 100, feeSettingsAndAllowListOwner);
+            feeTypes[1] = FeeSettings.FeeTypeInit(FeeTypes.CROWDINVESTING, 1000, 100, feeSettingsAndAllowListOwner);
+            feeTypes[2] = FeeSettings.FeeTypeInit(FeeTypes.PRIVATE_OFFER, 500, 100, feeSettingsAndAllowListOwner);
+            feeTypes[3] = FeeSettings.FeeTypeInit(FeeTypes.SECONDARY_MARKET, 500, 0, feeSettingsAndAllowListOwner);
             feeSettings = FeeSettings(
                 feeSettingsCloneFactory.createFeeSettingsClone(
                     0,

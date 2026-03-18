@@ -76,12 +76,8 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         address feeCollector;
         if (feeSettingsV2.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
             IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(feeSettingsV2));
-            fee = feeSettings.fee(
-                FeeTypes.DISTRIBUTION_FEE,
-                _arguments.totalCurrencyAmount,
-                address(_arguments.token)
-            );
-            feeCollector = feeSettings.feeCollector(FeeTypes.DISTRIBUTION_FEE, address(_arguments.token));
+            fee = feeSettings.fee(FeeTypes.DISTRIBUTION, _arguments.totalCurrencyAmount, address(_arguments.token));
+            feeCollector = feeSettings.feeCollector(FeeTypes.DISTRIBUTION, address(_arguments.token));
         } else {
             fee = feeSettingsV2.privateOfferFee(_arguments.totalCurrencyAmount, address(_arguments.token));
             feeCollector = feeSettingsV2.privateOfferFeeCollector(address(_arguments.token));

@@ -798,14 +798,14 @@ contract TokenSwapTest is Test {
         // set fees to 0
         {
             FeeSettings feeSettings = FeeSettings(address(token.feeSettings()));
-            feeSettings.planFeeChange(FeeTypes.TOKEN_FEE, 0, uint64(block.timestamp));
-            feeSettings.planFeeChange(FeeTypes.CROWDINVESTING_FEE, 0, uint64(block.timestamp));
-            feeSettings.planFeeChange(FeeTypes.PRIVATE_OFFER_FEE, 0, uint64(block.timestamp));
-            feeSettings.planFeeChange(FeeTypes.SECONDARY_MARKET_FEE, 0, uint64(block.timestamp));
-            feeSettings.executeFeeChange(FeeTypes.TOKEN_FEE);
-            feeSettings.executeFeeChange(FeeTypes.CROWDINVESTING_FEE);
-            feeSettings.executeFeeChange(FeeTypes.PRIVATE_OFFER_FEE);
-            feeSettings.executeFeeChange(FeeTypes.SECONDARY_MARKET_FEE);
+            feeSettings.planFeeChange(FeeTypes.TOKEN, 0, uint64(block.timestamp));
+            feeSettings.planFeeChange(FeeTypes.CROWDINVESTING, 0, uint64(block.timestamp));
+            feeSettings.planFeeChange(FeeTypes.PRIVATE_OFFER, 0, uint64(block.timestamp));
+            feeSettings.planFeeChange(FeeTypes.SECONDARY_MARKET, 0, uint64(block.timestamp));
+            feeSettings.executeFeeChange(FeeTypes.TOKEN);
+            feeSettings.executeFeeChange(FeeTypes.CROWDINVESTING);
+            feeSettings.executeFeeChange(FeeTypes.PRIVATE_OFFER);
+            feeSettings.executeFeeChange(FeeTypes.SECONDARY_MARKET);
         }
 
         // approve
@@ -857,14 +857,14 @@ contract TokenSwapTest is Test {
         // set fees to 0
         {
             FeeSettings feeSettings = FeeSettings(address(token.feeSettings()));
-            feeSettings.planFeeChange(FeeTypes.TOKEN_FEE, 0, uint64(block.timestamp));
-            feeSettings.planFeeChange(FeeTypes.CROWDINVESTING_FEE, 0, uint64(block.timestamp));
-            feeSettings.planFeeChange(FeeTypes.PRIVATE_OFFER_FEE, 0, uint64(block.timestamp));
-            feeSettings.planFeeChange(FeeTypes.SECONDARY_MARKET_FEE, 0, uint64(block.timestamp));
-            feeSettings.executeFeeChange(FeeTypes.TOKEN_FEE);
-            feeSettings.executeFeeChange(FeeTypes.CROWDINVESTING_FEE);
-            feeSettings.executeFeeChange(FeeTypes.PRIVATE_OFFER_FEE);
-            feeSettings.executeFeeChange(FeeTypes.SECONDARY_MARKET_FEE);
+            feeSettings.planFeeChange(FeeTypes.TOKEN, 0, uint64(block.timestamp));
+            feeSettings.planFeeChange(FeeTypes.CROWDINVESTING, 0, uint64(block.timestamp));
+            feeSettings.planFeeChange(FeeTypes.PRIVATE_OFFER, 0, uint64(block.timestamp));
+            feeSettings.planFeeChange(FeeTypes.SECONDARY_MARKET, 0, uint64(block.timestamp));
+            feeSettings.executeFeeChange(FeeTypes.TOKEN);
+            feeSettings.executeFeeChange(FeeTypes.CROWDINVESTING);
+            feeSettings.executeFeeChange(FeeTypes.PRIVATE_OFFER);
+            feeSettings.executeFeeChange(FeeTypes.SECONDARY_MARKET);
         }
 
         // approve holder to spend payment token
@@ -1035,10 +1035,10 @@ contract TokenSwapTest is Test {
         // Update fee settings to 2% secondary market fee
         uint64 feeActivationTime = 13 weeks;
         FeeSettings _feeSettings = FeeSettings(address(token.feeSettings()));
-        _feeSettings.planFeeChange(FeeTypes.SECONDARY_MARKET_FEE, feePercentage, feeActivationTime);
+        _feeSettings.planFeeChange(FeeTypes.SECONDARY_MARKET, feePercentage, feeActivationTime);
         vm.warp(feeActivationTime + 1);
-        _feeSettings.executeFeeChange(FeeTypes.SECONDARY_MARKET_FEE);
-        assertTrue(_feeSettings.fee(FeeTypes.SECONDARY_MARKET_FEE, 100 * 10 ** 10, address(token)) == 2 * 10 ** 10);
+        _feeSettings.executeFeeChange(FeeTypes.SECONDARY_MARKET);
+        assertTrue(_feeSettings.fee(FeeTypes.SECONDARY_MARKET, 100 * 10 ** 10, address(token)) == 2 * 10 ** 10);
 
         // Update token price
         vm.prank(owner);
@@ -1103,10 +1103,10 @@ contract TokenSwapTest is Test {
         // Update fee settings to 2% secondary market fee
         uint64 feeActivationTime = 13 weeks;
         FeeSettings _feeSettings = FeeSettings(address(token.feeSettings()));
-        _feeSettings.planFeeChange(FeeTypes.SECONDARY_MARKET_FEE, feePercentage, feeActivationTime);
+        _feeSettings.planFeeChange(FeeTypes.SECONDARY_MARKET, feePercentage, feeActivationTime);
         vm.warp(feeActivationTime + 1);
-        _feeSettings.executeFeeChange(FeeTypes.SECONDARY_MARKET_FEE);
-        assertTrue(_feeSettings.fee(FeeTypes.SECONDARY_MARKET_FEE, 100 * 10 ** 10, address(token)) == 2 * 10 ** 10);
+        _feeSettings.executeFeeChange(FeeTypes.SECONDARY_MARKET);
+        assertTrue(_feeSettings.fee(FeeTypes.SECONDARY_MARKET, 100 * 10 ** 10, address(token)) == 2 * 10 ** 10);
 
         // Update token price
         vm.prank(owner);

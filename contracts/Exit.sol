@@ -104,8 +104,8 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         address feeCollector;
         if (feeSettingsV2.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
             IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(feeSettingsV2));
-            fee = feeSettings.fee(FeeTypes.EXIT_FEE, currencyAmount, address(token));
-            feeCollector = feeSettings.feeCollector(FeeTypes.EXIT_FEE, address(token));
+            fee = feeSettings.fee(FeeTypes.EXIT, currencyAmount, address(token));
+            feeCollector = feeSettings.feeCollector(FeeTypes.EXIT, address(token));
         } else {
             fee = feeSettingsV2.privateOfferFee(currencyAmount, address(token));
             feeCollector = feeSettingsV2.privateOfferFeeCollector(address(token));

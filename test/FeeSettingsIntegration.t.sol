@@ -43,10 +43,10 @@ contract FeeSettingsIntegrationTest is Test {
         FeeSettingsCloneFactory feeSettingsCloneFactory = new FeeSettingsCloneFactory(address(feeSettingsLogic));
         customFees = Fees(10, 20, 30, 101 * 365 days);
         FeeSettings.FeeTypeInit[] memory feeTypes = new FeeSettings.FeeTypeInit[](4);
-        feeTypes[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN_FEE, 500, 101, platformAdmin);
-        feeTypes[1] = FeeSettings.FeeTypeInit(FeeTypes.CROWDINVESTING_FEE, 1000, 102, platformAdmin);
-        feeTypes[2] = FeeSettings.FeeTypeInit(FeeTypes.PRIVATE_OFFER_FEE, 500, 103, platformAdmin);
-        feeTypes[3] = FeeSettings.FeeTypeInit(FeeTypes.SECONDARY_MARKET_FEE, 500, 0, platformAdmin);
+        feeTypes[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN, 500, 101, platformAdmin);
+        feeTypes[1] = FeeSettings.FeeTypeInit(FeeTypes.CROWDINVESTING, 1000, 102, platformAdmin);
+        feeTypes[2] = FeeSettings.FeeTypeInit(FeeTypes.PRIVATE_OFFER, 500, 103, platformAdmin);
+        feeTypes[3] = FeeSettings.FeeTypeInit(FeeTypes.SECONDARY_MARKET, 500, 0, platformAdmin);
         vm.prank(platformAdmin);
         feeSettings = FeeSettings(
             feeSettingsCloneFactory.createFeeSettingsClone("salt", trustedForwarder, platformAdmin, feeTypes)
@@ -95,13 +95,8 @@ contract FeeSettingsIntegrationTest is Test {
         assertEq(token.balanceOf(_customFeeCollector), 0, "token.balanceOf(customFeeCollector) != 0 before");
 
         vm.startPrank(platformAdmin);
-        feeSettings.setCustomFee(
-            FeeTypes.TOKEN_FEE,
-            address(token),
-            customFees.tokenFeeNumerator,
-            customFees.validityDate
-        );
-        feeSettings.setCustomFeeCollector(FeeTypes.TOKEN_FEE, address(token), _customFeeCollector);
+        feeSettings.setCustomFee(FeeTypes.TOKEN, address(token), customFees.tokenFeeNumerator, customFees.validityDate);
+        feeSettings.setCustomFeeCollector(FeeTypes.TOKEN, address(token), _customFeeCollector);
         vm.stopPrank();
         vm.prank(companyAdmin);
         token.mint(investor, tokenAmount);
@@ -122,19 +117,14 @@ contract FeeSettingsIntegrationTest is Test {
         vm.warp(100 * 365 days);
 
         vm.startPrank(platformAdmin);
+        feeSettings.setCustomFee(FeeTypes.TOKEN, address(token), customFees.tokenFeeNumerator, customFees.validityDate);
         feeSettings.setCustomFee(
-            FeeTypes.TOKEN_FEE,
-            address(token),
-            customFees.tokenFeeNumerator,
-            customFees.validityDate
-        );
-        feeSettings.setCustomFee(
-            FeeTypes.PRIVATE_OFFER_FEE,
+            FeeTypes.PRIVATE_OFFER,
             address(token),
             customFees.privateOfferFeeNumerator,
             customFees.validityDate
         );
-        feeSettings.setCustomFeeCollector(FeeTypes.PRIVATE_OFFER_FEE, address(token), _customFeeCollector);
+        feeSettings.setCustomFeeCollector(FeeTypes.PRIVATE_OFFER, address(token), _customFeeCollector);
         vm.stopPrank();
 
         assertEq(token.balanceOf(investor), 0, "token.balanceOf(investor) != 0 before");
@@ -209,19 +199,14 @@ contract FeeSettingsIntegrationTest is Test {
         vm.warp(100 * 365 days);
 
         vm.startPrank(platformAdmin);
+        feeSettings.setCustomFee(FeeTypes.TOKEN, address(token), customFees.tokenFeeNumerator, customFees.validityDate);
         feeSettings.setCustomFee(
-            FeeTypes.TOKEN_FEE,
-            address(token),
-            customFees.tokenFeeNumerator,
-            customFees.validityDate
-        );
-        feeSettings.setCustomFee(
-            FeeTypes.CROWDINVESTING_FEE,
+            FeeTypes.CROWDINVESTING,
             address(token),
             customFees.crowdinvestingFeeNumerator,
             customFees.validityDate
         );
-        feeSettings.setCustomFeeCollector(FeeTypes.CROWDINVESTING_FEE, address(token), _customFeeCollector);
+        feeSettings.setCustomFeeCollector(FeeTypes.CROWDINVESTING, address(token), _customFeeCollector);
         vm.stopPrank();
 
         assertEq(token.balanceOf(investor), 0, "token.balanceOf(investor) != 0 before");

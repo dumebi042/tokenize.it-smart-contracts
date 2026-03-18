@@ -117,18 +117,18 @@ contract CrowdinvestingTest is Test {
         // apply fees for test
         uint64 activationDate = uint64(block.timestamp + 13 weeks);
         vm.prank(platformAdmin);
-        feeSettings.planFeeChange(FeeTypes.TOKEN_FEE, tokenFeeNumerator, activationDate);
+        feeSettings.planFeeChange(FeeTypes.TOKEN, tokenFeeNumerator, activationDate);
         vm.prank(platformAdmin);
-        feeSettings.planFeeChange(FeeTypes.CROWDINVESTING_FEE, crowdinvestingFeeNumerator, activationDate);
+        feeSettings.planFeeChange(FeeTypes.CROWDINVESTING, crowdinvestingFeeNumerator, activationDate);
         vm.prank(platformAdmin);
-        feeSettings.planFeeChange(FeeTypes.PRIVATE_OFFER_FEE, crowdinvestingFeeNumerator, activationDate);
+        feeSettings.planFeeChange(FeeTypes.PRIVATE_OFFER, crowdinvestingFeeNumerator, activationDate);
         vm.warp(activationDate + 1 seconds);
         vm.prank(platformAdmin);
-        feeSettings.executeFeeChange(FeeTypes.TOKEN_FEE);
+        feeSettings.executeFeeChange(FeeTypes.TOKEN);
         vm.prank(platformAdmin);
-        feeSettings.executeFeeChange(FeeTypes.CROWDINVESTING_FEE);
+        feeSettings.executeFeeChange(FeeTypes.CROWDINVESTING);
         vm.prank(platformAdmin);
-        feeSettings.executeFeeChange(FeeTypes.PRIVATE_OFFER_FEE);
+        feeSettings.executeFeeChange(FeeTypes.PRIVATE_OFFER);
 
         uint8 _paymentTokenDecimals = 6;
         // uint8 _maxDecimals = 25;
@@ -248,8 +248,8 @@ contract CrowdinvestingTest is Test {
     }
 
     function testVariousFees(uint32 tokenFeeNumerator, uint32 privateOfferFeeNumerator) public {
-        vm.assume(tokenFeeNumerator <= feeSettings.MAX_TOKEN_FEE_NUMERATOR());
-        vm.assume(privateOfferFeeNumerator <= feeSettings.MAX_PRIVATE_OFFER_FEE_NUMERATOR());
+        vm.assume(tokenFeeNumerator <= feeSettings.MAX_TOKEN_NUMERATOR());
+        vm.assume(privateOfferFeeNumerator <= feeSettings.MAX_PRIVATE_OFFER_NUMERATOR());
         feeCalculation(tokenFeeNumerator, privateOfferFeeNumerator);
     }
 

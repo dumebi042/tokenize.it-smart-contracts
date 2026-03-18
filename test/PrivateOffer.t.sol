@@ -315,12 +315,12 @@ contract PrivateOfferTest is Test {
 
         // set fees to 0, otherwise extra tokens are minted which causes an overflow
         FeeSettings _feeSettings = FeeSettings(address(token.feeSettings()));
-        _feeSettings.planFeeChange(FeeTypes.CROWDINVESTING_FEE, 0, uint64(block.timestamp));
-        _feeSettings.planFeeChange(FeeTypes.PRIVATE_OFFER_FEE, 0, uint64(block.timestamp));
-        _feeSettings.planFeeChange(FeeTypes.TOKEN_FEE, 0, uint64(block.timestamp));
-        _feeSettings.executeFeeChange(FeeTypes.TOKEN_FEE);
-        _feeSettings.executeFeeChange(FeeTypes.CROWDINVESTING_FEE);
-        _feeSettings.executeFeeChange(FeeTypes.PRIVATE_OFFER_FEE);
+        _feeSettings.planFeeChange(FeeTypes.CROWDINVESTING, 0, uint64(block.timestamp));
+        _feeSettings.planFeeChange(FeeTypes.PRIVATE_OFFER, 0, uint64(block.timestamp));
+        _feeSettings.planFeeChange(FeeTypes.TOKEN, 0, uint64(block.timestamp));
+        _feeSettings.executeFeeChange(FeeTypes.TOKEN);
+        _feeSettings.executeFeeChange(FeeTypes.CROWDINVESTING);
+        _feeSettings.executeFeeChange(FeeTypes.PRIVATE_OFFER);
 
         vm.prank(admin);
         token.increaseMintingAllowance(expectedAddress, _tokenBuyAmount);

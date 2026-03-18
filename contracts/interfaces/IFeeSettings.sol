@@ -69,12 +69,12 @@ struct Fees {
  *      in every consuming contract.
  */
 library FeeTypes {
-    bytes32 internal constant TOKEN_FEE = keccak256("TOKEN_FEE");
-    bytes32 internal constant CROWDINVESTING_FEE = keccak256("CROWDINVESTING_FEE");
-    bytes32 internal constant PRIVATE_OFFER_FEE = keccak256("PRIVATE_OFFER_FEE");
-    bytes32 internal constant SECONDARY_MARKET_FEE = keccak256("SECONDARY_MARKET_FEE");
-    bytes32 internal constant DISTRIBUTION_FEE = keccak256("DISTRIBUTION_FEE");
-    bytes32 internal constant EXIT_FEE = keccak256("EXIT_FEE");
+    bytes32 internal constant TOKEN = keccak256("TOKEN");
+    bytes32 internal constant CROWDINVESTING = keccak256("CROWDINVESTING");
+    bytes32 internal constant PRIVATE_OFFER = keccak256("PRIVATE_OFFER");
+    bytes32 internal constant SECONDARY_MARKET = keccak256("SECONDARY_MARKET");
+    bytes32 internal constant DISTRIBUTION = keccak256("DISTRIBUTION");
+    bytes32 internal constant EXIT = keccak256("EXIT");
 }
 
 /**

@@ -101,10 +101,10 @@ contract CrowdinvestingDynamicPricingTest is Test {
         FeeSettingsCloneFactory feeSettingsCloneFactory = new FeeSettingsCloneFactory(address(feeLogic));
         {
             FeeSettings.FeeTypeInit[] memory feeTypes = new FeeSettings.FeeTypeInit[](4);
-            feeTypes[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN_FEE, 500, 100, platformAdmin);
-            feeTypes[1] = FeeSettings.FeeTypeInit(FeeTypes.CROWDINVESTING_FEE, 1000, 100, platformAdmin);
-            feeTypes[2] = FeeSettings.FeeTypeInit(FeeTypes.PRIVATE_OFFER_FEE, 500, 100, platformAdmin);
-            feeTypes[3] = FeeSettings.FeeTypeInit(FeeTypes.SECONDARY_MARKET_FEE, 500, 0, platformAdmin);
+            feeTypes[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN, 500, 100, platformAdmin);
+            feeTypes[1] = FeeSettings.FeeTypeInit(FeeTypes.CROWDINVESTING, 1000, 100, platformAdmin);
+            feeTypes[2] = FeeSettings.FeeTypeInit(FeeTypes.PRIVATE_OFFER, 500, 100, platformAdmin);
+            feeTypes[3] = FeeSettings.FeeTypeInit(FeeTypes.SECONDARY_MARKET, 500, 0, platformAdmin);
             feeSettings = IFeeSettingsV2(
                 feeSettingsCloneFactory.createFeeSettingsClone(0, trustedForwarder, platformAdmin, feeTypes)
             );

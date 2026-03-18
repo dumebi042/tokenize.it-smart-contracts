@@ -26,11 +26,11 @@ contract FeeSettings is
     // -------------------------------------------------------------------------
 
     /// max token fee is 5%
-    uint32 public constant MAX_TOKEN_FEE_NUMERATOR = 500;
+    uint32 public constant MAX_TOKEN_NUMERATOR = 500;
     /// max crowdinvesting fee is 10%
-    uint32 public constant MAX_CROWDINVESTING_FEE_NUMERATOR = 1000;
+    uint32 public constant MAX_CROWDINVESTING_NUMERATOR = 1000;
     /// max private offer fee is 5%
-    uint32 public constant MAX_PRIVATE_OFFER_FEE_NUMERATOR = 500;
+    uint32 public constant MAX_PRIVATE_OFFER_NUMERATOR = 500;
 
     /// Denominator to calculate all fees
     uint32 public constant FEE_DENOMINATOR = 10000;
@@ -51,7 +51,7 @@ contract FeeSettings is
 
     /**
      * @notice Initialization data for a single fee type, used in initialize().
-     * @param feeType          bytes32 identifier (e.g. FeeTypes.TOKEN_FEE)
+     * @param feeType          bytes32 identifier (e.g. FeeTypes.TOKEN)
      * @param maxNumerator     Hard cap for this fee type
      * @param defaultNumerator Initial default numerator; must be <= maxNumerator
      * @param collector        Default fee collector address for this type
@@ -364,12 +364,12 @@ contract FeeSettings is
 
     /// @dev V2 wrapper
     function tokenFee(uint256 _tokenAmount, address _token) public view override(IFeeSettingsV2) returns (uint256) {
-        return fee(FeeTypes.TOKEN_FEE, _tokenAmount, _token);
+        return fee(FeeTypes.TOKEN, _tokenAmount, _token);
     }
 
     /// @dev V2 wrapper
     function tokenFeeCollector(address _token) public view override(IFeeSettingsV2) returns (address) {
-        return feeCollector(FeeTypes.TOKEN_FEE, _token);
+        return feeCollector(FeeTypes.TOKEN, _token);
     }
 
     /// @dev V2 wrapper
@@ -377,12 +377,12 @@ contract FeeSettings is
         uint256 _currencyAmount,
         address _token
     ) public view override(IFeeSettingsV2) returns (uint256) {
-        return fee(FeeTypes.CROWDINVESTING_FEE, _currencyAmount, _token);
+        return fee(FeeTypes.CROWDINVESTING, _currencyAmount, _token);
     }
 
     /// @dev V2 wrapper
     function crowdinvestingFeeCollector(address _token) public view override(IFeeSettingsV2) returns (address) {
-        return feeCollector(FeeTypes.CROWDINVESTING_FEE, _token);
+        return feeCollector(FeeTypes.CROWDINVESTING, _token);
     }
 
     /// @dev V2 wrapper
@@ -390,12 +390,12 @@ contract FeeSettings is
         uint256 _currencyAmount,
         address _token
     ) public view override(IFeeSettingsV2) returns (uint256) {
-        return fee(FeeTypes.PRIVATE_OFFER_FEE, _currencyAmount, _token);
+        return fee(FeeTypes.PRIVATE_OFFER, _currencyAmount, _token);
     }
 
     /// @dev V2 wrapper
     function privateOfferFeeCollector(address _token) public view override(IFeeSettingsV2) returns (address) {
-        return feeCollector(FeeTypes.PRIVATE_OFFER_FEE, _token);
+        return feeCollector(FeeTypes.PRIVATE_OFFER, _token);
     }
 
     // -------------------------------------------------------------------------
@@ -407,7 +407,7 @@ contract FeeSettings is
      * @dev V1 compat — V1 has no concept of per-token collectors, so we return the type default.
      */
     function feeCollector() external view override(IFeeSettingsV1) returns (address) {
-        return feeCollectors[FeeTypes.TOKEN_FEE][address(0)];
+        return feeCollectors[FeeTypes.TOKEN][address(0)];
     }
 
     /**

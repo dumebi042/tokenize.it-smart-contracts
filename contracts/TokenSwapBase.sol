@@ -104,7 +104,7 @@ abstract contract TokenSwapBase is
 
     /**
      * @notice Retrieves the fee amount and the fee receiver for a token swap transaction.
-     * @dev Uses IFeeSettingsV3.fee(FeeTypes.SECONDARY_MARKET_FEE, ...) when the fee settings
+     * @dev Uses IFeeSettingsV3.fee(FeeTypes.SECONDARY_MARKET, ...) when the fee settings
      *      contract supports V3; falls back to privateOfferFee for V2-only deployments.
      * @param _currencyAmount The total currency amount involved in the swap transaction, in bits (smallest subunit of currency)
      * @return The fee amount to be collected, in bits (smallest subunit of currency)
@@ -115,8 +115,8 @@ abstract contract TokenSwapBase is
         if (feeSettingsV2.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
             IFeeSettingsV3 feeSettingsV3 = IFeeSettingsV3(address(feeSettingsV2));
             return (
-                feeSettingsV3.fee(FeeTypes.SECONDARY_MARKET_FEE, _currencyAmount, address(token)),
-                feeSettingsV3.feeCollector(FeeTypes.SECONDARY_MARKET_FEE, address(token))
+                feeSettingsV3.fee(FeeTypes.SECONDARY_MARKET, _currencyAmount, address(token)),
+                feeSettingsV3.feeCollector(FeeTypes.SECONDARY_MARKET, address(token))
             );
         }
         // V2 fallback: use privateOfferFee until the fee settings contract is upgraded

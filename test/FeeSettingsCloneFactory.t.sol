@@ -32,13 +32,13 @@ contract tokenTest is Test {
         address ciCollector,
         address poCollector
     ) internal pure returns (FeeSettings.FeeTypeInit[] memory) {
-        FeeSettings.FeeTypeInit[] memory feeType= new FeeSettings.FeeTypeInit[](6);
-        feeType[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN_FEE, 500, tokenNum, tokenCollector);
-        feeType[1] = FeeSettings.FeeTypeInit(FeeTypes.CROWDINVESTING_FEE, 1000, ciNum, ciCollector);
-        feeType[2] = FeeSettings.FeeTypeInit(FeeTypes.PRIVATE_OFFER_FEE, 500, poNum, poCollector);
-        feeType[3] = FeeSettings.FeeTypeInit(FeeTypes.SECONDARY_MARKET_FEE, 500, 0, poCollector);
-        feeType[4] = FeeSettings.FeeTypeInit(FeeTypes.DISTRIBUTION_FEE, 500, 0, poCollector);
-        feeType[5] = FeeSettings.FeeTypeInit(FeeTypes.EXIT_FEE, 500, 0, poCollector);
+        FeeSettings.FeeTypeInit[] memory feeType = new FeeSettings.FeeTypeInit[](6);
+        feeType[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN, 500, tokenNum, tokenCollector);
+        feeType[1] = FeeSettings.FeeTypeInit(FeeTypes.CROWDINVESTING, 1000, ciNum, ciCollector);
+        feeType[2] = FeeSettings.FeeTypeInit(FeeTypes.PRIVATE_OFFER, 500, poNum, poCollector);
+        feeType[3] = FeeSettings.FeeTypeInit(FeeTypes.SECONDARY_MARKET, 500, 0, poCollector);
+        feeType[4] = FeeSettings.FeeTypeInit(FeeTypes.DISTRIBUTION, 500, 0, poCollector);
+        feeType[5] = FeeSettings.FeeTypeInit(FeeTypes.EXIT, 500, 0, poCollector);
         return feeType;
     }
 
@@ -231,9 +231,9 @@ contract tokenTest is Test {
             "privateOfferFeeCollector not set"
         );
 
-        (, uint32 _tokenFeeNumerator) = feeSettings.feeTypeConfigs(FeeTypes.TOKEN_FEE);
-        (, uint32 _crowdinvestingFeeNumerator) = feeSettings.feeTypeConfigs(FeeTypes.CROWDINVESTING_FEE);
-        (, uint32 _privateOfferFeeNumerator) = feeSettings.feeTypeConfigs(FeeTypes.PRIVATE_OFFER_FEE);
+        (, uint32 _tokenFeeNumerator) = feeSettings.feeTypeConfigs(FeeTypes.TOKEN);
+        (, uint32 _crowdinvestingFeeNumerator) = feeSettings.feeTypeConfigs(FeeTypes.CROWDINVESTING);
+        (, uint32 _privateOfferFeeNumerator) = feeSettings.feeTypeConfigs(FeeTypes.PRIVATE_OFFER);
 
         assertEq(_tokenFeeNumerator, 1, "defaultTokenFeeNumerator not set");
         assertEq(_crowdinvestingFeeNumerator, 2, "defaultCrowdinvestingFeeNumerator not set");

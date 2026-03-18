@@ -22,33 +22,33 @@ function createFeeSettings(
     address _privateOfferFeeCollector
 ) returns (FeeSettings) {
     FeeSettings.FeeTypeInit[] memory feeTypes = new FeeSettings.FeeTypeInit[](6);
-    feeTypes[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN_FEE, 500, _fees.tokenFeeNumerator, _tokenFeeCollector);
+    feeTypes[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN, 500, _fees.tokenFeeNumerator, _tokenFeeCollector);
     feeTypes[1] = FeeSettings.FeeTypeInit(
-        FeeTypes.CROWDINVESTING_FEE,
+        FeeTypes.CROWDINVESTING,
         1000,
         _fees.crowdinvestingFeeNumerator,
         _crowdinvestingFeeCollector
     );
     feeTypes[2] = FeeSettings.FeeTypeInit(
-        FeeTypes.PRIVATE_OFFER_FEE,
+        FeeTypes.PRIVATE_OFFER,
         500,
         _fees.privateOfferFeeNumerator,
         _privateOfferFeeCollector
     );
     feeTypes[3] = FeeSettings.FeeTypeInit(
-        FeeTypes.SECONDARY_MARKET_FEE,
+        FeeTypes.SECONDARY_MARKET,
         500,
         _fees.privateOfferFeeNumerator,
         _privateOfferFeeCollector
     );
     feeTypes[4] = FeeSettings.FeeTypeInit(
-        FeeTypes.DISTRIBUTION_FEE,
+        FeeTypes.DISTRIBUTION,
         500,
         _fees.privateOfferFeeNumerator,
         _privateOfferFeeCollector
     );
     feeTypes[5] = FeeSettings.FeeTypeInit(
-        FeeTypes.EXIT_FEE,
+        FeeTypes.EXIT,
         500,
         _fees.privateOfferFeeNumerator,
         _privateOfferFeeCollector
