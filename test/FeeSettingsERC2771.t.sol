@@ -49,7 +49,18 @@ contract FeeSettingERC2771Test is Test {
 
     function setUpFeeSettingsWithForwarder(Forwarder forwarder) public {
         // this is part of the platform setup, but we need it here to use the correct forwarder
-        feeSettings = createFeeSettings(address(forwarder), platformColdWallet, buildFeeTypes(feeSettingsFeeNumerator, crowdinvestingFeeNumerator, privateOfferFeeNumerator, feeCollector, feeCollector, feeCollector));
+        feeSettings = createFeeSettings(
+            address(forwarder),
+            platformColdWallet,
+            buildFeeTypes(
+                feeSettingsFeeNumerator,
+                crowdinvestingFeeNumerator,
+                privateOfferFeeNumerator,
+                feeCollector,
+                feeCollector,
+                feeCollector
+            )
+        );
 
         // make platform hot wallet a manager
         vm.prank(platformColdWallet);

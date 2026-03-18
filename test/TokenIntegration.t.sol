@@ -32,7 +32,11 @@ contract tokenTest is Test {
 
     function setUp() public {
         allowList = createAllowList(trustedForwarder, admin);
-        feeSettings = createFeeSettings(trustedForwarder, feeSettingsOwner, buildFeeTypes(100, 100, 100, admin, admin, admin));
+        feeSettings = createFeeSettings(
+            trustedForwarder,
+            feeSettingsOwner,
+            buildFeeTypes(100, 100, 100, admin, admin, admin)
+        );
         Token implementation = new Token(trustedForwarder);
         TokenProxyFactory tokenCloneFactory = new TokenProxyFactory(address(implementation));
         token = Token(
@@ -87,14 +91,22 @@ contract tokenTest is Test {
 
     function testSuggestNewFeeSettingsWrongCaller(address wrongUpdater) public {
         vm.assume(wrongUpdater != feeSettings.owner());
-        FeeSettings newFeeSettings = createFeeSettings(trustedForwarder, address(this), buildFeeTypes(0, 0, 0, pauser, pauser, pauser));
+        FeeSettings newFeeSettings = createFeeSettings(
+            trustedForwarder,
+            address(this),
+            buildFeeTypes(0, 0, 0, pauser, pauser, pauser)
+        );
         vm.prank(wrongUpdater);
         vm.expectRevert("Only fee settings owner can suggest fee settings update");
         token.suggestNewFeeSettings(newFeeSettings);
     }
 
     function testSuggestNewFeeSettingsFeeCollector() public {
-        FeeSettings newFeeSettings = createFeeSettings(trustedForwarder, address(this), buildFeeTypes(0, 0, 0, pauser, pauser, pauser));
+        FeeSettings newFeeSettings = createFeeSettings(
+            trustedForwarder,
+            address(this),
+            buildFeeTypes(0, 0, 0, pauser, pauser, pauser)
+        );
         vm.prank(feeSettings.feeCollector());
         vm.expectRevert("Only fee settings owner can suggest fee settings update");
         token.suggestNewFeeSettings(newFeeSettings);
@@ -108,7 +120,11 @@ contract tokenTest is Test {
 
     function testSuggestNewFeeSettings(address newCollector) public {
         vm.assume(newCollector != address(0));
-        FeeSettings newFeeSettings = createFeeSettings(trustedForwarder, address(this), buildFeeTypes(0, 0, 0, newCollector, newCollector, newCollector));
+        FeeSettings newFeeSettings = createFeeSettings(
+            trustedForwarder,
+            address(this),
+            buildFeeTypes(0, 0, 0, newCollector, newCollector, newCollector)
+        );
 
         (, uint32 _oldTokenFeeNumerator) = FeeSettings(address(token.feeSettings())).feeTypeConfigs(FeeTypes.TOKEN);
         (, uint32 _oldCrowdinvestingFeeNumerator) = FeeSettings(address(token.feeSettings())).feeTypeConfigs(
@@ -145,7 +161,11 @@ contract tokenTest is Test {
 
     function testAcceptNewFeeSettings(address newCollector) public {
         vm.assume(newCollector != address(0));
-        FeeSettings newFeeSettings = createFeeSettings(trustedForwarder, address(this), buildFeeTypes(0, 0, 0, newCollector, newCollector, newCollector));
+        FeeSettings newFeeSettings = createFeeSettings(
+            trustedForwarder,
+            address(this),
+            buildFeeTypes(0, 0, 0, newCollector, newCollector, newCollector)
+        );
         (, uint32 _oldTokenFeeNumerator) = FeeSettings(address(token.feeSettings())).feeTypeConfigs(FeeTypes.TOKEN);
         (, uint32 _oldCrowdinvestingFeeNumerator) = FeeSettings(address(token.feeSettings())).feeTypeConfigs(
             FeeTypes.CROWDINVESTING
@@ -175,7 +195,18 @@ contract tokenTest is Test {
 
     function testAcceptFeeCollectorInsteadOfFeeSettings(address newFeeSettingsPretendAddress) public {
         vm.assume(newFeeSettingsPretendAddress != address(0));
-        FeeSettings newFeeSettings = createFeeSettings(trustedForwarder, address(this), buildFeeTypes(0, 0, 0, newFeeSettingsPretendAddress, newFeeSettingsPretendAddress, newFeeSettingsPretendAddress));
+        FeeSettings newFeeSettings = createFeeSettings(
+            trustedForwarder,
+            address(this),
+            buildFeeTypes(
+                0,
+                0,
+                0,
+                newFeeSettingsPretendAddress,
+                newFeeSettingsPretendAddress,
+                newFeeSettingsPretendAddress
+            )
+        );
         vm.assume(newFeeSettingsPretendAddress != address(newFeeSettings));
 
         vm.prank(feeSettings.owner());
@@ -190,8 +221,30 @@ contract tokenTest is Test {
 
     function testAcceptWrongFeeSettings() public {
         {
-            FeeSettings realNewFeeSettings = createFeeSettings(trustedForwarder, feeSettings.owner(), buildFeeTypes(0, 0, 0, feeSettings.feeCollector(), feeSettings.feeCollector(), feeSettings.feeCollector()));
-            FeeSettings fakeNewFeeSettings = createFeeSettings(trustedForwarder, address(this), buildFeeTypes(0, 0, 0, feeSettings.feeCollector(), feeSettings.feeCollector(), feeSettings.feeCollector()));
+            FeeSettings realNewFeeSettings = createFeeSettings(
+                trustedForwarder,
+                feeSettings.owner(),
+                buildFeeTypes(
+                    0,
+                    0,
+                    0,
+                    feeSettings.feeCollector(),
+                    feeSettings.feeCollector(),
+                    feeSettings.feeCollector()
+                )
+            );
+            FeeSettings fakeNewFeeSettings = createFeeSettings(
+                trustedForwarder,
+                address(this),
+                buildFeeTypes(
+                    0,
+                    0,
+                    0,
+                    feeSettings.feeCollector(),
+                    feeSettings.feeCollector(),
+                    feeSettings.feeCollector()
+                )
+            );
 
             assertTrue(
                 address(fakeNewFeeSettings) != address(realNewFeeSettings),

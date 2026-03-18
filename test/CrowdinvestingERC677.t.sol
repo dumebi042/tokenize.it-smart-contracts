@@ -62,7 +62,11 @@ contract CrowdinvestingTest is Test {
         vm.prank(owner);
         list.set(address(paymentToken), TRUSTED_CURRENCY);
 
-        feeSettings = createFeeSettings(trustedForwarder, address(this), buildFeeTypes(100, 100, 100, wrongFeeReceiver, admin, wrongFeeReceiver));
+        feeSettings = createFeeSettings(
+            trustedForwarder,
+            address(this),
+            buildFeeTypes(100, 100, 100, wrongFeeReceiver, admin, wrongFeeReceiver)
+        );
 
         // create token
         address tokenLogicContract = address(new Token(trustedForwarder));

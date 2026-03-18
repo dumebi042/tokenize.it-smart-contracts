@@ -65,7 +65,18 @@ contract TokenERC2612Test is Test {
         allowList = createAllowList(trustedForwarder, platformAdmin);
 
         // deploy fee settings
-        feeSettings = createFeeSettings(trustedForwarder, platformAdmin, buildFeeTypes(tokenFeeNumerator, crowdinvestingFeeNumerator, privateOfferFeeNumerator, feeCollector, feeCollector, feeCollector));
+        feeSettings = createFeeSettings(
+            trustedForwarder,
+            platformAdmin,
+            buildFeeTypes(
+                tokenFeeNumerator,
+                crowdinvestingFeeNumerator,
+                privateOfferFeeNumerator,
+                feeCollector,
+                feeCollector,
+                feeCollector
+            )
+        );
 
         // deploy forwarder
         Forwarder forwarder = new Forwarder();

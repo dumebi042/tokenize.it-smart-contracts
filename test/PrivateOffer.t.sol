@@ -58,7 +58,11 @@ contract PrivateOfferTest is Test {
         list.set(tokenHolder, requirements);
         list.set(address(currency), TRUSTED_CURRENCY);
 
-        feeSettings = createFeeSettings(trustedForwarder, address(this), buildFeeTypes(100, 100, 100, wrongFeeReceiver, wrongFeeReceiver, admin));
+        feeSettings = createFeeSettings(
+            trustedForwarder,
+            address(this),
+            buildFeeTypes(100, 100, 100, wrongFeeReceiver, wrongFeeReceiver, admin)
+        );
 
         Token implementation = new Token(trustedForwarder);
         TokenProxyFactory tokenCloneFactory = new TokenProxyFactory(address(implementation));

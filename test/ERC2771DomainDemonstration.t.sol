@@ -59,7 +59,18 @@ contract TokenERC2771Test is Test {
 
         // deploy fee settings
         vm.prank(platformAdmin);
-        feeSettings = createFeeSettings(trustedForwarder, platformAdmin, buildFeeTypes(tokenFeeNumerator, crowdinvestingFeeNumerator, privateOfferFeeNumerator, feeCollector, feeCollector, feeCollector));
+        feeSettings = createFeeSettings(
+            trustedForwarder,
+            platformAdmin,
+            buildFeeTypes(
+                tokenFeeNumerator,
+                crowdinvestingFeeNumerator,
+                privateOfferFeeNumerator,
+                feeCollector,
+                feeCollector,
+                feeCollector
+            )
+        );
 
         Token implementation = new Token(address(forwarder));
         factory = new TokenProxyFactory(address(implementation));

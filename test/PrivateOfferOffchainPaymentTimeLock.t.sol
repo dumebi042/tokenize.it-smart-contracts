@@ -41,7 +41,11 @@ contract PrivateOfferOffchainPaymentTimeLockTest is Test {
         list.set(tokenReceiver, requirements);
         list.set(address(currency), TRUSTED_CURRENCY);
 
-        feeSettings = createFeeSettings(trustedForwarder, address(this), buildFeeTypes(100, 100, 100, admin, admin, admin));
+        feeSettings = createFeeSettings(
+            trustedForwarder,
+            address(this),
+            buildFeeTypes(100, 100, 100, admin, admin, admin)
+        );
 
         Token implementation = new Token(trustedForwarder);
         TokenProxyFactory tokenCloneFactory = new TokenProxyFactory(address(implementation));

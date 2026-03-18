@@ -90,7 +90,18 @@ contract CompanySetUpTest is Test {
         companyAdmin = vm.addr(companyAdminPrivateKey);
 
         // set up FeeSettings
-        feeSettings = createFeeSettings(address(8), platformAdmin, buildFeeTypes(tokenFeeNumerator, paymentTokenFeeNumerator, paymentTokenFeeNumerator, platformFeeCollector, platformFeeCollector, platformFeeCollector));
+        feeSettings = createFeeSettings(
+            address(8),
+            platformAdmin,
+            buildFeeTypes(
+                tokenFeeNumerator,
+                paymentTokenFeeNumerator,
+                paymentTokenFeeNumerator,
+                platformFeeCollector,
+                platformFeeCollector,
+                platformFeeCollector
+            )
+        );
 
         // set up currency. In real life (irl) this would be a real currency, but for testing purposes we use a fake one.
         vm.prank(paymentTokenProvider);

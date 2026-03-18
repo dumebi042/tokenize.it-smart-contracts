@@ -53,7 +53,18 @@ contract TokenERC2771Test is Test {
 
         // deploy fee settings
         vm.prank(platformAdmin);
-        feeSettings = createFeeSettings(trustedForwarder, address(this), buildFeeTypes(tokenFeeNumerator, crowdinvestingFeeNumerator, privateOfferFeeNumerator, feeCollector, feeCollector, feeCollector));
+        feeSettings = createFeeSettings(
+            trustedForwarder,
+            address(this),
+            buildFeeTypes(
+                tokenFeeNumerator,
+                crowdinvestingFeeNumerator,
+                privateOfferFeeNumerator,
+                feeCollector,
+                feeCollector,
+                feeCollector
+            )
+        );
 
         // deploy helper functions (only for testing with foundry)
         ERC2771helper = new ERC2771Helper();

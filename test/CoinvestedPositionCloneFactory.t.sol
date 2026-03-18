@@ -33,7 +33,11 @@ contract CoinvestedPositionCloneFactoryTest is Test {
 
         address tokenLogic = address(new Token(trustedForwarder));
         tokenFactory = new TokenProxyFactory(tokenLogic);
-        IFeeSettingsV2 feeSettings = createFeeSettings(trustedForwarder, admin, buildFeeTypes(0, 0, 0, admin, admin, admin));
+        IFeeSettingsV2 feeSettings = createFeeSettings(
+            trustedForwarder,
+            admin,
+            buildFeeTypes(0, 0, 0, admin, admin, admin)
+        );
         token = Token(
             tokenFactory.createTokenProxy(0, trustedForwarder, feeSettings, admin, allowList, 0, "CPToken", "CPT")
         );

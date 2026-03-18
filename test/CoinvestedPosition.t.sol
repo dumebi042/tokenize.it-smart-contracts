@@ -571,7 +571,11 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
 
     function testBuyNonZeroFeeDeductedBeforeCarry() public {
         // Deploy with non-zero fee
-        IFeeSettingsV2 feeSettings100 = createFeeSettings(trustedForwarder, admin, buildFeeTypes(0, 0, 100, feeCollector, feeCollector, feeCollector));
+        IFeeSettingsV2 feeSettings100 = createFeeSettings(
+            trustedForwarder,
+            admin,
+            buildFeeTypes(0, 0, 100, feeCollector, feeCollector, feeCollector)
+        );
         // Deploy new token with this fee settings
         Token tokenWithFee = Token(
             tokenFactory.createTokenProxy(0, trustedForwarder, feeSettings100, admin, allowList, 0, "FeeToken", "FTK")
@@ -627,7 +631,11 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         // basePrice=100e6, tokenPrice=104e6, 1 token → paid=104e6
         // Without fee, carry would be 4e6.
         // With 5% fee (max allowed): fee=5.2e6, remaining=98.8e6 < basePayout=100e6 → carry=0
-        IFeeSettingsV2 feeSettings10 = createFeeSettings(trustedForwarder, admin, buildFeeTypes(0, 0, 500, feeCollector, feeCollector, feeCollector));
+        IFeeSettingsV2 feeSettings10 = createFeeSettings(
+            trustedForwarder,
+            admin,
+            buildFeeTypes(0, 0, 500, feeCollector, feeCollector, feeCollector)
+        );
         Token tokenHighFee = Token(
             tokenFactory.createTokenProxy(
                 0,

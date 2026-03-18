@@ -59,7 +59,11 @@ contract ExitTest is Test {
 
         address tokenLogic = address(new Token(trustedForwarder));
         tokenFactory = new TokenProxyFactory(tokenLogic);
-        IFeeSettingsV2 feeSettings = createFeeSettings(trustedForwarder, admin, buildFeeTypes(0, 0, 0, admin, admin, admin));
+        IFeeSettingsV2 feeSettings = createFeeSettings(
+            trustedForwarder,
+            admin,
+            buildFeeTypes(0, 0, 0, admin, admin, admin)
+        );
         token = Token(
             tokenFactory.createTokenProxy(0, trustedForwarder, feeSettings, admin, allowList, 0, "ExitToken", "EXT")
         );
@@ -621,7 +625,11 @@ contract ExitTest is Test {
         internal
         returns (Exit feeExit, IFeeSettingsV2 feeSettingsWithFee, Token feeToken)
     {
-        feeSettingsWithFee = createFeeSettings(trustedForwarder, admin, buildFeeTypes(0, 0, 100, admin, admin, feeCollector));
+        feeSettingsWithFee = createFeeSettings(
+            trustedForwarder,
+            admin,
+            buildFeeTypes(0, 0, 100, admin, admin, feeCollector)
+        );
         feeToken = Token(
             tokenFactory.createTokenProxy(
                 bytes32("feeTok"),

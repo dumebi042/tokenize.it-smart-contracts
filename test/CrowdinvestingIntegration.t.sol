@@ -52,7 +52,11 @@ contract CrowdinvestingTest is Test {
         vm.prank(platformAdmin);
         list.set(address(paymentToken), TRUSTED_CURRENCY);
 
-        feeSettings = createFeeSettings(trustedForwarder, platformAdmin, buildFeeTypes(100, 100, 100, platformAdmin, platformAdmin, platformAdmin));
+        feeSettings = createFeeSettings(
+            trustedForwarder,
+            platformAdmin,
+            buildFeeTypes(100, 100, 100, platformAdmin, platformAdmin, platformAdmin)
+        );
         vm.prank(platformAdmin);
         token = Token(
             tokenFactory.createTokenProxy(
@@ -240,8 +244,8 @@ contract CrowdinvestingTest is Test {
     }
 
     function testVariousFees(uint32 tokenFeeNumerator, uint32 privateOfferFeeNumerator) public {
-        (uint32 maxTokenNumerator,) = feeSettings.feeTypeConfigs(FeeTypes.TOKEN);
-        (uint32 maxPrivateOfferNumerator,) = feeSettings.feeTypeConfigs(FeeTypes.PRIVATE_OFFER);
+        (uint32 maxTokenNumerator, ) = feeSettings.feeTypeConfigs(FeeTypes.TOKEN);
+        (uint32 maxPrivateOfferNumerator, ) = feeSettings.feeTypeConfigs(FeeTypes.PRIVATE_OFFER);
         vm.assume(tokenFeeNumerator <= maxTokenNumerator);
         vm.assume(privateOfferFeeNumerator <= maxPrivateOfferNumerator);
         feeCalculation(tokenFeeNumerator, privateOfferFeeNumerator);
