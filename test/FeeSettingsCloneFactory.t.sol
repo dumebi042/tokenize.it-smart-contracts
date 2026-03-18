@@ -32,11 +32,13 @@ contract tokenTest is Test {
         address ciCollector,
         address poCollector
     ) internal pure returns (FeeSettings.FeeTypeInit[] memory) {
-        FeeSettings.FeeTypeInit[] memory feeType= new FeeSettings.FeeTypeInit[](4);
+        FeeSettings.FeeTypeInit[] memory feeType= new FeeSettings.FeeTypeInit[](6);
         feeType[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN_FEE, 500, tokenNum, tokenCollector);
         feeType[1] = FeeSettings.FeeTypeInit(FeeTypes.CROWDINVESTING_FEE, 1000, ciNum, ciCollector);
         feeType[2] = FeeSettings.FeeTypeInit(FeeTypes.PRIVATE_OFFER_FEE, 500, poNum, poCollector);
         feeType[3] = FeeSettings.FeeTypeInit(FeeTypes.SECONDARY_MARKET_FEE, 500, 0, poCollector);
+        feeType[4] = FeeSettings.FeeTypeInit(FeeTypes.DISTRIBUTION_FEE, 500, 0, poCollector);
+        feeType[5] = FeeSettings.FeeTypeInit(FeeTypes.EXIT_FEE, 500, 0, poCollector);
         return feeType;
     }
 

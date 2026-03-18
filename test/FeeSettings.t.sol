@@ -44,11 +44,13 @@ contract FeeSettingsTest is Test {
     address public constant exampleTokenAddress = address(74);
 
     function _buildFeeTypes(address collector) internal pure returns (FeeSettings.FeeTypeInit[] memory) {
-        FeeSettings.FeeTypeInit[] memory feeTypes = new FeeSettings.FeeTypeInit[](4);
+        FeeSettings.FeeTypeInit[] memory feeTypes = new FeeSettings.FeeTypeInit[](6);
         feeTypes[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN_FEE, 500, 1, collector);
         feeTypes[1] = FeeSettings.FeeTypeInit(FeeTypes.CROWDINVESTING_FEE, 1000, 2, collector);
         feeTypes[2] = FeeSettings.FeeTypeInit(FeeTypes.PRIVATE_OFFER_FEE, 500, 3, collector);
         feeTypes[3] = FeeSettings.FeeTypeInit(FeeTypes.SECONDARY_MARKET_FEE, 500, 0, collector);
+        feeTypes[4] = FeeSettings.FeeTypeInit(FeeTypes.DISTRIBUTION_FEE, 500, 0, collector);
+        feeTypes[5] = FeeSettings.FeeTypeInit(FeeTypes.EXIT_FEE, 500, 0, collector);
         return feeTypes;
     }
 
@@ -56,7 +58,7 @@ contract FeeSettingsTest is Test {
         Fees memory _fees,
         address collector
     ) internal pure returns (FeeSettings.FeeTypeInit[] memory) {
-        FeeSettings.FeeTypeInit[] memory feeTypes = new FeeSettings.FeeTypeInit[](4);
+        FeeSettings.FeeTypeInit[] memory feeTypes = new FeeSettings.FeeTypeInit[](6);
         feeTypes[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN_FEE, 500, _fees.tokenFeeNumerator, collector);
         feeTypes[1] = FeeSettings.FeeTypeInit(
             FeeTypes.CROWDINVESTING_FEE,
@@ -71,6 +73,8 @@ contract FeeSettingsTest is Test {
             collector
         );
         feeTypes[3] = FeeSettings.FeeTypeInit(FeeTypes.SECONDARY_MARKET_FEE, 500, 0, collector);
+        feeTypes[4] = FeeSettings.FeeTypeInit(FeeTypes.DISTRIBUTION_FEE, 500, 0, collector);
+        feeTypes[5] = FeeSettings.FeeTypeInit(FeeTypes.EXIT_FEE, 500, 0, collector);
         return feeTypes;
     }
 
