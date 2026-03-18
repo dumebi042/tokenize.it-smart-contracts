@@ -150,8 +150,8 @@ contract FeeSettings is
 
         for (uint256 i = 0; i < _feeTypes.length; i++) {
             FeeTypeInit memory feeType = _feeTypes[i];
-            require(feeType.collector != address(0), "Fee collector cannot be 0x0");
             _registerFeeType(feeType.feeType, feeType.maxNumerator, feeType.defaultNumerator);
+            require(feeType.collector != address(0), "Fee collector cannot be 0x0");
             feeCollectors[feeType.feeType][address(0)] = feeType.collector;
         }
     }
@@ -195,6 +195,7 @@ contract FeeSettings is
     function _registerFeeType(bytes32 _feeType, uint32 _maxNumerator, uint32 _defaultNumerator) internal {
         require(_feeType != bytes32(0), "feeType cannot be 0");
         require(_maxNumerator > 0, "maxNumerator cannot be 0");
+        require(_maxNumerator < FEE_DENOMINATOR, "maxNumerator too large");
         require(feeTypeConfigs[_feeType].maxNumerator == 0, "fee type already registered");
         require(_defaultNumerator <= _maxNumerator, "default exceeds max");
         feeTypeConfigs[_feeType] = FeeTypeConfig({maxNumerator: _maxNumerator, defaultNumerator: _defaultNumerator});

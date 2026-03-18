@@ -1159,4 +1159,93 @@ contract FeeSettingsTest is Test {
         vm.prank(admin);
         feeSettings.removeCustomFeeCollector(FeeTypes.PRIVATE_OFFER, address(0));
     }
+
+    function testAllFeeTypesRegisteredWithUniqueSettings() public {
+        bytes32[] memory allFeeTypes = new bytes32[](6);
+        allFeeTypes[0] = FeeTypes.TOKEN;
+        allFeeTypes[1] = FeeTypes.CROWDINVESTING;
+        allFeeTypes[2] = FeeTypes.PRIVATE_OFFER;
+        allFeeTypes[3] = FeeTypes.SECONDARY_MARKET;
+        allFeeTypes[4] = FeeTypes.DISTRIBUTION;
+        allFeeTypes[5] = FeeTypes.EXIT;
+
+        FeeSettings.FeeTypeInit[] memory feeTypeInits = new FeeSettings.FeeTypeInit[](allFeeTypes.length);
+        for (uint256 i = 0; i < allFeeTypes.length; i++) {
+            uint32 maxNumerator     = uint32((i + 1) * 100);
+            uint32 defaultNumerator = uint32((i + 1) * 50);
+            address collector       = address(uint160(i + 1));
+            feeTypeInits[i] = FeeSettings.FeeTypeInit(allFeeTypes[i], maxNumerator, defaultNumerator, collector);
+        }
+
+        FeeSettings logic = new FeeSettings(trustedForwarder);
+        FeeSettingsCloneFactory factory = new FeeSettingsCloneFactory(address(logic));
+        FeeSettings freshFeeSettings = FeeSettings(
+            factory.createFeeSettingsClone("all-types-salt", trustedForwarder, admin, feeTypeInits)
+        );
+
+        for (uint256 i = 0; i < allFeeTypes.length; i++) {
+            uint32 expectedMax     = uint32((i + 1) * 100);
+            uint32 expectedDefault = uint32((i + 1) * 50);
+            address expectedCollector = address(uint160(i + 1));
+
+            (uint32 actualMax, uint32 actualDefault) = freshFeeSettings.feeTypeConfigs(allFeeTypes[i]);
+            assertEq(actualMax,     expectedMax,     "maxNumerator wrong");
+            assertEq(actualDefault, expectedDefault, "defaultNumerator wrong");
+            assertEq(
+                freshFeeSettings.feeCollector(allFeeTypes[i], address(0)),
+                expectedCollector,
+                "collector wrong"
+            );
+        }
+    }
+
+    function testFuzz_RegisterFeeTypeRevertsIfMaxNumeratorTooLarge(bytes32 feeType, uint32 maxNumerator) public {
+        vm.assume(feeType != bytes32(0));
+        vm.assume(maxNumerator >= feeSettings.FEE_DENOMINATOR());
+
+        vm.expectRevert("maxNumerator too large");
+        vm.prank(admin);
+        feeSettings.registerFeeType(feeType, maxNumerator, 0);
+    }
+
+    function testFuzz_FeeCalculationAndCollectorReturnedCorrectly(
+        bytes32 feeType,
+        uint32 maxNumerator,
+        uint32 defaultNumerator,
+        address collector,
+        uint256 amount
+    ) public {
+        // constraints from _registerFeeType
+        vm.assume(feeType != bytes32(0));
+        vm.assume(maxNumerator > 0 && maxNumerator < feeSettings.FEE_DENOMINATOR());
+        vm.assume(defaultNumerator <= maxNumerator);
+        vm.assume(collector != address(0));
+        // avoid overflow: amount * maxNumerator must not exceed uint256 max
+        vm.assume(amount <= type(uint256).max / feeSettings.FEE_DENOMINATOR());
+
+        // deploy a fresh FeeSettings with no pre-registered fee types
+        FeeSettings logic = new FeeSettings(trustedForwarder);
+        FeeSettingsCloneFactory factory = new FeeSettingsCloneFactory(address(logic));
+        FeeSettings.FeeTypeInit[] memory emptyFeeTypes = new FeeSettings.FeeTypeInit[](0);
+        FeeSettings freshFeeSettings = FeeSettings(
+            factory.createFeeSettingsClone("fuzz-salt", trustedForwarder, admin, emptyFeeTypes)
+        );
+
+        vm.startPrank(admin);
+        freshFeeSettings.registerFeeType(feeType, maxNumerator, defaultNumerator);
+        freshFeeSettings.setDefaultFeeCollector(feeType, collector);
+        vm.stopPrank();
+
+        uint256 expectedFee = (amount * defaultNumerator) / freshFeeSettings.FEE_DENOMINATOR();
+        assertEq(
+            freshFeeSettings.fee(feeType, amount, exampleTokenAddress),
+            expectedFee,
+            "Fee calculation wrong"
+        );
+        assertEq(
+            freshFeeSettings.feeCollector(feeType, exampleTokenAddress),
+            collector,
+            "Collector wrong"
+        );
+    }
 }
