@@ -347,16 +347,6 @@ contract FeeSettings is
     }
 
     /**
-     * @notice Convenience overload — accepts a human-readable fee type name and hashes it internally.
-     * @param _feeType The fee type name (e.g. "TOKEN", "CROWDINVESTING")
-     * @param _amount  The base amount
-     * @param _token   The token address
-     */
-    function fee(string calldata _feeType, uint256 _amount, address _token) external view returns (uint256) {
-        return fee(keccak256(bytes(_feeType)), _amount, _token);
-    }
-
-    /**
      * @notice Returns the fee collector for a given fee type and token.
      *      Falls back to the type-level default (key = address(0)) if no per-token entry exists.
      * @param _feeType The fee type key
@@ -366,15 +356,6 @@ contract FeeSettings is
         address custom = feeCollectors[_feeType][_token];
         if (custom != address(0)) return custom;
         return feeCollectors[_feeType][address(0)];
-    }
-
-    /**
-     * @notice Convenience overload — accepts a human-readable fee type name and hashes it internally.
-     * @param _feeType The fee type name (e.g. "TOKEN", "CROWDINVESTING")
-     * @param _token   The token address
-     */
-    function feeCollector(string calldata _feeType, address _token) external view returns (address) {
-        return feeCollector(keccak256(bytes(_feeType)), _token);
     }
 
     /**
