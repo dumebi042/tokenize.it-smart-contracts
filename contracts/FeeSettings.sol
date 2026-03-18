@@ -124,7 +124,7 @@ contract FeeSettings is
     event FeeCollectorSet(bytes32 indexed feeType, address indexed token, address indexed collector);
 
     /// @notice A custom fee collector has been removed for a token (reverts to type default)
-    event FeeCollectorRemoved(bytes32 indexed feeType, address indexed token);
+    event CustomFeeCollectorRemoved(bytes32 indexed feeType, address indexed token);
 
     // -------------------------------------------------------------------------
     // Constructor & initializer
@@ -150,9 +150,7 @@ contract FeeSettings is
 
         for (uint256 i = 0; i < _feeTypes.length; i++) {
             FeeTypeInit memory feeType = _feeTypes[i];
-            _registerFeeType(feeType.feeType, feeType.maxNumerator, feeType.defaultNumerator);
-            require(feeType.defaultCollector != address(0), "Fee collector cannot be 0x0");
-            collectors[feeType.feeType][address(0)] = feeType.defaultCollector;
+            _registerFeeType(feeType.feeType, feeType.maxNumerator, feeType.defaultNumerator, feeType.defaultCollector);
         }
     }
 
@@ -188,17 +186,29 @@ contract FeeSettings is
      * @param _maxNumerator     Hard cap enforced on all numerators for this type
      * @param _defaultNumerator Initial default numerator; must be <= _maxNumerator
      */
-    function registerFeeType(bytes32 _feeType, uint32 _maxNumerator, uint32 _defaultNumerator) external onlyOwner {
-        _registerFeeType(_feeType, _maxNumerator, _defaultNumerator);
+    function registerFeeType(
+        bytes32 _feeType,
+        uint32 _maxNumerator,
+        uint32 _defaultNumerator,
+        address _collector
+    ) external onlyOwner {
+        _registerFeeType(_feeType, _maxNumerator, _defaultNumerator, _collector);
     }
 
-    function _registerFeeType(bytes32 _feeType, uint32 _maxNumerator, uint32 _defaultNumerator) internal {
+    function _registerFeeType(
+        bytes32 _feeType,
+        uint32 _maxNumerator,
+        uint32 _defaultNumerator,
+        address _collector
+    ) internal {
         require(_feeType != bytes32(0), "feeType cannot be 0");
         require(_maxNumerator > 0, "maxNumerator cannot be 0");
         require(_maxNumerator < FEE_DENOMINATOR, "maxNumerator too large");
         require(feeTypeConfigs[_feeType].maxNumerator == 0, "fee type already registered");
         require(_defaultNumerator <= _maxNumerator, "default exceeds max");
+        require(_collector != address(0), "Fee collector cannot be 0x0");
         feeTypeConfigs[_feeType] = FeeTypeConfig({maxNumerator: _maxNumerator, defaultNumerator: _defaultNumerator});
+        collectors[_feeType][address(0)] = _collector;
         emit FeeTypeRegistered(_feeType, _maxNumerator, _defaultNumerator);
     }
 
@@ -315,7 +325,7 @@ contract FeeSettings is
     function removeCustomFeeCollector(bytes32 _feeType, address _token) external onlyManager {
         require(_token != address(0), "token cannot be 0x0");
         delete collectors[_feeType][_token];
-        emit FeeCollectorRemoved(_feeType, _token);
+        emit CustomFeeCollectorRemoved(_feeType, _token);
     }
 
     // -------------------------------------------------------------------------
