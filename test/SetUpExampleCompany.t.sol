@@ -90,15 +90,7 @@ contract CompanySetUpTest is Test {
         companyAdmin = vm.addr(companyAdminPrivateKey);
 
         // set up FeeSettings
-        Fees memory fees = Fees(tokenFeeNumerator, paymentTokenFeeNumerator, paymentTokenFeeNumerator, 0);
-        feeSettings = createFeeSettings(
-            address(8), // fake forwarder
-            platformAdmin,
-            fees,
-            platformFeeCollector,
-            platformFeeCollector,
-            platformFeeCollector
-        );
+        feeSettings = createFeeSettings(address(8), platformAdmin, buildFeeTypes(tokenFeeNumerator, paymentTokenFeeNumerator, paymentTokenFeeNumerator, platformFeeCollector, platformFeeCollector, platformFeeCollector));
 
         // set up currency. In real life (irl) this would be a real currency, but for testing purposes we use a fake one.
         vm.prank(paymentTokenProvider);

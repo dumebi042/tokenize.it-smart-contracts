@@ -49,21 +49,6 @@ interface IFeeSettingsV2 {
 }
 
 /**
- * @notice The Fees struct contains all the parameters to change fee quantities and fee collector addresses,
- * as well as the time when the new settings can be activated.
- * @dev time has different meanings:
- *  1. it is ignored when the struct is used during initialization.
- *  2. it is the time when the new settings can be activated when the struct is used during a fee change.
- *  3. it is the time up to which the settings are valid when the struct is used for fee discounts for specific customers
- */
-struct Fees {
-    uint32 tokenFeeNumerator;
-    uint32 crowdinvestingFeeNumerator;
-    uint32 privateOfferFeeNumerator;
-    uint64 validityDate;
-}
-
-/**
  * @notice Central registry of well-known fee type identifiers.
  *      Import this library alongside IFeeSettingsV3 to avoid re-declaring the same keccak constants
  *      in every consuming contract.

@@ -31,8 +31,7 @@ contract tokenTest is Test {
     function setUp() public {
         allowList = createAllowList(trustedForwarder, admin);
         vm.prank(feeSettingsOwner);
-        Fees memory fees = Fees(100, 100, 100, 0);
-        feeSettings = createFeeSettings(trustedForwarder, address(this), fees, admin, admin, admin);
+        feeSettings = createFeeSettings(trustedForwarder, address(this), buildFeeTypes(100, 100, 100, admin, admin, admin));
         token = Token(
             tokenCloneFactory.createTokenProxy(
                 0,

@@ -14,7 +14,10 @@ import "./resources/CloneCreators.sol";
 
 contract FeeSettingsIntegrationTest is Test {
     FeeSettings feeSettings;
-    Fees customFees;
+    uint32 customTokenFeeNumerator;
+    uint32 customCrowdinvestingFeeNumerator;
+    uint32 customPrivateOfferFeeNumerator;
+    uint64 customFeeValidity;
     Token token;
     FakePaymentToken currency;
     PrivateOfferFactory privateOfferFactory;
@@ -41,7 +44,10 @@ contract FeeSettingsIntegrationTest is Test {
     function setUp() public {
         FeeSettings feeSettingsLogic = new FeeSettings(trustedForwarder);
         FeeSettingsCloneFactory feeSettingsCloneFactory = new FeeSettingsCloneFactory(address(feeSettingsLogic));
-        customFees = Fees(10, 20, 30, 101 * 365 days);
+        customTokenFeeNumerator = 10;
+        customCrowdinvestingFeeNumerator = 20;
+        customPrivateOfferFeeNumerator = 30;
+        customFeeValidity = uint64(101 * 365 days);
         FeeSettings.FeeTypeInit[] memory feeTypes = new FeeSettings.FeeTypeInit[](4);
         feeTypes[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN, 500, 101, platformAdmin);
         feeTypes[1] = FeeSettings.FeeTypeInit(FeeTypes.CROWDINVESTING, 1000, 102, platformAdmin);
@@ -95,7 +101,7 @@ contract FeeSettingsIntegrationTest is Test {
         assertEq(token.balanceOf(_customFeeCollector), 0, "token.balanceOf(customFeeCollector) != 0 before");
 
         vm.startPrank(platformAdmin);
-        feeSettings.setCustomFee(FeeTypes.TOKEN, address(token), customFees.tokenFeeNumerator, customFees.validityDate);
+        feeSettings.setCustomFee(FeeTypes.TOKEN, address(token), customTokenFeeNumerator, customFeeValidity);
         feeSettings.setCustomFeeCollector(FeeTypes.TOKEN, address(token), _customFeeCollector);
         vm.stopPrank();
         vm.prank(companyAdmin);
@@ -117,12 +123,12 @@ contract FeeSettingsIntegrationTest is Test {
         vm.warp(100 * 365 days);
 
         vm.startPrank(platformAdmin);
-        feeSettings.setCustomFee(FeeTypes.TOKEN, address(token), customFees.tokenFeeNumerator, customFees.validityDate);
+        feeSettings.setCustomFee(FeeTypes.TOKEN, address(token), customTokenFeeNumerator, customFeeValidity);
         feeSettings.setCustomFee(
             FeeTypes.PRIVATE_OFFER,
             address(token),
-            customFees.privateOfferFeeNumerator,
-            customFees.validityDate
+            customPrivateOfferFeeNumerator,
+            customFeeValidity
         );
         feeSettings.setCustomFeeCollector(FeeTypes.PRIVATE_OFFER, address(token), _customFeeCollector);
         vm.stopPrank();
@@ -199,12 +205,12 @@ contract FeeSettingsIntegrationTest is Test {
         vm.warp(100 * 365 days);
 
         vm.startPrank(platformAdmin);
-        feeSettings.setCustomFee(FeeTypes.TOKEN, address(token), customFees.tokenFeeNumerator, customFees.validityDate);
+        feeSettings.setCustomFee(FeeTypes.TOKEN, address(token), customTokenFeeNumerator, customFeeValidity);
         feeSettings.setCustomFee(
             FeeTypes.CROWDINVESTING,
             address(token),
-            customFees.crowdinvestingFeeNumerator,
-            customFees.validityDate
+            customCrowdinvestingFeeNumerator,
+            customFeeValidity
         );
         feeSettings.setCustomFeeCollector(FeeTypes.CROWDINVESTING, address(token), _customFeeCollector);
         vm.stopPrank();

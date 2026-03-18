@@ -62,15 +62,7 @@ contract TokenSwapTest is Test {
         vm.prank(owner);
         list.set(address(paymentToken), TRUSTED_CURRENCY);
 
-        Fees memory fees = Fees(100, 100, 100, 100);
-        feeSettings = createFeeSettings(
-            trustedForwarder,
-            address(this),
-            fees,
-            wrongFeeReceiver,
-            admin,
-            wrongFeeReceiver
-        );
+        feeSettings = createFeeSettings(trustedForwarder, address(this), buildFeeTypes(100, 100, 100, wrongFeeReceiver, admin, wrongFeeReceiver));
 
         // create token
         address tokenLogicContract = address(new Token(trustedForwarder));

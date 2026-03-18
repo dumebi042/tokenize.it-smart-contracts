@@ -69,15 +69,7 @@ contract CrowdinvestingTransferTest is Test {
         list.set(tokenHolder, 0x0);
         vm.stopPrank();
 
-        Fees memory fees = Fees(100, 100, 100, 100);
-        feeSettings = createFeeSettings(
-            trustedForwarder,
-            address(this),
-            fees,
-            wrongFeeReceiver,
-            admin,
-            wrongFeeReceiver
-        );
+        feeSettings = createFeeSettings(trustedForwarder, address(this), buildFeeTypes(100, 100, 100, wrongFeeReceiver, admin, wrongFeeReceiver));
 
         // create token
         address tokenLogicContract = address(new Token(trustedForwarder));

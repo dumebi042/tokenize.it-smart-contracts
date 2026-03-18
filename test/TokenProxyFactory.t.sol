@@ -30,15 +30,7 @@ contract tokenProxyFactoryTest is Test {
 
     function setUp() public {
         allowList = createAllowList(trustedForwarder, feeSettingsAndAllowListOwner);
-        Fees memory fees = Fees(100, 100, 100, 0);
-        feeSettings = createFeeSettings(
-            trustedForwarder,
-            feeSettingsAndAllowListOwner,
-            fees,
-            feeSettingsAndAllowListOwner,
-            feeSettingsAndAllowListOwner,
-            feeSettingsAndAllowListOwner
-        );
+        feeSettings = createFeeSettings(trustedForwarder, feeSettingsAndAllowListOwner, buildFeeTypes(100, 100, 100, feeSettingsAndAllowListOwner, feeSettingsAndAllowListOwner, feeSettingsAndAllowListOwner));
         vm.stopPrank();
 
         implementation = new Token(trustedForwarder);
@@ -161,14 +153,7 @@ contract tokenProxyFactoryTest is Test {
         console.log("name: %s", name);
         console.log("symbol: %s", symbol);
 
-        FeeSettings _feeSettings = createFeeSettings(
-            trustedForwarder,
-            address(this),
-            Fees(100, 100, 100, 0),
-            feeSettingsAndAllowListOwner,
-            feeSettingsAndAllowListOwner,
-            feeSettingsAndAllowListOwner
-        );
+        FeeSettings _feeSettings = createFeeSettings(trustedForwarder, address(this), buildFeeTypes(100, 100, 100, feeSettingsAndAllowListOwner, feeSettingsAndAllowListOwner, feeSettingsAndAllowListOwner));
 
         Token clone = Token(
             factory.createTokenProxy(
@@ -228,14 +213,7 @@ contract tokenProxyFactoryTest is Test {
         vm.assume(rando != address(0));
         vm.assume(rando != _admin);
 
-        FeeSettings _feeSettings = createFeeSettings(
-            trustedForwarder,
-            address(this),
-            Fees(100, 100, 100, 0),
-            feeSettingsAndAllowListOwner,
-            feeSettingsAndAllowListOwner,
-            feeSettingsAndAllowListOwner
-        );
+        FeeSettings _feeSettings = createFeeSettings(trustedForwarder, address(this), buildFeeTypes(100, 100, 100, feeSettingsAndAllowListOwner, feeSettingsAndAllowListOwner, feeSettingsAndAllowListOwner));
 
         Token _token = Token(
             factory.createTokenProxy(
@@ -280,14 +258,7 @@ contract tokenProxyFactoryTest is Test {
         vm.assume(newPauser != address(0));
         vm.assume(newPauser != admin);
 
-        FeeSettings _feeSettings = createFeeSettings(
-            trustedForwarder,
-            address(this),
-            Fees(100, 100, 100, 0),
-            feeSettingsAndAllowListOwner,
-            feeSettingsAndAllowListOwner,
-            feeSettingsAndAllowListOwner
-        );
+        FeeSettings _feeSettings = createFeeSettings(trustedForwarder, address(this), buildFeeTypes(100, 100, 100, feeSettingsAndAllowListOwner, feeSettingsAndAllowListOwner, feeSettingsAndAllowListOwner));
 
         Token _token = Token(
             factory.createTokenProxy(

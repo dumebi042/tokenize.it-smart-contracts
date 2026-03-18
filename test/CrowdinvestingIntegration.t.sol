@@ -52,15 +52,7 @@ contract CrowdinvestingTest is Test {
         vm.prank(platformAdmin);
         list.set(address(paymentToken), TRUSTED_CURRENCY);
 
-        Fees memory fees = Fees(100, 100, 100, 100);
-        feeSettings = createFeeSettings(
-            trustedForwarder,
-            platformAdmin,
-            fees,
-            platformAdmin,
-            platformAdmin,
-            platformAdmin
-        );
+        feeSettings = createFeeSettings(trustedForwarder, platformAdmin, buildFeeTypes(100, 100, 100, platformAdmin, platformAdmin, platformAdmin));
         vm.prank(platformAdmin);
         token = Token(
             tokenFactory.createTokenProxy(

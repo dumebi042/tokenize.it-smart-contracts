@@ -101,8 +101,7 @@ contract CoinvestedPositionDistributionTest is Test {
 
         // Infrastructure
         allowList = createAllowList(trustedForwarder, admin);
-        Fees memory zeroFees = Fees(0, 0, 0, 0);
-        feeSettings = createFeeSettings(trustedForwarder, admin, zeroFees, feeCollector, feeCollector, feeCollector);
+        feeSettings = createFeeSettings(trustedForwarder, admin, buildFeeTypes(0, 0, 0, feeCollector, feeCollector, feeCollector));
 
         // Currencies
         eurc = new FakePaymentToken(0, 6);

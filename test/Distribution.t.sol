@@ -63,8 +63,7 @@ contract DistributionTest is Test {
 
         address tokenLogic = address(new Token(trustedForwarder));
         tokenFactory = new TokenProxyFactory(tokenLogic);
-        Fees memory fees = Fees(0, 0, 0, 0);
-        IFeeSettingsV2 feeSettings = createFeeSettings(trustedForwarder, admin, fees, admin, admin, admin);
+        IFeeSettingsV2 feeSettings = createFeeSettings(trustedForwarder, admin, buildFeeTypes(0, 0, 0, admin, admin, admin));
         token = Token(
             tokenFactory.createTokenProxy(0, trustedForwarder, feeSettings, admin, allowList, 0, "DistToken", "DST")
         );
@@ -174,8 +173,7 @@ contract DistributionTest is Test {
 
     function testInitializeZeroTotalSupplyReverts() public {
         // Take a snapshot before any tokens are minted on a fresh token
-        Fees memory fees = Fees(0, 0, 0, 0);
-        IFeeSettingsV2 feeSettings = createFeeSettings(trustedForwarder, admin, fees, admin, admin, admin);
+        IFeeSettingsV2 feeSettings = createFeeSettings(trustedForwarder, admin, buildFeeTypes(0, 0, 0, admin, admin, admin));
         Token emptyToken = Token(
             tokenFactory.createTokenProxy(
                 bytes32("empty"),
@@ -235,8 +233,7 @@ contract DistributionTest is Test {
         uint256 balC = uint256(balA) + balB > 0 ? uint256(balA) + balB : 1;
 
         // Deploy a fresh token with three holders
-        Fees memory fees = Fees(0, 0, 0, 0);
-        IFeeSettingsV2 feeSettings = createFeeSettings(trustedForwarder, admin, fees, admin, admin, admin);
+        IFeeSettingsV2 feeSettings = createFeeSettings(trustedForwarder, admin, buildFeeTypes(0, 0, 0, admin, admin, admin));
         Token fuzzToken = Token(
             tokenFactory.createTokenProxy(
                 bytes32("fuzz"),
@@ -681,15 +678,7 @@ contract DistributionTest is Test {
     /// @dev Deploy a Distribution backed by a token with 1% private offer fee.
     ///      Returns the deployed clone and the fee amount deducted from TOTAL_CURRENCY.
     function _deployDistWithNonZeroFee() internal returns (Distribution d, uint256 fee) {
-        Fees memory nonZeroFees = Fees(0, 0, 100, 0); // 1% private offer fee (100/10000)
-        IFeeSettingsV2 feeSettingsWithFee = createFeeSettings(
-            trustedForwarder,
-            admin,
-            nonZeroFees,
-            admin,
-            admin,
-            feeCollector
-        );
+        IFeeSettingsV2 feeSettingsWithFee = createFeeSettings(trustedForwarder, admin, buildFeeTypes(0, 0, 100, admin, admin, feeCollector));
         Token feeToken = Token(
             tokenFactory.createTokenProxy(
                 bytes32("feeTok"),
