@@ -25,13 +25,6 @@ contract FeeSettings is
     // Constants
     // -------------------------------------------------------------------------
 
-    /// max token fee is 5%
-    uint32 public constant MAX_TOKEN_NUMERATOR = 500;
-    /// max crowdinvesting fee is 10%
-    uint32 public constant MAX_CROWDINVESTING_NUMERATOR = 1000;
-    /// max private offer fee is 5%
-    uint32 public constant MAX_PRIVATE_OFFER_NUMERATOR = 500;
-
     /// Denominator to calculate all fees
     uint32 public constant FEE_DENOMINATOR = 10000;
 

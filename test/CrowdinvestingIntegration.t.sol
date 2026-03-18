@@ -248,8 +248,10 @@ contract CrowdinvestingTest is Test {
     }
 
     function testVariousFees(uint32 tokenFeeNumerator, uint32 privateOfferFeeNumerator) public {
-        vm.assume(tokenFeeNumerator <= feeSettings.MAX_TOKEN_NUMERATOR());
-        vm.assume(privateOfferFeeNumerator <= feeSettings.MAX_PRIVATE_OFFER_NUMERATOR());
+        (uint32 maxTokenNumerator,) = feeSettings.feeTypeConfigs(FeeTypes.TOKEN);
+        (uint32 maxPrivateOfferNumerator,) = feeSettings.feeTypeConfigs(FeeTypes.PRIVATE_OFFER);
+        vm.assume(tokenFeeNumerator <= maxTokenNumerator);
+        vm.assume(privateOfferFeeNumerator <= maxPrivateOfferNumerator);
         feeCalculation(tokenFeeNumerator, privateOfferFeeNumerator);
     }
 
