@@ -377,6 +377,15 @@ contract FeeSettings is
         return feeCollector(keccak256(bytes(_feeType)), _token);
     }
 
+    /**
+     * @notice Converts a human-readable fee type name to its bytes32 key.
+     *      Useful for block explorer users who need the hash to query mappings directly.
+     * @param _feeType The fee type name (e.g. "TOKEN", "CROWDINVESTING")
+     */
+    function feeTypeId(string calldata _feeType) external pure returns (bytes32) {
+        return keccak256(bytes(_feeType));
+    }
+
     // -------------------------------------------------------------------------
     // IFeeSettingsV2 named accessors (backwards-compat wrappers over V3 generics)
     // -------------------------------------------------------------------------
