@@ -47,13 +47,13 @@ contract FeeSettings is
      * @param feeType          bytes32 identifier (e.g. FeeTypes.TOKEN)
      * @param maxNumerator     Hard cap for this fee type
      * @param defaultNumerator Initial default numerator; must be <= maxNumerator
-     * @param collector        Default fee collector address for this type
+     * @param defaultCollector Default fee collector address for this type
      */
     struct FeeTypeInit {
         bytes32 feeType;
         uint32 maxNumerator;
         uint32 defaultNumerator;
-        address collector;
+        address defaultCollector;
     }
 
     /**
@@ -89,8 +89,8 @@ contract FeeSettings is
     /// per-token custom discounts:  feeType => token => discount
     mapping(bytes32 => mapping(address => CustomFee)) public customFees;
 
-    /// fee collectors:  feeType => token => collector  (address(0) key = default collector for that type)
-    mapping(bytes32 => mapping(address => address)) public feeCollectors;
+    /// per-token custom collectors:  feeType => token => collector  (address(0) key = default collector for that type)
+    mapping(bytes32 => mapping(address => address)) public collectors;
 
     /// pending default-fee changes:  feeType => proposal
     mapping(bytes32 => ProposedFeeChange) public proposedFeeChanges;
@@ -151,8 +151,8 @@ contract FeeSettings is
         for (uint256 i = 0; i < _feeTypes.length; i++) {
             FeeTypeInit memory feeType = _feeTypes[i];
             _registerFeeType(feeType.feeType, feeType.maxNumerator, feeType.defaultNumerator);
-            require(feeType.collector != address(0), "Fee collector cannot be 0x0");
-            feeCollectors[feeType.feeType][address(0)] = feeType.collector;
+            require(feeType.defaultCollector != address(0), "Fee collector cannot be 0x0");
+            collectors[feeType.feeType][address(0)] = feeType.defaultCollector;
         }
     }
 
@@ -289,7 +289,7 @@ contract FeeSettings is
     function setDefaultFeeCollector(bytes32 _feeType, address _collector) external onlyOwner {
         require(feeTypeConfigs[_feeType].maxNumerator > 0, "unknown fee type");
         require(_collector != address(0), "collector cannot be 0x0");
-        feeCollectors[_feeType][address(0)] = _collector;
+        collectors[_feeType][address(0)] = _collector;
         emit FeeCollectorSet(_feeType, address(0), _collector);
     }
 
@@ -303,7 +303,7 @@ contract FeeSettings is
         require(feeTypeConfigs[_feeType].maxNumerator > 0, "unknown fee type");
         require(_token != address(0), "token cannot be 0x0");
         require(_collector != address(0), "collector cannot be 0x0");
-        feeCollectors[_feeType][_token] = _collector;
+        collectors[_feeType][_token] = _collector;
         emit FeeCollectorSet(_feeType, _token, _collector);
     }
 
@@ -314,7 +314,7 @@ contract FeeSettings is
      */
     function removeCustomFeeCollector(bytes32 _feeType, address _token) external onlyManager {
         require(_token != address(0), "token cannot be 0x0");
-        delete feeCollectors[_feeType][_token];
+        delete collectors[_feeType][_token];
         emit FeeCollectorRemoved(_feeType, _token);
     }
 
@@ -347,9 +347,9 @@ contract FeeSettings is
      * @param _token   The token address
      */
     function feeCollector(bytes32 _feeType, address _token) public view override(IFeeSettingsV3) returns (address) {
-        address custom = feeCollectors[_feeType][_token];
+        address custom = collectors[_feeType][_token];
         if (custom != address(0)) return custom;
-        return feeCollectors[_feeType][address(0)];
+        return collectors[_feeType][address(0)];
     }
 
     /**
@@ -410,7 +410,7 @@ contract FeeSettings is
      * @dev V1 compat — V1 has no concept of per-token collectors, so we return the type default.
      */
     function feeCollector() external view override(IFeeSettingsV1) returns (address) {
-        return feeCollectors[FeeTypes.TOKEN][address(0)];
+        return collectors[FeeTypes.TOKEN][address(0)];
     }
 
     /**
