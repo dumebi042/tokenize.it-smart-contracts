@@ -64,7 +64,12 @@ contract BackwardsCompatibilityV4_2_0_beta_0 is Test {
         FeeSettings.FeeTypeInit[] memory feeTypes = new FeeSettings.FeeTypeInit[](2);
         feeTypes[0] = FeeSettings.FeeTypeInit(keccak256("TOKEN"), 500, TOKEN_FEE_NUMERATOR, feeCollector);
         // personalInviteFee(uint256) in the current FeeSettings routes through FeeTypes.PRIVATE_OFFER
-        feeTypes[1] = FeeSettings.FeeTypeInit(keccak256("PRIVATE_OFFER"), 500, PERSONAL_INVITE_FEE_NUMERATOR, feeCollector);
+        feeTypes[1] = FeeSettings.FeeTypeInit(
+            keccak256("PRIVATE_OFFER"),
+            500,
+            PERSONAL_INVITE_FEE_NUMERATOR,
+            feeCollector
+        );
         vm.prank(platformAdmin);
         feeSettings = feeSettingsCloneFactory.createFeeSettingsClone(
             "someSalt",

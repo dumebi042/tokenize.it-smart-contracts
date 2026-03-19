@@ -89,7 +89,12 @@ contract BackwardsCompatibilityV6_1_0 is Test {
 
         FeeSettings.FeeTypeInit[] memory feeTypes = new FeeSettings.FeeTypeInit[](2);
         feeTypes[0] = FeeSettings.FeeTypeInit(keccak256("TOKEN"), 500, TOKEN_FEE_NUMERATOR, feeCollector);
-        feeTypes[1] = FeeSettings.FeeTypeInit(keccak256("PRIVATE_OFFER"), 500, PRIVATE_OFFER_FEE_NUMERATOR, feeCollector);
+        feeTypes[1] = FeeSettings.FeeTypeInit(
+            keccak256("PRIVATE_OFFER"),
+            500,
+            PRIVATE_OFFER_FEE_NUMERATOR,
+            feeCollector
+        );
         vm.prank(platformAdmin);
         feeSettings = feeSettingsCloneFactory.createFeeSettingsClone(
             "someSalt",
@@ -108,10 +113,7 @@ contract BackwardsCompatibilityV6_1_0 is Test {
         allowList.initialize(address(this));
 
         // Deploy v6.1.0 Token from npm artifact bytecode (upgradeable: impl + ERC1967 proxy).
-        address tokenImpl = deployCode(
-            string.concat(ARTIFACTS, "Token.sol/Token.json"),
-            abi.encode(trustedForwarder)
-        );
+        address tokenImpl = deployCode(string.concat(ARTIFACTS, "Token.sol/Token.json"), abi.encode(trustedForwarder));
         bytes memory initData = abi.encodeWithSignature(
             "initialize(address,address,address,uint256,string,string)",
             feeSettings,
