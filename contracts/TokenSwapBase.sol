@@ -136,10 +136,7 @@ abstract contract TokenSwapBase is
     /**
      * @notice unpause the contract
      */
-    function unpause() external onlyOwner {
-        require(tokenPrice != 0, "tokenPrice must be set before unpausing");
-        _unpause();
-    }
+    function unpause() external virtual;
 
     /**
      * @dev both Ownable and ERC2771Context have a _msgSender() function, so we need to override and select which one to use.
