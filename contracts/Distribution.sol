@@ -10,6 +10,12 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./Token.sol";
 import "./interfaces/IFeeSettings.sol";
 
+struct Reassignment {
+    address from;
+    address to;
+    uint256 amount;
+}
+
 struct DistributionInitializerArguments {
     /// @notice Owner of the contract
     address owner;
@@ -23,6 +29,8 @@ struct DistributionInitializerArguments {
     uint256 totalCurrencyAmount;
     /// @notice Earliest timestamp at which the owner can reassign unclaimed funds
     uint64 reassignAfter;
+    /// @notice Reassignments to apply immediately at initialization, bypassing the reassignAfter time restriction
+    Reassignment[] initialReassignments;
 }
 
 /**
@@ -82,6 +90,10 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         totalCurrencyAmount = _arguments.totalCurrencyAmount - fee;
         reassignAfter = _arguments.reassignAfter;
         _arguments.currency.safeTransferFrom(_currencyProvider, address(this), totalCurrencyAmount);
+        for (uint256 i = 0; i < _arguments.initialReassignments.length; i++) {
+            Reassignment memory reassignment = _arguments.initialReassignments[i];
+            _reassign(reassignment.from, reassignment.to, reassignment.amount);
+        }
     }
 
     function eligible(address _holder) public view returns (uint256) {
@@ -106,6 +118,10 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
      */
     function reassign(address _from, address _to, uint256 _amount) external onlyOwner {
         require(block.timestamp >= reassignAfter, "reassignment not yet available");
+        _reassign(_from, _to, _amount);
+    }
+
+    function _reassign(address _from, address _to, uint256 _amount) internal {
         require(_amount > 0, "amount must be positive");
         require(_amount <= eligible(_from), "amount exceeds eligible");
         paidOut[_from] += _amount;
