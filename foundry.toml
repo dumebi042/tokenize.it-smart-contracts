@@ -17,6 +17,16 @@ optimizer_runs = 10_000
 
 gas_reports = ["AllowList", "Crowdinvesting", "FeeSettings", "PrivateOffer", "PrivateOfferFactory", "Token"]
 
+[profile.backwards-compatibility]
+# Compiles and runs only test/backwards-compatibility/. Old contract bytecode is loaded at runtime
+# from npm artifacts via deployCode — no source compilation of legacy code, no remapping needed.
+test = "test/backwards-compatibility"
+via-ir = false
+optimizer = true
+optimizer_runs = 10_000
+# Allow deployCode to read pre-compiled artifact JSON files from installed npm packages
+fs_permissions = [{ access = "read", path = "./test/legacy/" }]
+
 [rpc_endpoints]
 goerli = "${GOERLI_RPC_URL}"
 chiado = "${CHIADO_RPC_URL}"
