@@ -9,6 +9,8 @@ import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/factories/CrowdinvestingCloneFactory.sol";
 import "../contracts/PrivateOffer.sol";
 import "../contracts/factories/PrivateOfferFactory.sol";
+import "../contracts/factories/TimeLockCloneFactory.sol";
+import "../contracts/TimeLock.sol";
 import "./resources/CloneCreators.sol";
 import "./resources/ERC20Helper.sol";
 
@@ -76,9 +78,9 @@ contract MainnetCurrencies is Test {
 
         fundraisingFactory = new CrowdinvestingCloneFactory(address(new Crowdinvesting(trustedForwarder)));
 
-        Vesting vestingImplementation = new Vesting(trustedForwarder);
-        VestingCloneFactory vestingCloneFactory = new VestingCloneFactory(address(vestingImplementation));
-        inviteFactory = new PrivateOfferFactory(vestingCloneFactory);
+        TimeLock timeLockImplementation = new TimeLock();
+        TimeLockCloneFactory timeLockCloneFactory = new TimeLockCloneFactory(address(timeLockImplementation));
+        inviteFactory = new PrivateOfferFactory(timeLockCloneFactory);
         currencyCost = (amountOfTokenToBuy * price) / 10 ** token.decimals();
         currencyAmount = currencyCost * 2;
     }

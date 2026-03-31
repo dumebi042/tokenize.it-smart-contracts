@@ -81,7 +81,8 @@ contract DistributionTest is Test {
             snapshotId: snapshotId,
             currency: IERC20(address(currency)),
             totalCurrencyAmount: totalCurrency,
-            reassignAfter: _reassignAfter
+            reassignAfter: _reassignAfter,
+            initialReassignments: new Reassignment[](0)
         });
         address cloneAddr = factory.predictCloneAddress(salt, trustedForwarder, args);
         currency.mint(currencyProvider, totalCurrency);
@@ -99,7 +100,8 @@ contract DistributionTest is Test {
             snapshotId: snapshotId,
             currency: IERC20(address(currency)),
             totalCurrencyAmount: 0,
-            reassignAfter: reassignAfter
+            reassignAfter: reassignAfter,
+            initialReassignments: new Reassignment[](0)
         });
         vm.expectRevert("Initializable: contract is already initialized");
         distLogic.initialize(args, currencyProvider);
@@ -112,7 +114,8 @@ contract DistributionTest is Test {
             snapshotId: snapshotId,
             currency: IERC20(address(currency)),
             totalCurrencyAmount: 0,
-            reassignAfter: reassignAfter
+            reassignAfter: reassignAfter,
+            initialReassignments: new Reassignment[](0)
         });
         vm.expectRevert("Initializable: contract is already initialized");
         dist.initialize(args, currencyProvider);
@@ -128,7 +131,8 @@ contract DistributionTest is Test {
             snapshotId: snapshotId,
             currency: IERC20(address(badCurrency)),
             totalCurrencyAmount: 0,
-            reassignAfter: reassignAfter
+            reassignAfter: reassignAfter,
+            initialReassignments: new Reassignment[](0)
         });
         vm.expectRevert("currency needs to be on the allowlist with TRUSTED_CURRENCY attribute");
         factory.createDistributionClone(bytes32("ntc"), trustedForwarder, currencyProvider, args);
@@ -141,7 +145,8 @@ contract DistributionTest is Test {
             snapshotId: snapshotId,
             currency: IERC20(address(currency)),
             totalCurrencyAmount: 500e6,
-            reassignAfter: reassignAfter
+            reassignAfter: reassignAfter,
+            initialReassignments: new Reassignment[](0)
         });
         address cloneAddr = factory.predictCloneAddress(bytes32("lowA"), trustedForwarder, args);
         currency.mint(currencyProvider, 500e6);
@@ -189,7 +194,8 @@ contract DistributionTest is Test {
             snapshotId: emptySnap,
             currency: IERC20(address(currency)),
             totalCurrencyAmount: TOTAL_CURRENCY,
-            reassignAfter: reassignAfter
+            reassignAfter: reassignAfter,
+            initialReassignments: new Reassignment[](0)
         });
         address cloneAddr = factory.predictCloneAddress(bytes32("emptyDist"), trustedForwarder, args);
         currency.mint(currencyProvider, TOTAL_CURRENCY);
@@ -259,7 +265,8 @@ contract DistributionTest is Test {
             snapshotId: snap,
             currency: IERC20(address(currency)),
             totalCurrencyAmount: totalCurrency,
-            reassignAfter: reassignAfter
+            reassignAfter: reassignAfter,
+            initialReassignments: new Reassignment[](0)
         });
         address cloneAddr = factory.predictCloneAddress(bytes32("fuzz2"), trustedForwarder, args);
         currency.mint(currencyProvider, totalCurrency);
@@ -349,7 +356,8 @@ contract DistributionTest is Test {
             snapshotId: snap,
             currency: IERC20(address(currency)),
             totalCurrencyAmount: totalCurrency,
-            reassignAfter: reassignAfter
+            reassignAfter: reassignAfter,
+            initialReassignments: new Reassignment[](0)
         });
         address cloneAddr = factory.predictCloneAddress(salt, trustedForwarder, args);
         currency.mint(currencyProvider, totalCurrency);
@@ -672,7 +680,8 @@ contract DistributionTest is Test {
             snapshotId: snap,
             currency: IERC20(address(currency)),
             totalCurrencyAmount: TOTAL_CURRENCY,
-            reassignAfter: reassignAfter
+            reassignAfter: reassignAfter,
+            initialReassignments: new Reassignment[](0)
         });
         address cloneAddr = factory.predictCloneAddress(bytes32("feeDist"), trustedForwarder, args);
         fee = feeSettingsWithFee.privateOfferFee(TOTAL_CURRENCY, address(feeToken));

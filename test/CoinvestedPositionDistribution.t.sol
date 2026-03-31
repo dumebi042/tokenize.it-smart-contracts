@@ -171,7 +171,8 @@ contract CoinvestedPositionDistributionTest is Test {
             leadInvestors: leadInvestors,
             basePrice: basePrice,
             baseCurrency: IERC20(address(baseCurrency)),
-            token: token
+            token: token,
+            lockedUntil: 0
         });
         return
             CoinvestedPosition(coinvestedPositionFactory.createCoinvestedPositionClone(salt, trustedForwarder, args));
@@ -199,7 +200,8 @@ contract CoinvestedPositionDistributionTest is Test {
             snapshotId: _snapshotId,
             currency: IERC20(address(_currency)),
             totalCurrencyAmount: totalCurrency,
-            reassignAfter: reassignAfter
+            reassignAfter: reassignAfter,
+            initialReassignments: new Reassignment[](0)
         });
         address cloneAddr = distributionFactory.predictCloneAddress(salt, trustedForwarder, args);
         _currency.mint(currencyProvider, totalCurrency);
@@ -242,7 +244,7 @@ contract CoinvestedPositionDistributionTest is Test {
         uint256 beforeR = usdc.balanceOf(receiver);
 
         vm.prank(owner);
-        coinvestedPosition.distributeDividends(IDistribution(address(distribution)), IERC20(address(usdc)));
+        coinvestedPosition.distributeDividends(IDistribution(address(distribution)));
 
         uint256 aGot = usdc.balanceOf(leadA) - beforeA;
         uint256 bGot = usdc.balanceOf(leadB) - beforeB;
@@ -305,7 +307,7 @@ contract CoinvestedPositionDistributionTest is Test {
         uint256 beforeB = usdc.balanceOf(leadB);
 
         vm.prank(owner);
-        coinvestedPosition.distributeDividends(IDistribution(address(distribution)), IERC20(address(usdc)));
+        coinvestedPosition.distributeDividends(IDistribution(address(distribution)));
 
         uint256 aGot = usdc.balanceOf(leadA) - beforeA;
         uint256 bGot = usdc.balanceOf(leadB) - beforeB;
@@ -386,7 +388,7 @@ contract CoinvestedPositionDistributionTest is Test {
         uint256 beforeR = usdc.balanceOf(receiver);
 
         vm.prank(owner);
-        coinvestedPosition3.distributeDividends(IDistribution(address(distribution)), IERC20(address(usdc)));
+        coinvestedPosition3.distributeDividends(IDistribution(address(distribution)));
 
         assertEq(usdc.balanceOf(leadA) - beforeA, expectedA, "DI-III-A: wrong leadA payout");
         assertEq(usdc.balanceOf(leadB) - beforeB, expectedB, "DI-III-A: wrong leadB payout");
@@ -469,7 +471,7 @@ contract CoinvestedPositionDistributionTest is Test {
         uint256 beforeR = eure.balanceOf(receiver);
 
         vm.prank(owner);
-        coinvestedPosition3.distributeDividends(IDistribution(address(distribution)), IERC20(address(eure)));
+        coinvestedPosition3.distributeDividends(IDistribution(address(distribution)));
 
         assertEq(eure.balanceOf(leadA) - beforeA, expectedA, "DI-III-B: wrong leadA EURe payout");
         assertEq(eure.balanceOf(leadB) - beforeB, expectedB, "DI-III-B: wrong leadB EURe payout");
@@ -503,7 +505,7 @@ contract CoinvestedPositionDistributionTest is Test {
 
         // Must not revert
         vm.prank(owner);
-        coinvestedPosition.distributeDividends(IDistribution(address(distribution)), IERC20(address(usdc)));
+        coinvestedPosition.distributeDividends(IDistribution(address(distribution)));
 
         uint256 aGot = usdc.balanceOf(leadA) - beforeA;
         uint256 bGot = usdc.balanceOf(leadB) - beforeB;
@@ -523,13 +525,15 @@ contract CoinvestedPositionDistributionTest is Test {
     }
 
     function testDI_IV_UntrustedCurrency_Rejected() public {
-        // A currency not on the allowlist should be rejected
+        // A currency not on the allowlist should be rejected.
+        // Use a stub Distribution that reports an untrusted token as its currency,
+        // bypassing Distribution's own constructor guard.
         FakePaymentToken untrusted = new FakePaymentToken(0, 6);
-        Distribution distribution = _deployDistribution(bytes32("DI-IV-bad"), usdc, TOTAL_USDC);
+        TokenTransferStub stub = new TokenTransferStub(IERC20(address(untrusted)), 0);
 
         vm.expectRevert("dividend currency must be a trusted currency");
         vm.prank(owner);
-        coinvestedPosition.distributeDividends(IDistribution(address(distribution)), IERC20(address(untrusted)));
+        coinvestedPosition.distributeDividends(IDistribution(address(stub)));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -549,7 +553,7 @@ contract CoinvestedPositionDistributionTest is Test {
         uint256 beforeR = usdc.balanceOf(receiver);
 
         vm.prank(owner);
-        coinvestedPosition.distributeDividends(IDistribution(address(distribution)), IERC20(address(usdc)));
+        coinvestedPosition.distributeDividends(IDistribution(address(distribution)));
 
         uint256 aGot = usdc.balanceOf(leadA) - beforeA;
         uint256 bGot = usdc.balanceOf(leadB) - beforeB;
@@ -594,7 +598,7 @@ contract CoinvestedPositionDistributionTest is Test {
         // distributeDividends must revert because received = 0
         vm.expectRevert("didn't receive expected currency from distribution");
         vm.prank(owner);
-        coinvestedPositionZero.distributeDividends(IDistribution(address(distribution)), IERC20(address(usdc)));
+        coinvestedPositionZero.distributeDividends(IDistribution(address(distribution)));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -640,7 +644,7 @@ contract CoinvestedPositionDistributionTest is Test {
         uint256 beforeR = usdc.balanceOf(receiver);
 
         vm.prank(owner);
-        coinvestedPosition.distributeDividends(IDistribution(address(distribution)), IERC20(address(usdc)));
+        coinvestedPosition.distributeDividends(IDistribution(address(distribution)));
 
         uint256 aGot = usdc.balanceOf(leadA) - beforeA;
         uint256 bGot = usdc.balanceOf(leadB) - beforeB;
@@ -685,7 +689,7 @@ contract CoinvestedPositionDistributionTest is Test {
             uint256 beforeR = usdc.balanceOf(receiver);
 
             vm.prank(owner);
-            coinvestedPosition.distributeDividends(IDistribution(address(usdcDistribution)), IERC20(address(usdc)));
+            coinvestedPosition.distributeDividends(IDistribution(address(usdcDistribution)));
 
             uint256 aGot = usdc.balanceOf(leadA) - beforeA;
             uint256 bGot = usdc.balanceOf(leadB) - beforeB;
@@ -723,7 +727,7 @@ contract CoinvestedPositionDistributionTest is Test {
             uint256 beforeR = eure.balanceOf(receiver);
 
             vm.prank(owner);
-            coinvestedPosition.distributeDividends(IDistribution(address(eureDistribution)), IERC20(address(eure)));
+            coinvestedPosition.distributeDividends(IDistribution(address(eureDistribution)));
 
             uint256 aGot = eure.balanceOf(leadA) - beforeA;
             uint256 bGot = eure.balanceOf(leadB) - beforeB;
@@ -763,7 +767,7 @@ contract CoinvestedPositionDistributionTest is Test {
         uint256 beforeR = usdc.balanceOf(receiver);
 
         vm.prank(owner);
-        coinvestedPosition.distributeDividends(IDistribution(address(distribution)), IERC20(address(usdc)));
+        coinvestedPosition.distributeDividends(IDistribution(address(distribution)));
 
         uint256 aGot = usdc.balanceOf(leadA) - beforeA;
         uint256 bGot = usdc.balanceOf(leadB) - beforeB;
@@ -836,7 +840,7 @@ contract CoinvestedPositionDistributionTest is Test {
         uint256 beforeR = usdc.balanceOf(receiver);
 
         vm.prank(owner);
-        coinvestedPosition.distributeDividends(IDistribution(address(distribution)), IERC20(address(usdc)));
+        coinvestedPosition.distributeDividends(IDistribution(address(distribution)));
 
         uint256 aGot = usdc.balanceOf(leadA) - beforeA;
         uint256 bGot = usdc.balanceOf(leadB) - beforeB;
@@ -876,7 +880,8 @@ contract CoinvestedPositionDistributionTest is Test {
             snapshotId: snapshotId,
             currency: IERC20(address(token)),
             totalCurrencyAmount: 100e18,
-            reassignAfter: reassignAfter
+            reassignAfter: reassignAfter,
+            initialReassignments: new Reassignment[](0)
         });
         address cloneAddr = distributionFactory.predictCloneAddress(bytes32("DI-XII"), trustedForwarder, args);
         vm.prank(admin);
@@ -904,7 +909,7 @@ contract CoinvestedPositionDistributionTest is Test {
 
         vm.expectRevert("currency cannot be the held token");
         vm.prank(owner);
-        coinvestedPosition.distributeDividends(IDistribution(address(stub)), IERC20(address(token)));
+        coinvestedPosition.distributeDividends(IDistribution(address(stub)));
     }
 
     /**
@@ -987,7 +992,8 @@ contract CoinvestedPositionDistributionTest is Test {
                         leadInvestors: leadInvestors,
                         basePrice: BASE_PRICE_EURC,
                         baseCurrency: IERC20(address(eurc)),
-                        token: fuzzToken
+                        token: fuzzToken,
+                        lockedUntil: 0
                     });
                 coinvestedPositionFuzz = CoinvestedPosition(
                     coinvestedPositionFactory.createCoinvestedPositionClone(
@@ -1012,7 +1018,8 @@ contract CoinvestedPositionDistributionTest is Test {
                 snapshotId: snapFuzz,
                 currency: IERC20(address(usdc)),
                 totalCurrencyAmount: uint256(totalCurrencyAmount),
-                reassignAfter: reassignAfter
+                reassignAfter: reassignAfter,
+                initialReassignments: new Reassignment[](0)
             });
             address cloneAddr = distributionFactory.predictCloneAddress(
                 bytes32("DI-XI-dist"),
@@ -1042,7 +1049,7 @@ contract CoinvestedPositionDistributionTest is Test {
         if (coinvestedPositionEligible == 0) {
             vm.expectRevert("didn't receive expected currency from distribution");
             vm.prank(owner);
-            coinvestedPositionFuzz.distributeDividends(IDistribution(address(distributionFuzz)), IERC20(address(usdc)));
+            coinvestedPositionFuzz.distributeDividends(IDistribution(address(distributionFuzz)));
             return;
         }
 
@@ -1055,7 +1062,7 @@ contract CoinvestedPositionDistributionTest is Test {
         snaps[3] = usdc.balanceOf(receiver);
 
         vm.prank(owner);
-        coinvestedPositionFuzz.distributeDividends(IDistribution(address(distributionFuzz)), IERC20(address(usdc)));
+        coinvestedPositionFuzz.distributeDividends(IDistribution(address(distributionFuzz)));
 
         uint256 totalGot = 0;
         {

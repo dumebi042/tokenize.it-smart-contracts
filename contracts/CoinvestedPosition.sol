@@ -28,6 +28,8 @@ struct CoinvestedPositionInitializerArguments {
     IERC20 baseCurrency;
     /// token being held
     Token token;
+    /// unix timestamp before which unpause() is blocked; 0 means no lock
+    uint64 lockedUntil;
 }
 
 /**
@@ -53,6 +55,8 @@ contract CoinvestedPosition is TokenSwapBase {
     uint256 public basePrice;
     /// decimals of the currency used when basePrice was set; used to scale payouts when a different EURO token is used at exit/dividend time
     uint8 public basePriceDecimals;
+    /// unix timestamp before which unpause() is blocked; 0 means no lock
+    uint64 public lockedUntil;
 
     /**
      * This constructor creates a logic contract that is used to clone new contracts.
@@ -85,9 +89,19 @@ contract CoinvestedPosition is TokenSwapBase {
         }
         basePrice = _arguments.basePrice;
         basePriceDecimals = IERC20Metadata(address(_arguments.baseCurrency)).decimals();
+        lockedUntil = _arguments.lockedUntil;
 
         // Pausing the contract prevents an immediate sell of the tokens. Once they should be sold, update price and unpause.
         _pause();
+    }
+
+    /**
+     * @notice Unpause the contract. Blocked until lockedUntil has passed.
+     */
+    function unpause() external override onlyOwner {
+        require(tokenPrice != 0, "tokenPrice must be set before unpausing");
+        require(block.timestamp >= lockedUntil, "timelock has not expired");
+        _unpause();
     }
 
     /**
@@ -185,18 +199,18 @@ contract CoinvestedPosition is TokenSwapBase {
      * @dev The full received amount is treated as carry and split among lead investors by carryFraction;
      *      remainder goes to receiver. Any trusted currency may be used (TRUSTED_CURRENCY bit required).
      * @param _dist the Distribution (dividend) contract to claim from
-     * @param _dividendCurrency the currency paid out by the distribution
      */
-    function distributeDividends(IDistribution _dist, IERC20 _dividendCurrency) external onlyOwner nonReentrant {
+    function distributeDividends(IDistribution _dist) external onlyOwner nonReentrant {
+        IERC20 dividendCurrency = _dist.currency();
         require(
-            token.allowList().map(address(_dividendCurrency)) & TRUSTED_CURRENCY == TRUSTED_CURRENCY,
+            token.allowList().map(address(dividendCurrency)) & TRUSTED_CURRENCY == TRUSTED_CURRENCY,
             "dividend currency must be a trusted currency"
         );
-        uint256 before = _dividendCurrency.balanceOf(address(this));
+        uint256 before = dividendCurrency.balanceOf(address(this));
         _dist.claim(address(this));
-        uint256 received = _dividendCurrency.balanceOf(address(this)) - before;
+        uint256 received = dividendCurrency.balanceOf(address(this)) - before;
         require(received > 0, "didn't receive expected currency from distribution");
-        _settle(received, _dividendCurrency);
+        _settle(received, dividendCurrency);
     }
 
     /**
