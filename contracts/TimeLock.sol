@@ -22,7 +22,7 @@ contract TimeLock is Initializable, OwnableUpgradeable {
     uint64 public lockedUntil;
 
     event Drained(IERC20 indexed token, address indexed recipient, uint256 amount);
-    event DividendsDistributed(IDistribution indexed distribution, IERC20 indexed currency, address indexed recipient, uint256 amount);
+    event DividendsDistributed(IDistribution indexed distribution, IERC20 indexed currency, address indexed recipient);
 
 
     /**
@@ -54,12 +54,8 @@ contract TimeLock is Initializable, OwnableUpgradeable {
     function distributeDividends(IDistribution _dist, address _recipient) external onlyOwner {
         require(_recipient != address(0), "recipient can not be zero address");
         IERC20 dividendCurrency = _dist.currency();
-        uint256 before = dividendCurrency.balanceOf(address(this));
-        _dist.claim(address(this));
-        uint256 received = dividendCurrency.balanceOf(address(this)) - before;
-        require(received > 0, "no currency received from distribution");
-        dividendCurrency.safeTransfer(_recipient, received);
-        emit DividendsDistributed(_dist, dividendCurrency, _recipient, received);
+        _dist.claim(_recipient);
+        emit DividendsDistributed(_dist, dividendCurrency, _recipient);
     }
 
     /**
