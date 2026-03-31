@@ -105,11 +105,7 @@ contract PrivateOfferFactoryTest is Test {
         assertTrue(len != 0, "Contract not deployed or to wrong address");
     }
 
-    function testDeployWithTimeLock(
-        uint64 _lockedUntil,
-        address tokenReceiver,
-        address timeLockOwner
-    ) public {
+    function testDeployWithTimeLock(uint64 _lockedUntil, address tokenReceiver, address timeLockOwner) public {
         vm.assume(_lockedUntil > block.timestamp);
         vm.assume(_lockedUntil < type(uint64).max / 2);
         vm.assume(tokenReceiver != address(0));
@@ -163,12 +159,7 @@ contract PrivateOfferFactoryTest is Test {
 
         // deploy contracts
         assertEq(
-            factory.deployPrivateOfferWithTimeLock(
-                salt,
-                arguments,
-                _lockedUntil,
-                timeLockOwner
-            ),
+            factory.deployPrivateOfferWithTimeLock(salt, arguments, _lockedUntil, timeLockOwner),
             expectedTimeLock
         );
 

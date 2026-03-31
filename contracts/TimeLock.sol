@@ -24,7 +24,6 @@ contract TimeLock is Initializable, OwnableUpgradeable {
     event Drained(IERC20 indexed token, address indexed recipient, uint256 amount);
     event DividendsDistributed(IDistribution indexed distribution, IERC20 indexed currency, address indexed recipient);
 
-
     /**
      * This contract will be used through clones, so the constructor only initializes
      * the logic contract.

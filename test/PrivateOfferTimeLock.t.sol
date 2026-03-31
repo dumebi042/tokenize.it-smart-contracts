@@ -73,11 +73,7 @@ contract PrivateOfferTimeLockTest is Test {
      * @param lockedUntil unix timestamp before which drain() is blocked
      * @param attemptTime try to drain tokens at this timestamp (must be before lockedUntil)
      */
-    function testPrivateOfferWithTimeLock(
-        bytes32 salt,
-        uint64 lockedUntil,
-        uint64 attemptTime
-    ) public {
+    function testPrivateOfferWithTimeLock(bytes32 salt, uint64 lockedUntil, uint64 attemptTime) public {
         vm.assume(lockedUntil > block.timestamp + 1);
         vm.assume(lockedUntil < type(uint64).max / 2);
         vm.assume(attemptTime > block.timestamp);
@@ -99,12 +95,7 @@ contract PrivateOfferTimeLockTest is Test {
 
         // predict addresses
         (address expectedInviteAddress, address expectedTimeLockAddress) = privateOfferFactory
-            .predictPrivateOfferAndTimeLockAddress(
-                salt,
-                arguments,
-                lockedUntil,
-                admin
-            );
+            .predictPrivateOfferAndTimeLockAddress(salt, arguments, lockedUntil, admin);
 
         // add time lock and token receiver to the allow list
         list.set(expectedTimeLockAddress, requirements);
@@ -137,12 +128,7 @@ contract PrivateOfferTimeLockTest is Test {
         uint256 gasBefore = gasleft();
         // deploy private offer and time lock
         TimeLock timeLock = TimeLock(
-            privateOfferFactory.deployPrivateOfferWithTimeLock(
-                salt,
-                arguments,
-                lockedUntil,
-                admin
-            )
+            privateOfferFactory.deployPrivateOfferWithTimeLock(salt, arguments, lockedUntil, admin)
         );
         uint256 gasAfter = gasleft();
         console.log("gas used: %s", gasBefore - gasAfter);

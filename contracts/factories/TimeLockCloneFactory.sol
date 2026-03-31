@@ -21,11 +21,7 @@ contract TimeLockCloneFactory is CloneFactory {
      * @param _owner owner of the new TimeLock
      * @param _lockedUntil unix timestamp before which drain() is blocked
      */
-    function createTimeLockClone(
-        bytes32 _rawSalt,
-        address _owner,
-        uint64 _lockedUntil
-    ) external returns (address) {
+    function createTimeLockClone(bytes32 _rawSalt, address _owner, uint64 _lockedUntil) external returns (address) {
         bytes32 salt = _getSalt(_rawSalt, _owner, _lockedUntil);
         TimeLock clone = TimeLock(Clones.cloneDeterministic(implementation, salt));
         clone.initialize(_owner, _lockedUntil);
@@ -51,11 +47,7 @@ contract TimeLockCloneFactory is CloneFactory {
     /**
      * @notice generates a salt from all input parameters
      */
-    function _getSalt(
-        bytes32 _rawSalt,
-        address _owner,
-        uint64 _lockedUntil
-    ) internal pure returns (bytes32) {
+    function _getSalt(bytes32 _rawSalt, address _owner, uint64 _lockedUntil) internal pure returns (bytes32) {
         return keccak256(abi.encode(_rawSalt, _owner, _lockedUntil));
     }
 }

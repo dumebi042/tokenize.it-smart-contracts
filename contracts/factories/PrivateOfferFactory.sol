@@ -50,9 +50,7 @@ contract PrivateOfferFactory {
         address _timeLockOwner
     ) external returns (address) {
         // deploy the time lock contract
-        TimeLock timeLock = TimeLock(
-            timeLockCloneFactory.createTimeLockClone(_rawSalt, _timeLockOwner, _lockedUntil)
-        );
+        TimeLock timeLock = TimeLock(timeLockCloneFactory.createTimeLockClone(_rawSalt, _timeLockOwner, _lockedUntil));
 
         // route token delivery through the time lock
         PrivateOfferArguments memory arguments = _arguments;
