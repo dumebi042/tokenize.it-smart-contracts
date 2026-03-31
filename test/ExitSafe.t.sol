@@ -57,7 +57,7 @@ contract ExitSafeTest is Test {
         allowList = createAllowList(trustedForwarder, admin);
         currency = new FakePaymentToken(0, CURRENCY_DECIMALS);
         vm.prank(admin);
-        allowList.set(address(currency), TRUSTED_CURRENCY | EURO_CURRENCY);
+        allowList.set(address(currency), TRUSTED_CURRENCY);
 
         address tokenLogic = address(new Token(trustedForwarder));
         tokenFactory = new TokenProxyFactory(tokenLogic);

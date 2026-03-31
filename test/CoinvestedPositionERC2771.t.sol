@@ -25,7 +25,7 @@ contract CoinvestedPositionERC2771Test is CoinvestedPositionTestBase {
 
         eurc = new FakePaymentToken(0, 6);
         vm.prank(admin);
-        allowList.set(address(eurc), TRUSTED_CURRENCY | EURO_CURRENCY);
+        allowList.set(address(eurc), TRUSTED_CURRENCY);
 
         address tokenLogic = address(new Token(trustedForwarder));
         tokenFactory = new TokenProxyFactory(tokenLogic);

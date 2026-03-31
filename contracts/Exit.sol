@@ -15,7 +15,7 @@ struct ExitInitializerArguments {
     address owner;
     /// @notice Token holders will return in exchange for exit proceeds
     Token token;
-    /// @notice ERC20 token used for exit payouts; must have TRUSTED_CURRENCY | EURO_CURRENCY bits set on the token's allowList
+    /// @notice ERC20 token used for exit payouts; must have TRUSTED_CURRENCY bit set on the token's allowList
     IERC20 currency;
     /// @notice Currency amount (in smallest currency units) per 10**token.decimals() token units
     uint256 pricePerToken;
@@ -63,9 +63,8 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         _transferOwnership(_arguments.owner);
         token = _arguments.token;
         require(
-            token.allowList().map(address(_arguments.currency)) & (TRUSTED_CURRENCY | EURO_CURRENCY) ==
-                (TRUSTED_CURRENCY | EURO_CURRENCY),
-            "currency needs to be a trusted EURO currency"
+            token.allowList().map(address(_arguments.currency)) == TRUSTED_CURRENCY,
+            "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
         );
         currency = _arguments.currency;
         pricePerToken = _arguments.pricePerToken;

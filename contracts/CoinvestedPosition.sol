@@ -24,7 +24,7 @@ struct CoinvestedPositionInitializerArguments {
     LeadInvestor[] leadInvestors;
     /// base price per token in bits in currency below
     uint256 basePrice;
-    /// currency used for buy() payments. Must be a EURO ERC20 (TRUSTED_CURRENCY | EURO_CURRENCY bits set on the token's allowList).
+    /// currency used for buy() payments. Must have TRUSTED_CURRENCY bit set on the token's allowList.
     IERC20 baseCurrency;
     /// token being held
     Token token;
@@ -41,8 +41,7 @@ struct CoinvestedPositionInitializerArguments {
  *      Any remaining proceeds after fees and coinvestor payout are split among lead investors
  *      according to their carry percentages, with dust going to the coinvestor.
  *      If the sale price minus fees is less than the base price, all proceeds go to the coinvestor.
- *      For exits, any EURO token (TRUSTED_CURRENCY | EURO_CURRENCY bits) may be used.
- *      For dividends, any trusted token (TRUSTED_CURRENCY bit) may be used.
+ *      For exits and dividends, any trusted token (TRUSTED_CURRENCY bit) may be used.
  *      Neither needs to match the currency stored for buy().
  * @dev Uses clone/proxy pattern. Constructor disables initializers, separate initialize().
  */
@@ -51,7 +50,7 @@ contract CoinvestedPosition is TokenSwapBase {
 
     /// lead investors and their carry fractions
     LeadInvestor[] public leadInvestors;
-    /// base price per token in EURO bits (smallest subunit of any EURO currency)
+    /// base price per token in currency bits (smallest subunit of the base currency)
     uint256 public basePrice;
     /// decimals of the currency used when basePrice was set; used to scale payouts when a different EURO token is used at exit/dividend time
     uint8 public basePriceDecimals;
@@ -75,9 +74,8 @@ contract CoinvestedPosition is TokenSwapBase {
         _initializeBase(_arguments.owner, 0, _arguments.baseCurrency, _arguments.token, _arguments.receiver);
 
         require(
-            _arguments.token.allowList().map(address(_arguments.baseCurrency)) & (TRUSTED_CURRENCY | EURO_CURRENCY) ==
-                (TRUSTED_CURRENCY | EURO_CURRENCY),
-            "currency must be a trusted EURO currency"
+            _arguments.token.allowList().map(address(_arguments.baseCurrency)) == TRUSTED_CURRENCY,
+            "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
         );
         require(_arguments.leadInvestors.length > 0, "There must be at least one lead investor");
         uint64 carryFractionsSum = 0;
@@ -108,13 +106,12 @@ contract CoinvestedPosition is TokenSwapBase {
      * @notice Change the payment currency to any trusted EURO currency.
      * @dev basePrice remains in its original canonical units (basePriceDecimals); buy() scales it
      *      dynamically, so no re-scaling of basePrice is needed here.
-     * @param _currency new currency; must have TRUSTED_CURRENCY | EURO_CURRENCY bits set on the token's allowList
+     * @param _currency new currency; must have TRUSTED_CURRENCY bit set on the token's allowList
      */
     function setCurrency(IERC20 _currency) external onlyOwner {
         require(
-            token.allowList().map(address(_currency)) & (TRUSTED_CURRENCY | EURO_CURRENCY) ==
-                (TRUSTED_CURRENCY | EURO_CURRENCY),
-            "currency must be a trusted EURO currency"
+            token.allowList().map(address(_currency)) == TRUSTED_CURRENCY,
+            "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
         );
         currency = _currency;
     }
@@ -218,7 +215,7 @@ contract CoinvestedPosition is TokenSwapBase {
      * @dev Transfers all held tokens to the Exit contract in exchange for currency.
      *      If proceeds < base, receiver gets everything.
      *      Carry is split among lead investors by carryFraction; remainder goes to receiver.
-     *      Any EURO token (TRUSTED_CURRENCY | EURO_CURRENCY) may be used, independent of the currency used for buy().
+     *      Any trusted token (TRUSTED_CURRENCY) may be used, independent of the currency used for buy().
      * @param _exit the Exit contract to claim from
      * @param _exitCurrency the EURO token paid out by the exit
      * @param _minCurrencyAmount minimum currency the call must receive; reverts if proceeds fall short.
@@ -230,9 +227,8 @@ contract CoinvestedPosition is TokenSwapBase {
         uint256 _minCurrencyAmount
     ) external onlyOwner nonReentrant {
         require(
-            token.allowList().map(address(_exitCurrency)) & (TRUSTED_CURRENCY | EURO_CURRENCY) ==
-                (TRUSTED_CURRENCY | EURO_CURRENCY),
-            "exit currency must be a trusted EURO currency"
+            token.allowList().map(address(_exitCurrency)) == TRUSTED_CURRENCY,
+            "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
         );
         uint256 tokenBalance = token.balanceOf(address(this));
         require(tokenBalance > 0, "no tokens to claim");

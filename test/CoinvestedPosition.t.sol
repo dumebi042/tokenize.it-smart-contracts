@@ -62,8 +62,8 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
 
         // Register currencies on allowList
         vm.startPrank(admin);
-        allowList.set(address(eurc), TRUSTED_CURRENCY | EURO_CURRENCY);
-        allowList.set(address(eure), TRUSTED_CURRENCY | EURO_CURRENCY);
+        allowList.set(address(eurc), TRUSTED_CURRENCY);
+        allowList.set(address(eure), TRUSTED_CURRENCY);
         vm.stopPrank();
 
         // Token (18 dec)
@@ -195,7 +195,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
 
         FakePaymentToken fuzzCurrency = new FakePaymentToken(0, decimals);
         vm.prank(admin);
-        allowList.set(address(fuzzCurrency), TRUSTED_CURRENCY | EURO_CURRENCY);
+        allowList.set(address(fuzzCurrency), TRUSTED_CURRENCY);
 
         bytes32 salt = keccak256(abi.encodePacked(decimals, basePrice));
         CoinvestedPositionInitializerArguments memory args = CoinvestedPositionInitializerArguments({
@@ -223,31 +223,9 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         assertTrue(coinvestedPosition.paused(), "contract is not paused at init");
     }
 
-    function testInitNonEuroCurrencyReverts() public {
-        // Currency with only TRUSTED but not EURO bit
-        FakePaymentToken nonEuro = new FakePaymentToken(0, 6);
-        vm.prank(admin);
-        allowList.set(address(nonEuro), TRUSTED_CURRENCY); // no EURO_CURRENCY bit
-
-        LeadInvestor[] memory leadInvestors = _defaultLeadInvestors();
-        CoinvestedPositionInitializerArguments memory args = CoinvestedPositionInitializerArguments({
-            owner: owner,
-            receiver: receiver,
-            leadInvestors: leadInvestors,
-            basePrice: 100e6,
-            baseCurrency: IERC20(address(nonEuro)),
-            token: token,
-            lockedUntil: 0
-        });
-        vm.expectRevert("currency must be a trusted EURO currency");
-        factory.createCoinvestedPositionClone(bytes32("nonEuro"), trustedForwarder, args);
-    }
-
     function testInitNonTrustedCurrencyReverts() public {
-        // Currency with only EURO but not TRUSTED bit
+        // Currency not on allowList → 0 attributes, no TRUSTED_CURRENCY bit
         FakePaymentToken nonTrusted = new FakePaymentToken(0, 6);
-        vm.prank(admin);
-        allowList.set(address(nonTrusted), EURO_CURRENCY); // no TRUSTED_CURRENCY bit
 
         LeadInvestor[] memory leadInvestors = _defaultLeadInvestors();
         CoinvestedPositionInitializerArguments memory args = CoinvestedPositionInitializerArguments({
@@ -279,9 +257,9 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         vm.expectRevert();
         factory.createCoinvestedPositionClone(bytes32("noBit"), trustedForwarder, args);
 
-        // Adding the currency to the allowList with both required bits makes creation succeed
+        // Adding the currency to the allowList with TRUSTED_CURRENCY bit makes creation succeed
         vm.prank(admin);
-        allowList.set(address(noBit), TRUSTED_CURRENCY | EURO_CURRENCY);
+        allowList.set(address(noBit), TRUSTED_CURRENCY);
         factory.createCoinvestedPositionClone(bytes32("noBit"), trustedForwarder, args); // must not revert
     }
 
@@ -379,21 +357,11 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         coinvestedPosition.setCurrency(IERC20(address(eure)));
     }
 
-    function testSetCurrencyNonEuroReverts() public {
-        FakePaymentToken nonEuro = new FakePaymentToken(0, 6);
-        vm.prank(admin);
-        allowList.set(address(nonEuro), TRUSTED_CURRENCY);
-        vm.prank(owner);
-        vm.expectRevert("currency must be a trusted EURO currency");
-        coinvestedPosition.setCurrency(IERC20(address(nonEuro)));
-    }
-
     function testSetCurrencyNonTrustedReverts() public {
         FakePaymentToken nonTrusted = new FakePaymentToken(0, 6);
-        vm.prank(admin);
-        allowList.set(address(nonTrusted), EURO_CURRENCY);
+        // not on allowList → 0 attributes, no TRUSTED_CURRENCY bit
         vm.prank(owner);
-        vm.expectRevert("currency must be a trusted EURO currency");
+        vm.expectRevert("currency needs to be on the allowlist with TRUSTED_CURRENCY attribute");
         coinvestedPosition.setCurrency(IERC20(address(nonTrusted)));
     }
 
@@ -405,9 +373,9 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         vm.expectRevert();
         coinvestedPosition.setCurrency(IERC20(address(newCurrency)));
 
-        // Add to allowList with both required bits → accepted
+        // Add to allowList with TRUSTED_CURRENCY bit → accepted
         vm.prank(admin);
-        allowList.set(address(newCurrency), TRUSTED_CURRENCY | EURO_CURRENCY);
+        allowList.set(address(newCurrency), TRUSTED_CURRENCY);
         vm.prank(owner);
         coinvestedPosition.setCurrency(IERC20(address(newCurrency)));
         assertEq(address(coinvestedPosition.currency()), address(newCurrency));
@@ -1239,7 +1207,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         // Create a fresh currency with fuzzed decimals and register it
         FakePaymentToken fuzzCurrency = new FakePaymentToken(0, baseDecimals);
         vm.prank(admin);
-        allowList.set(address(fuzzCurrency), TRUSTED_CURRENCY | EURO_CURRENCY);
+        allowList.set(address(fuzzCurrency), TRUSTED_CURRENCY);
 
         // Deploy coinvestedPosition with the fuzz currency and price
         CoinvestedPosition fuzzPosition = _deployCoinvestedPosition(
@@ -1316,7 +1284,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         // Create a fresh buy currency with fuzzed decimals and register it
         FakePaymentToken buyCurrency = new FakePaymentToken(0, buyCurrencyDecimals);
         vm.prank(admin);
-        allowList.set(address(buyCurrency), TRUSTED_CURRENCY | EURO_CURRENCY);
+        allowList.set(address(buyCurrency), TRUSTED_CURRENCY);
 
         // Switch to the fuzz buy currency and set tokenPrice = 2× scaledBasePrice
         // so carry = scaledBasePrice (50% markup over base)
@@ -1405,9 +1373,9 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
     // ─────────────────────────────────────────────────────────────────────────
 
     function testBuyRevertsWhenCurrencyIsHeldToken() public {
-        // Give token TRUSTED_CURRENCY | EURO_CURRENCY so setCurrency accepts it
+        // Give token TRUSTED_CURRENCY so setCurrency accepts it
         vm.prank(admin);
-        allowList.set(address(token), TRUSTED_CURRENCY | EURO_CURRENCY);
+        allowList.set(address(token), TRUSTED_CURRENCY);
 
         // Switch the sell currency to the equity token itself
         vm.prank(owner);
@@ -1435,7 +1403,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
 
         // Register on allowList
         vm.prank(admin);
-        allowList.set(address(malicious), TRUSTED_CURRENCY | EURO_CURRENCY);
+        allowList.set(address(malicious), TRUSTED_CURRENCY);
 
         // Deploy a coinvestedPosition using malicious currency
         LeadInvestor[] memory leadInvestors = _defaultLeadInvestors();

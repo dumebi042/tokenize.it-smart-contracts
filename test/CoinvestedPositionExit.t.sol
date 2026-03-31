@@ -92,9 +92,9 @@ contract CoinvestedPositionExitTest is Test {
         trustedNonEuro = new FakePaymentToken(0, 6);
 
         vm.startPrank(admin);
-        allowList.set(address(eurc), TRUSTED_CURRENCY | EURO_CURRENCY);
-        allowList.set(address(eure), TRUSTED_CURRENCY | EURO_CURRENCY);
-        allowList.set(address(trustedNonEuro), TRUSTED_CURRENCY); // TRUSTED but not EURO
+        allowList.set(address(eurc), TRUSTED_CURRENCY);
+        allowList.set(address(eure), TRUSTED_CURRENCY);
+        allowList.set(address(trustedNonEuro), TRUSTED_CURRENCY);
         vm.stopPrank();
 
         // Token
@@ -250,19 +250,6 @@ contract CoinvestedPositionExitTest is Test {
         vm.expectRevert("no tokens to claim");
         vm.prank(owner);
         coinvestedPositionEmpty.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 1);
-    }
-
-    function testDistributeExitRevertsForNonEuroCurrency() public {
-        // Deploy an exit with a trusted but non-EURO currency
-        // Note: Exit.initialize itself checks TRUSTED_CURRENCY | EURO_CURRENCY on the exit contract.
-        // The check in distributeExit happens before calling the exit.
-        // We deploy the Exit with eurc (valid), but then try to call distributeExit with trustedNonEuro.
-        Exit exitContract = _deployExit(bytes32("i4"), eurc, 200e6, CP_TOKEN_AMOUNT);
-
-        vm.warp(claimStart);
-        vm.expectRevert("exit currency must be a trusted EURO currency");
-        vm.prank(owner);
-        coinvestedPosition.distributeExit(IExit(address(exitContract)), IERC20(address(trustedNonEuro)), 1);
     }
 
     function testDistributeExitOnlyOwner() public {
@@ -1024,9 +1011,9 @@ contract CoinvestedPositionExitTest is Test {
     /// XII: distributeExit reverts when exitCurrency is the held token.
     /// Uses a no-op Exit stub so received == 0 (>= _minCurrencyAmount 0), reaching _settle.
     function testXII_DistributeExitRevertsWhenCurrencyIsHeldToken() public {
-        // Give the equity token TRUSTED_CURRENCY | EURO_CURRENCY to pass the exit currency check
+        // Give the equity token TRUSTED_CURRENCY to pass the exit currency check
         vm.prank(admin);
-        allowList.set(address(token), TRUSTED_CURRENCY | EURO_CURRENCY);
+        allowList.set(address(token), TRUSTED_CURRENCY);
 
         NoOpExit noOpExit = new NoOpExit();
 

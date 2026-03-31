@@ -113,9 +113,9 @@ contract CoinvestedPositionDistributionTest is Test {
         eure = new FakePaymentToken(0, 18);
 
         vm.startPrank(admin);
-        allowList.set(address(eurc), TRUSTED_CURRENCY | EURO_CURRENCY);
-        allowList.set(address(usdc), TRUSTED_CURRENCY); // NOT EURO
-        allowList.set(address(eure), TRUSTED_CURRENCY | EURO_CURRENCY);
+        allowList.set(address(eurc), TRUSTED_CURRENCY);
+        allowList.set(address(usdc), TRUSTED_CURRENCY);
+        allowList.set(address(eure), TRUSTED_CURRENCY);
         vm.stopPrank();
 
         // Token
@@ -496,7 +496,7 @@ contract CoinvestedPositionDistributionTest is Test {
     // ─────────────────────────────────────────────────────────────────────────
 
     function testDI_IV_NonEuroTrustedCurrency_Accepted() public {
-        // USDC has only TRUSTED_CURRENCY bit (no EURO_CURRENCY) — must be accepted by distributeDividends
+        // USDC has TRUSTED_CURRENCY bit — must be accepted by distributeDividends
         Distribution distribution = _deployDistribution(bytes32("DI-IV"), usdc, TOTAL_USDC);
 
         uint256 beforeA = usdc.balanceOf(leadA);

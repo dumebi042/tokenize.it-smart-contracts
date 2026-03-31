@@ -281,7 +281,7 @@ contract DistributionCloneFactoryTest is Test {
     }
 
     function testTrustedNonEuroCurrencyAccepted() public {
-        // Distribution only requires TRUSTED_CURRENCY, not EURO_CURRENCY
+        // Distribution only requires TRUSTED_CURRENCY
         FakePaymentToken nonEuro = new FakePaymentToken(0, 6);
         vm.prank(admin);
         allowList.set(address(nonEuro), TRUSTED_CURRENCY); // trusted, not EURO
