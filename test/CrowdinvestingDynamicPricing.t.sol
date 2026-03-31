@@ -7,6 +7,7 @@ import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/factories/FeeSettingsCloneFactory.sol";
 import "../contracts/factories/CrowdinvestingCloneFactory.sol";
 import "../contracts/factories/PriceLinearCloneFactory.sol";
+import "../contracts/interfaces/IFeeSettings.sol";
 import "./resources/FakePaymentToken.sol";
 import "./resources/MaliciousPaymentToken.sol";
 import "./resources/CloneCreators.sol";
@@ -96,20 +97,18 @@ contract CrowdinvestingDynamicPricingTest is Test {
         list.set(address(paymentToken), TRUSTED_CURRENCY);
 
         vm.startPrank(platformAdmin);
-        Fees memory fees = Fees(100, 100, 100, 100);
         FeeSettings feeLogic = new FeeSettings(trustedForwarder);
         FeeSettingsCloneFactory feeSettingsCloneFactory = new FeeSettingsCloneFactory(address(feeLogic));
-        feeSettings = IFeeSettingsV2(
-            feeSettingsCloneFactory.createFeeSettingsClone(
-                0,
-                trustedForwarder,
-                platformAdmin,
-                fees,
-                platformAdmin,
-                platformAdmin,
-                platformAdmin
-            )
-        );
+        {
+            FeeSettings.FeeTypeInit[] memory feeTypes = new FeeSettings.FeeTypeInit[](4);
+            feeTypes[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN, 500, 100, platformAdmin);
+            feeTypes[1] = FeeSettings.FeeTypeInit(FeeTypes.CROWDINVESTING, 1000, 100, platformAdmin);
+            feeTypes[2] = FeeSettings.FeeTypeInit(FeeTypes.PRIVATE_OFFER, 500, 100, platformAdmin);
+            feeTypes[3] = FeeSettings.FeeTypeInit(FeeTypes.SECONDARY_MARKET, 500, 0, platformAdmin);
+            feeSettings = IFeeSettingsV2(
+                feeSettingsCloneFactory.createFeeSettingsClone(0, trustedForwarder, platformAdmin, feeTypes)
+            );
+        }
 
         // create token
         address tokenLogicContract = address(new Token(trustedForwarder));

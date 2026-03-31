@@ -36,8 +36,11 @@ contract ExitCloneFactoryTest is Test {
 
         address tokenLogic = address(new Token(trustedForwarder));
         tokenFactory = new TokenProxyFactory(tokenLogic);
-        Fees memory fees = Fees(0, 0, 0, 0);
-        IFeeSettingsV2 feeSettings = createFeeSettings(trustedForwarder, admin, fees, admin, admin, admin);
+        IFeeSettingsV2 feeSettings = createFeeSettings(
+            trustedForwarder,
+            admin,
+            buildFeeTypes(0, 0, 0, admin, admin, admin)
+        );
         token = Token(
             tokenFactory.createTokenProxy(0, trustedForwarder, feeSettings, admin, allowList, 0, "ExitToken", "EXT")
         );
@@ -179,16 +182,16 @@ contract ExitCloneFactoryTest is Test {
 
     // ========== F3-E. _currencyProvider Is Not in the Salt ==========
 
-    function testCurrencyProviderDoesNotAffectAddress(address currencyProvider) public {
-        vm.assume(currencyProvider != address(0));
+    function testCurrencyProviderDoesNotAffectAddress(address _currencyProvider) public {
+        vm.assume(_currencyProvider != address(0));
         ExitInitializerArguments memory args = _baseArgs();
         address predicted = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
 
         // Provider 1 deploys
-        currency.mint(currencyProvider, args.totalCurrencyAmount);
-        vm.prank(currencyProvider);
+        currency.mint(_currencyProvider, args.totalCurrencyAmount);
+        vm.prank(_currencyProvider);
         currency.approve(predicted, args.totalCurrencyAmount);
-        address actual = factory.createExitClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args);
+        address actual = factory.createExitClone(EXAMPLE_SALT, trustedForwarder, _currencyProvider, args);
         assertEq(predicted, actual);
     }
 

@@ -80,8 +80,11 @@ contract CoinvestedPositionExitTest is Test {
 
         // Infrastructure
         allowList = createAllowList(trustedForwarder, admin);
-        Fees memory zeroFees = Fees(0, 0, 0, 0);
-        feeSettings = createFeeSettings(trustedForwarder, admin, zeroFees, feeCollector, feeCollector, feeCollector);
+        feeSettings = createFeeSettings(
+            trustedForwarder,
+            admin,
+            buildFeeTypes(0, 0, 0, feeCollector, feeCollector, feeCollector)
+        );
 
         // Currencies
         eurc = new FakePaymentToken(0, 6);
@@ -578,14 +581,10 @@ contract CoinvestedPositionExitTest is Test {
     /// @dev Deploys a Token with 0.1% fee setting + a CoinvestedPosition for it,
     ///      mints CP_TOKEN_AMOUNT tokens to that coinvestedPosition, returns (token, cp).
     function _deployFeeTokenAndCp() internal returns (Token, CoinvestedPosition) {
-        Fees memory nonZeroFees = Fees(0, 10, 0, 0); // 0.1% crowdinvesting fee (10/10000)
         IFeeSettingsV2 fsWithFee = createFeeSettings(
             trustedForwarder,
             admin,
-            nonZeroFees,
-            feeCollector,
-            feeCollector,
-            feeCollector
+            buildFeeTypes(0, 10, 0, feeCollector, feeCollector, feeCollector)
         );
         Token tokenWithFee = Token(
             tokenFactory.createTokenProxy(

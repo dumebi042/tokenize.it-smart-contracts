@@ -68,8 +68,11 @@ contract CrowdinvestingTest is Test {
         vm.prank(owner);
         list.set(address(paymentToken), TRUSTED_CURRENCY);
 
-        Fees memory fees = Fees(tokenFeeNumerator, paymentTokenFeeNumerator, paymentTokenFeeNumerator, 0);
-        feeSettings = createFeeSettings(trustedForwarder, address(this), fees, admin, admin, admin);
+        feeSettings = createFeeSettings(
+            trustedForwarder,
+            address(this),
+            buildFeeTypes(tokenFeeNumerator, paymentTokenFeeNumerator, paymentTokenFeeNumerator, admin, admin, admin)
+        );
 
         Token implementation = new Token(trustedForwarder);
         TokenProxyFactory tokenFactory = new TokenProxyFactory(address(implementation));

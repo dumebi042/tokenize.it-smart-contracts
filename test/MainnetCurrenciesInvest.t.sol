@@ -62,8 +62,11 @@ contract MainnetCurrencies is Test {
 
     function setUp() public {
         list = createAllowList(trustedForwarder, owner);
-        Fees memory fees = Fees(100, 100, 100, 0);
-        feeSettings = createFeeSettings(trustedForwarder, address(this), fees, admin, admin, admin);
+        feeSettings = createFeeSettings(
+            trustedForwarder,
+            address(this),
+            buildFeeTypes(100, 100, 100, admin, admin, admin)
+        );
 
         Token implementation = new Token(trustedForwarder);
         TokenProxyFactory tokenCloneFactory = new TokenProxyFactory(address(implementation));
