@@ -199,18 +199,18 @@ contract CoinvestedPosition is TokenSwapBase {
      * @dev The full received amount is treated as carry and split among lead investors by carryFraction;
      *      remainder goes to receiver. Any trusted currency may be used (TRUSTED_CURRENCY bit required).
      * @param _dist the Distribution (dividend) contract to claim from
-     * @param _dividendCurrency the currency paid out by the distribution
      */
-    function distributeDividends(IDistribution _dist, IERC20 _dividendCurrency) external onlyOwner nonReentrant {
+    function distributeDividends(IDistribution _dist) external onlyOwner nonReentrant {
+        IERC20 dividendCurrency = _dist.currency();
         require(
-            token.allowList().map(address(_dividendCurrency)) & TRUSTED_CURRENCY == TRUSTED_CURRENCY,
+            token.allowList().map(address(dividendCurrency)) & TRUSTED_CURRENCY == TRUSTED_CURRENCY,
             "dividend currency must be a trusted currency"
         );
-        uint256 before = _dividendCurrency.balanceOf(address(this));
+        uint256 before = dividendCurrency.balanceOf(address(this));
         _dist.claim(address(this));
-        uint256 received = _dividendCurrency.balanceOf(address(this)) - before;
+        uint256 received = dividendCurrency.balanceOf(address(this)) - before;
         require(received > 0, "didn't receive expected currency from distribution");
-        _settle(received, _dividendCurrency);
+        _settle(received, dividendCurrency);
     }
 
     /**

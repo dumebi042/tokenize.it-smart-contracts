@@ -24,6 +24,7 @@ contract TimeLock is Initializable, OwnableUpgradeable {
     event Drained(IERC20 indexed token, address indexed recipient, uint256 amount);
     event DividendsDistributed(IDistribution indexed distribution, IERC20 indexed currency, address indexed recipient, uint256 amount);
 
+
     /**
      * This contract will be used through clones, so the constructor only initializes
      * the logic contract.
@@ -48,17 +49,17 @@ contract TimeLock is Initializable, OwnableUpgradeable {
     /**
      * @notice Claim this contract's eligible share from _dist and forward the received currency to _recipient.
      * @param _dist the Distribution contract to claim from
-     * @param _dividendCurrency the currency paid out by the distribution
      * @param _recipient address to forward the received currency to
      */
-    function distributeDividends(IDistribution _dist, IERC20 _dividendCurrency, address _recipient) external onlyOwner {
+    function distributeDividends(IDistribution _dist, address _recipient) external onlyOwner {
         require(_recipient != address(0), "recipient can not be zero address");
-        uint256 before = _dividendCurrency.balanceOf(address(this));
+        IERC20 dividendCurrency = _dist.currency();
+        uint256 before = dividendCurrency.balanceOf(address(this));
         _dist.claim(address(this));
-        uint256 received = _dividendCurrency.balanceOf(address(this)) - before;
+        uint256 received = dividendCurrency.balanceOf(address(this)) - before;
         require(received > 0, "no currency received from distribution");
-        _dividendCurrency.safeTransfer(_recipient, received);
-        emit DividendsDistributed(_dist, _dividendCurrency, _recipient, received);
+        dividendCurrency.safeTransfer(_recipient, received);
+        emit DividendsDistributed(_dist, dividendCurrency, _recipient, received);
     }
 
     /**
