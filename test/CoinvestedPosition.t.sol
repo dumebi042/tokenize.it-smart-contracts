@@ -54,8 +54,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
     function setUp() public {
         // Infrastructure
         allowList = createAllowList(trustedForwarder, admin);
-        Fees memory zeroFees = Fees(0, 0, 0, 0);
-        feeSettings = createFeeSettings(trustedForwarder, admin, zeroFees, admin, admin, admin);
+        feeSettings = createFeeSettings(trustedForwarder, admin, buildFeeTypes(0, 0, 0, admin, admin, admin));
 
         // EURc (6 dec) and EURe (18 dec)
         eurc = new FakePaymentToken(0, 6);
@@ -572,14 +571,10 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
 
     function testBuyNonZeroFeeDeductedBeforeCarry() public {
         // Deploy with non-zero fee
-        Fees memory fees = Fees(0, 0, 100, 0); // 1% private offer fee (bps = 100)
         IFeeSettingsV2 feeSettings100 = createFeeSettings(
             trustedForwarder,
             admin,
-            fees,
-            feeCollector,
-            feeCollector,
-            feeCollector
+            buildFeeTypes(0, 0, 100, feeCollector, feeCollector, feeCollector)
         );
         // Deploy new token with this fee settings
         Token tokenWithFee = Token(
@@ -636,14 +631,10 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         // basePrice=100e6, tokenPrice=104e6, 1 token → paid=104e6
         // Without fee, carry would be 4e6.
         // With 5% fee (max allowed): fee=5.2e6, remaining=98.8e6 < basePayout=100e6 → carry=0
-        Fees memory fees = Fees(0, 0, 500, 0); // 5% private offer fee (max allowed)
         IFeeSettingsV2 feeSettings10 = createFeeSettings(
             trustedForwarder,
             admin,
-            fees,
-            feeCollector,
-            feeCollector,
-            feeCollector
+            buildFeeTypes(0, 0, 500, feeCollector, feeCollector, feeCollector)
         );
         Token tokenHighFee = Token(
             tokenFactory.createTokenProxy(

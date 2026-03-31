@@ -44,8 +44,11 @@ contract PrivateOfferTimeLockTest is Test {
         list.set(tokenReceiver, requirements);
         list.set(address(currency), TRUSTED_CURRENCY);
 
-        Fees memory fees = Fees(100, 100, 100, 0);
-        feeSettings = createFeeSettings(trustedForwarder, address(this), fees, admin, admin, admin);
+        feeSettings = createFeeSettings(
+            trustedForwarder,
+            address(this),
+            buildFeeTypes(100, 100, 100, admin, admin, admin)
+        );
 
         Token implementation = new Token(trustedForwarder);
         TokenProxyFactory tokenCloneFactory = new TokenProxyFactory(address(implementation));

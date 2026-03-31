@@ -6,6 +6,7 @@ import "../lib/forge-std/src/console.sol";
 
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/FeeSettings.sol";
+import "../contracts/interfaces/IFeeSettings.sol";
 import "../contracts/factories/TokenSwapCloneFactory.sol";
 import "./resources/FakePaymentToken.sol";
 import "./resources/MaliciousPaymentToken.sol";
@@ -61,14 +62,10 @@ contract TokenSwapTest is Test {
         vm.prank(owner);
         list.set(address(paymentToken), TRUSTED_CURRENCY);
 
-        Fees memory fees = Fees(100, 100, 100, 100);
         feeSettings = createFeeSettings(
             trustedForwarder,
             address(this),
-            fees,
-            wrongFeeReceiver,
-            admin,
-            wrongFeeReceiver
+            buildFeeTypes(100, 100, 100, wrongFeeReceiver, admin, wrongFeeReceiver)
         );
 
         // create token
@@ -795,9 +792,17 @@ contract TokenSwapTest is Test {
         tokenSwap.setTokenPrice(_price);
 
         // set fees to 0
-        Fees memory fees = Fees(0, 0, 0, 0);
-        FeeSettings(address(token.feeSettings())).planFeeChange(fees);
-        FeeSettings(address(token.feeSettings())).executeFeeChange();
+        {
+            FeeSettings feeSettings = FeeSettings(address(token.feeSettings()));
+            feeSettings.planFeeChange(FeeTypes.TOKEN, 0, uint64(block.timestamp));
+            feeSettings.planFeeChange(FeeTypes.CROWDINVESTING, 0, uint64(block.timestamp));
+            feeSettings.planFeeChange(FeeTypes.PRIVATE_OFFER, 0, uint64(block.timestamp));
+            feeSettings.planFeeChange(FeeTypes.SECONDARY_MARKET, 0, uint64(block.timestamp));
+            feeSettings.executeFeeChange(FeeTypes.TOKEN);
+            feeSettings.executeFeeChange(FeeTypes.CROWDINVESTING);
+            feeSettings.executeFeeChange(FeeTypes.PRIVATE_OFFER);
+            feeSettings.executeFeeChange(FeeTypes.SECONDARY_MARKET);
+        }
 
         // approve
         vm.prank(buyer);
@@ -846,9 +851,17 @@ contract TokenSwapTest is Test {
         tokenSwap.setTokenPrice(_price);
 
         // set fees to 0
-        Fees memory fees = Fees(0, 0, 0, 0);
-        FeeSettings(address(token.feeSettings())).planFeeChange(fees);
-        FeeSettings(address(token.feeSettings())).executeFeeChange();
+        {
+            FeeSettings feeSettings = FeeSettings(address(token.feeSettings()));
+            feeSettings.planFeeChange(FeeTypes.TOKEN, 0, uint64(block.timestamp));
+            feeSettings.planFeeChange(FeeTypes.CROWDINVESTING, 0, uint64(block.timestamp));
+            feeSettings.planFeeChange(FeeTypes.PRIVATE_OFFER, 0, uint64(block.timestamp));
+            feeSettings.planFeeChange(FeeTypes.SECONDARY_MARKET, 0, uint64(block.timestamp));
+            feeSettings.executeFeeChange(FeeTypes.TOKEN);
+            feeSettings.executeFeeChange(FeeTypes.CROWDINVESTING);
+            feeSettings.executeFeeChange(FeeTypes.PRIVATE_OFFER);
+            feeSettings.executeFeeChange(FeeTypes.SECONDARY_MARKET);
+        }
 
         // approve holder to spend payment token
         vm.prank(holder);
@@ -1015,14 +1028,13 @@ contract TokenSwapTest is Test {
         uint256 earningAfterFee = 98 * 10 ** paymentTokenDecimals; // 98 payment tokens
         uint32 feePercentage = 200; // 2%
 
-        // Update fee settings to 2% private offer fee
+        // Update fee settings to 2% secondary market fee
         uint64 feeActivationTime = 13 weeks;
         FeeSettings _feeSettings = FeeSettings(address(token.feeSettings()));
-        Fees memory newFees = Fees(0, 0, feePercentage, feeActivationTime);
-        _feeSettings.planFeeChange(newFees);
+        _feeSettings.planFeeChange(FeeTypes.SECONDARY_MARKET, feePercentage, feeActivationTime);
         vm.warp(feeActivationTime + 1);
-        _feeSettings.executeFeeChange();
-        assertTrue(_feeSettings.privateOfferFee(100 * 10 ** 10, address(token)) == 2 * 10 ** 10);
+        _feeSettings.executeFeeChange(FeeTypes.SECONDARY_MARKET);
+        assertTrue(_feeSettings.fee(FeeTypes.SECONDARY_MARKET, 100 * 10 ** 10, address(token)) == 2 * 10 ** 10);
 
         // Update token price
         vm.prank(owner);
@@ -1084,14 +1096,13 @@ contract TokenSwapTest is Test {
         uint256 payoutAfterFee = 98 * 10 ** paymentTokenDecimals; // 98 payment tokens
         uint32 feePercentage = 200; // 2%
 
-        // Update fee settings to 2% private offer fee
+        // Update fee settings to 2% secondary market fee
         uint64 feeActivationTime = 13 weeks;
         FeeSettings _feeSettings = FeeSettings(address(token.feeSettings()));
-        Fees memory newFees = Fees(0, 0, feePercentage, feeActivationTime);
-        _feeSettings.planFeeChange(newFees);
+        _feeSettings.planFeeChange(FeeTypes.SECONDARY_MARKET, feePercentage, feeActivationTime);
         vm.warp(feeActivationTime + 1);
-        _feeSettings.executeFeeChange();
-        assertTrue(_feeSettings.privateOfferFee(100 * 10 ** 10, address(token)) == 2 * 10 ** 10);
+        _feeSettings.executeFeeChange(FeeTypes.SECONDARY_MARKET);
+        assertTrue(_feeSettings.fee(FeeTypes.SECONDARY_MARKET, 100 * 10 ** 10, address(token)) == 2 * 10 ** 10);
 
         // Update token price
         vm.prank(owner);

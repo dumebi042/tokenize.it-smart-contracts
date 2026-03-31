@@ -52,14 +52,10 @@ contract CrowdinvestingTest is Test {
         vm.prank(platformAdmin);
         list.set(address(paymentToken), TRUSTED_CURRENCY);
 
-        Fees memory fees = Fees(100, 100, 100, 100);
         feeSettings = createFeeSettings(
             trustedForwarder,
             platformAdmin,
-            fees,
-            platformAdmin,
-            platformAdmin,
-            platformAdmin
+            buildFeeTypes(100, 100, 100, platformAdmin, platformAdmin, platformAdmin)
         );
         vm.prank(platformAdmin);
         token = Token(
@@ -115,17 +111,20 @@ contract CrowdinvestingTest is Test {
     */
     function feeCalculation(uint32 tokenFeeNumerator, uint32 crowdinvestingFeeNumerator) public {
         // apply fees for test
-        Fees memory fees = Fees(
-            tokenFeeNumerator,
-            crowdinvestingFeeNumerator,
-            crowdinvestingFeeNumerator,
-            uint64(block.timestamp + 13 weeks)
-        );
+        uint64 activationDate = uint64(block.timestamp + 13 weeks);
         vm.prank(platformAdmin);
-        feeSettings.planFeeChange(fees);
-        vm.warp(fees.validityDate + 1 seconds);
+        feeSettings.planFeeChange(FeeTypes.TOKEN, tokenFeeNumerator, activationDate);
         vm.prank(platformAdmin);
-        feeSettings.executeFeeChange();
+        feeSettings.planFeeChange(FeeTypes.CROWDINVESTING, crowdinvestingFeeNumerator, activationDate);
+        vm.prank(platformAdmin);
+        feeSettings.planFeeChange(FeeTypes.PRIVATE_OFFER, crowdinvestingFeeNumerator, activationDate);
+        vm.warp(activationDate + 1 seconds);
+        vm.prank(platformAdmin);
+        feeSettings.executeFeeChange(FeeTypes.TOKEN);
+        vm.prank(platformAdmin);
+        feeSettings.executeFeeChange(FeeTypes.CROWDINVESTING);
+        vm.prank(platformAdmin);
+        feeSettings.executeFeeChange(FeeTypes.PRIVATE_OFFER);
 
         uint8 _paymentTokenDecimals = 6;
         // uint8 _maxDecimals = 25;
@@ -245,8 +244,10 @@ contract CrowdinvestingTest is Test {
     }
 
     function testVariousFees(uint32 tokenFeeNumerator, uint32 privateOfferFeeNumerator) public {
-        vm.assume(tokenFeeNumerator <= feeSettings.MAX_TOKEN_FEE_NUMERATOR());
-        vm.assume(privateOfferFeeNumerator <= feeSettings.MAX_PRIVATE_OFFER_FEE_NUMERATOR());
+        (uint32 maxTokenNumerator, ) = feeSettings.feeTypeConfigs(FeeTypes.TOKEN);
+        (uint32 maxPrivateOfferNumerator, ) = feeSettings.feeTypeConfigs(FeeTypes.PRIVATE_OFFER);
+        vm.assume(tokenFeeNumerator <= maxTokenNumerator);
+        vm.assume(privateOfferFeeNumerator <= maxPrivateOfferNumerator);
         feeCalculation(tokenFeeNumerator, privateOfferFeeNumerator);
     }
 
