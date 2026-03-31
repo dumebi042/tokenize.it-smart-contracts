@@ -144,7 +144,8 @@ contract CoinvestedPositionExitTest is Test {
             leadInvestors: leadInvestors,
             basePrice: basePrice,
             baseCurrency: IERC20(address(baseCurrency)),
-            token: token
+            token: token,
+            lockedUntil: 0
         });
         return
             CoinvestedPosition(coinvestedPositionFactory.createCoinvestedPositionClone(salt, trustedForwarder, args));
@@ -608,7 +609,8 @@ contract CoinvestedPositionExitTest is Test {
             leadInvestors: _defaultLeadInvestors(),
             basePrice: BASE_PRICE_EURC,
             baseCurrency: IERC20(address(eurc)),
-            token: tokenWithFee
+            token: tokenWithFee,
+            lockedUntil: 0
         });
         CoinvestedPosition coinvestedPositionFee = CoinvestedPosition(
             coinvestedPositionFactory.createCoinvestedPositionClone(

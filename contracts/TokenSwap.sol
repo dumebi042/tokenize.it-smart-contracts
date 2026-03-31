@@ -60,6 +60,14 @@ contract TokenSwap is TokenSwapBase {
     constructor(address _trustedForwarder) TokenSwapBase(_trustedForwarder) {}
 
     /**
+     * @notice unpause the contract
+     */
+    function unpause() external override onlyOwner {
+        require(tokenPrice != 0, "tokenPrice must be set before unpausing");
+        _unpause();
+    }
+
+    /**
      * @notice Sets up the TokenSwap. The contract is usable immediately after being initialized.
      * @param _arguments Struct containing all arguments for the initializer
      */

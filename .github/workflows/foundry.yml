@@ -35,3 +35,6 @@ jobs:
       - name: Run mainnet tests
         working-directory: .
         run: forge test --match-test Mainnet --fork-url ${{ secrets.MAINNET_RPC_URL }}
+      - name: Run backwards-compatibility tests
+        working-directory: .
+        run: make test-backwards-compatibility

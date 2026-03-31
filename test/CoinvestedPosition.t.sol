@@ -109,7 +109,8 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             leadInvestors: leadInvestors,
             basePrice: basePrice,
             baseCurrency: IERC20(address(baseCurrency)),
-            token: token
+            token: token,
+            lockedUntil: 0
         });
         return CoinvestedPosition(factory.createCoinvestedPositionClone(salt, trustedForwarder, args));
     }
@@ -133,7 +134,8 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             leadInvestors: leadInvestors,
             basePrice: 100e6,
             baseCurrency: IERC20(address(eurc)),
-            token: token
+            token: token,
+            lockedUntil: 0
         });
 
         CoinvestedPosition localLogic = new CoinvestedPosition(trustedForwarder);
@@ -202,7 +204,8 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             leadInvestors: _defaultLeadInvestors(),
             basePrice: basePrice,
             baseCurrency: IERC20(address(fuzzCurrency)),
-            token: token
+            token: token,
+            lockedUntil: 0
         });
         CoinvestedPosition fuzzPosition = CoinvestedPosition(
             factory.createCoinvestedPositionClone(salt, trustedForwarder, args)
@@ -233,7 +236,8 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             leadInvestors: leadInvestors,
             basePrice: 100e6,
             baseCurrency: IERC20(address(nonEuro)),
-            token: token
+            token: token,
+            lockedUntil: 0
         });
         vm.expectRevert("currency must be a trusted EURO currency");
         factory.createCoinvestedPositionClone(bytes32("nonEuro"), trustedForwarder, args);
@@ -252,7 +256,8 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             leadInvestors: leadInvestors,
             basePrice: 100e6,
             baseCurrency: IERC20(address(nonTrusted)),
-            token: token
+            token: token,
+            lockedUntil: 0
         });
         vm.expectRevert("currency needs to be on the allowlist with TRUSTED_CURRENCY attribute");
         factory.createCoinvestedPositionClone(bytes32("nonTrusted"), trustedForwarder, args);
@@ -268,7 +273,8 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             leadInvestors: leadInvestors,
             basePrice: 100e6,
             baseCurrency: IERC20(address(noBit)),
-            token: token
+            token: token,
+            lockedUntil: 0
         });
         vm.expectRevert();
         factory.createCoinvestedPositionClone(bytes32("noBit"), trustedForwarder, args);
@@ -287,7 +293,8 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             leadInvestors: leadInvestors,
             basePrice: 100e6,
             baseCurrency: IERC20(address(eurc)),
-            token: token
+            token: token,
+            lockedUntil: 0
         });
         vm.expectRevert("There must be at least one lead investor");
         factory.createCoinvestedPositionClone(bytes32("emptyLead"), trustedForwarder, args);
@@ -302,7 +309,8 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             leadInvestors: leadInvestors,
             basePrice: 100e6,
             baseCurrency: IERC20(address(eurc)),
-            token: token
+            token: token,
+            lockedUntil: 0
         });
         vm.expectRevert("lead investor can not be zero address");
         factory.createCoinvestedPositionClone(bytes32("zeroLead"), trustedForwarder, args);
@@ -317,7 +325,8 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             leadInvestors: leadInvestors,
             basePrice: 100e6,
             baseCurrency: IERC20(address(eurc)),
-            token: token
+            token: token,
+            lockedUntil: 0
         });
         vm.expectRevert("lead investor carry fraction can not be zero");
         factory.createCoinvestedPositionClone(bytes32("zeroCarry"), trustedForwarder, args);
@@ -334,7 +343,8 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             leadInvestors: leadInvestors,
             basePrice: 100e6,
             baseCurrency: IERC20(address(eurc)),
-            token: token
+            token: token,
+            lockedUntil: 0
         });
         vm.expectRevert("panic: arithmetic underflow or overflow (0x11)"); // arithmetic overflow
         factory.createCoinvestedPositionClone(bytes32("overflow"), trustedForwarder, args);
@@ -591,7 +601,8 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             leadInvestors: leadInvestors,
             basePrice: 100e6,
             baseCurrency: IERC20(address(eurc)),
-            token: tokenWithFee
+            token: tokenWithFee,
+            lockedUntil: 0
         });
         CoinvestedPosition coinvestedPositionWithFee = CoinvestedPosition(
             factory.createCoinvestedPositionClone(bytes32("fee"), trustedForwarder, args)
@@ -659,7 +670,8 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             leadInvestors: leadInvestors,
             basePrice: 100e6,
             baseCurrency: IERC20(address(eurc)),
-            token: tokenHighFee
+            token: tokenHighFee,
+            lockedUntil: 0
         });
         CoinvestedPosition coinvestedPositionHighFee = CoinvestedPosition(
             factory.createCoinvestedPositionClone(bytes32("highFee"), trustedForwarder, args)
@@ -1433,7 +1445,8 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             leadInvestors: leadInvestors,
             basePrice: 100e6,
             baseCurrency: IERC20(address(malicious)),
-            token: token
+            token: token,
+            lockedUntil: 0
         });
         CoinvestedPosition coinvestedPositionMalicious = CoinvestedPosition(
             factory.createCoinvestedPositionClone(bytes32("mal"), trustedForwarder, args)

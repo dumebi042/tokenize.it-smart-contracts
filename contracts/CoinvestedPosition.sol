@@ -27,6 +27,8 @@ struct CoinvestedPositionInitializerArguments {
     IERC20 baseCurrency;
     /// token being held
     Token token;
+    /// unix timestamp before which unpause() is blocked; 0 means no lock
+    uint64 lockedUntil;
 }
 
 /**
@@ -50,6 +52,8 @@ contract CoinvestedPosition is TokenSwapBase {
     LeadInvestor[] public leadInvestors;
     /// base price per token in bits of the current currency (always expressed in current currency's decimals)
     uint256 public basePrice;
+    /// unix timestamp before which unpause() is blocked; 0 means no lock
+    uint64 public lockedUntil;
 
     /**
      * This constructor creates a logic contract that is used to clone new contracts.
@@ -76,16 +80,26 @@ contract CoinvestedPosition is TokenSwapBase {
             leadInvestors.push(_arguments.leadInvestors[i]);
         }
         basePrice = _arguments.basePrice;
+        lockedUntil = _arguments.lockedUntil;
 
         // Pausing the contract prevents an immediate sell of the tokens. Once they should be sold, update price and unpause.
         _pause();
     }
 
     /**
-     * @notice Change the payment currency. When changing to a different currency, provide the
-     *      equivalent base price in the new currency's units; it overwrites the stored basePrice.
-     * @param _currency new currency
-     * @param _altBasePrice base price in the new currency's units; ignored if _currency == currency
+     * @notice Unpause the contract. Blocked until lockedUntil has passed.
+     */
+    function unpause() external override onlyOwner {
+        require(tokenPrice != 0, "tokenPrice must be set before unpausing");
+        require(block.timestamp >= lockedUntil, "timelock has not expired");
+        _unpause();
+    }
+
+    /**
+     * @notice Change the payment currency to any trusted EURO currency.
+     * @dev basePrice remains in its original canonical units (basePriceDecimals); buy() scales it
+     *      dynamically, so no re-scaling of basePrice is needed here.
+     * @param _currency new currency; must have TRUSTED_CURRENCY | EURO_CURRENCY bits set on the token's allowList
      */
     function setCurrency(IERC20 _currency, uint256 _altBasePrice) external onlyOwner {
         require(address(_currency) != address(0), "zero address");
@@ -161,14 +175,14 @@ contract CoinvestedPosition is TokenSwapBase {
      * @dev The full received amount is treated as carry and split among lead investors by carryFraction;
      *      remainder goes to receiver. Any currency may be used.
      * @param _dist the Distribution (dividend) contract to claim from
-     * @param _dividendCurrency the currency paid out by the distribution
      */
     function distributeDividends(IDistribution _dist, IERC20 _dividendCurrency) external onlyOwner nonReentrant {
+        IERC20 dividendCurrency = _dist.currency();
         uint256 before = _dividendCurrency.balanceOf(address(this));
         _dist.claim(address(this));
-        uint256 received = _dividendCurrency.balanceOf(address(this)) - before;
+        uint256 received = dividendCurrency.balanceOf(address(this)) - before;
         require(received > 0, "didn't receive expected currency from distribution");
-        _settle(received, _dividendCurrency);
+        _settle(received, dividendCurrency);
     }
 
     /**

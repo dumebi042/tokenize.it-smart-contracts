@@ -64,7 +64,8 @@ contract DistributionCloneFactoryTest is Test {
                 snapshotId: snapshotId,
                 currency: IERC20(address(currency)),
                 totalCurrencyAmount: EXAMPLE_TOTAL_CURRENCY,
-                reassignAfter: reassignAfter
+                reassignAfter: reassignAfter,
+                initialReassignments: new Reassignment[](0)
             });
     }
 

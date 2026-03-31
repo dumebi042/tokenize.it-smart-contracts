@@ -58,7 +58,8 @@ contract CoinvestedPositionERC2771Test is CoinvestedPositionTestBase {
             leadInvestors: leadInvestors,
             basePrice: BASE_PRICE,
             baseCurrency: IERC20(address(eurc)),
-            token: token
+            token: token,
+            lockedUntil: 0
         });
         return CoinvestedPosition(freshFactory.createCoinvestedPositionClone(bytes32(0), forwarder, args));
     }
