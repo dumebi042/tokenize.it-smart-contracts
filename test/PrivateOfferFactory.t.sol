@@ -7,6 +7,8 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/PrivateOffer.sol";
 import "../contracts/factories/PrivateOfferFactory.sol";
+import "../contracts/factories/TimeLockCloneFactory.sol";
+import "../contracts/TimeLock.sol";
 import "./resources/CloneCreators.sol";
 import "./resources/ERC20MintableByAnyone.sol";
 
@@ -40,9 +42,9 @@ contract PrivateOfferFactoryTest is Test {
     bytes32 public constant salt = bytes32("234");
 
     function setUp() public {
-        Vesting vestingImplementation = new Vesting(trustedForwarder);
-        VestingCloneFactory vestingCloneFactory = new VestingCloneFactory(address(vestingImplementation));
-        factory = new PrivateOfferFactory(vestingCloneFactory);
+        TimeLock timeLockImplementation = new TimeLock();
+        TimeLockCloneFactory timeLockCloneFactory = new TimeLockCloneFactory(address(timeLockImplementation));
+        factory = new PrivateOfferFactory(timeLockCloneFactory);
         currency = new ERC20MintableByAnyone("currency", "CUR");
 
         list = createAllowList(trustedForwarder, owner);
@@ -104,20 +106,15 @@ contract PrivateOfferFactoryTest is Test {
     }
 
     function testDeployWithTimeLock(
-        uint64 _vestingStart,
-        uint64 _vestingCliff,
-        uint64 _vestingDuration,
+        uint64 _lockedUntil,
         address tokenReceiver,
-        address companyAdmin
+        address timeLockOwner
     ) public {
-        vm.assume(_vestingCliff <= _vestingDuration);
-        vm.assume(_vestingStart < type(uint64).max / 2);
-        vm.assume(_vestingDuration < type(uint64).max / 2);
-        vm.assume(_vestingDuration > 0);
+        vm.assume(_lockedUntil > block.timestamp);
+        vm.assume(_lockedUntil < type(uint64).max / 2);
         vm.assume(tokenReceiver != address(0));
-        vm.assume(tokenReceiver != companyAdmin);
-        vm.assume(tokenReceiver != trustedForwarder);
-        vm.assume(companyAdmin != trustedForwarder);
+        vm.assume(timeLockOwner != address(0));
+        vm.assume(tokenReceiver != timeLockOwner);
 
         // mint currency to buyer
         currency.mint(buyer, currencyAmount);
@@ -134,23 +131,20 @@ contract PrivateOfferFactoryTest is Test {
             address(0)
         );
 
-        // predict addresses for vesting contract and private offer contract
-        (address expectedPrivateOffer, address expectedVesting) = factory.predictPrivateOfferAndTimeLockAddress(
+        // predict addresses for time lock contract and private offer contract
+        (address expectedPrivateOffer, address expectedTimeLock) = factory.predictPrivateOfferAndTimeLockAddress(
             salt,
             arguments,
-            _vestingStart,
-            _vestingCliff,
-            _vestingDuration,
-            companyAdmin,
-            trustedForwarder
+            _lockedUntil,
+            timeLockOwner
         );
 
         console.log("expectedPrivateOffer", expectedPrivateOffer);
-        console.log("expectedVesting", expectedVesting);
+        console.log("expectedTimeLock", expectedTimeLock);
 
         // make sure no contract lives here yet
         assertFalse(Address.isContract(expectedPrivateOffer), "Private Offer address already contains contract");
-        assertFalse(Address.isContract(expectedVesting), "Vesting address already contains contract");
+        assertFalse(Address.isContract(expectedTimeLock), "TimeLock address already contains contract");
 
         // give allowances to private offer contract
         vm.prank(buyer);
@@ -172,55 +166,37 @@ contract PrivateOfferFactoryTest is Test {
             factory.deployPrivateOfferWithTimeLock(
                 salt,
                 arguments,
-                _vestingStart,
-                _vestingCliff,
-                _vestingDuration,
-                companyAdmin,
-                trustedForwarder
+                _lockedUntil,
+                timeLockOwner
             ),
-            expectedVesting
+            expectedTimeLock
         );
 
         // make sure contracts live here now
         assertTrue(Address.isContract(expectedPrivateOffer), "Private Offer address does not contain contract");
-        assertTrue(Address.isContract(expectedVesting), "Vesting address does not contain contract");
+        assertTrue(Address.isContract(expectedTimeLock), "TimeLock address does not contain contract");
 
-        // make sure vesting contract is owned by correct address
-        Vesting vestingContract = Vesting(expectedVesting);
-        if (companyAdmin == address(0)) {
-            assertTrue(vestingContract.owner() == address(0), "Vesting contract has owner");
-        } else {
-            assertTrue(vestingContract.owner() == companyAdmin, "Vesting contract not owned by company admin");
-        }
+        // make sure time lock contract is configured correctly
+        TimeLock timeLockContract = TimeLock(expectedTimeLock);
+        assertEq(timeLockContract.owner(), timeLockOwner, "TimeLock contract not owned by timeLockOwner");
+        assertEq(timeLockContract.lockedUntil(), _lockedUntil, "TimeLock contract has wrong lockedUntil");
 
-        // check balances again
+        // check balances: tokens are held in the time lock, not yet accessible
         assertEq(currency.balanceOf(buyer), 0, "Buyer has wrong currency balance after deployment");
         assertEq(token.balanceOf(buyer), 0, "Buyer has wrong token balance after deployment");
         assertEq(currency.balanceOf(currencyReceiver), currencyAmount, "Currency receiver has wrong currency balance");
         assertEq(token.balanceOf(tokenReceiver), 0, "Token receiver has wrong token balance");
-        assertEq(token.balanceOf(expectedVesting), tokenAmount, "Token receiver has wrong token balance");
+        assertEq(token.balanceOf(expectedTimeLock), tokenAmount, "TimeLock contract has wrong token balance");
 
-        // check vesting plan details
-        assertEq(vestingContract.token(), address(token), "Vesting contract has wrong token");
-        assertEq(vestingContract.beneficiary(1), tokenReceiver, "Vesting contract has wrong beneficiary");
-        assertEq(vestingContract.start(1), _vestingStart, "Vesting contract has wrong vesting start");
-        assertEq(vestingContract.cliff(1), _vestingCliff, "Vesting contract has wrong vesting cliff");
-        assertEq(vestingContract.duration(1), _vestingDuration, "Vesting contract has wrong vesting duration");
-        assertEq(vestingContract.allocation(1), tokenAmount, "Vesting contract has wrong vesting amount");
+        // try to drain before lock expires — must revert
+        vm.prank(timeLockOwner);
+        vm.expectRevert("timelock has not expired");
+        timeLockContract.drain(IERC20(address(token)), tokenReceiver);
 
-        // try to release tokens
-        vm.startPrank(tokenReceiver);
-        vestingContract.release(1);
-        if (block.timestamp < uint64(_vestingStart + _vestingCliff)) {
-            assertEq(token.balanceOf(tokenReceiver), 0, "Token receiver has wrong token balance after first release");
-        }
-
-        vm.warp(uint256(_vestingStart + _vestingDuration));
-        vestingContract.release(1);
-        assertEq(
-            token.balanceOf(tokenReceiver),
-            tokenAmount,
-            "Token receiver has wrong token balance after second release"
-        );
+        // drain after lock expires
+        vm.warp(_lockedUntil);
+        vm.prank(timeLockOwner);
+        timeLockContract.drain(IERC20(address(token)), tokenReceiver);
+        assertEq(token.balanceOf(tokenReceiver), tokenAmount, "Token receiver has wrong token balance after drain");
     }
 }

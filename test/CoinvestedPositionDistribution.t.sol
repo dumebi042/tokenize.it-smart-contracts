@@ -171,7 +171,8 @@ contract CoinvestedPositionDistributionTest is Test {
             leadInvestors: leadInvestors,
             basePrice: basePrice,
             baseCurrency: IERC20(address(baseCurrency)),
-            token: token
+            token: token,
+            lockedUntil: 0
         });
         return
             CoinvestedPosition(coinvestedPositionFactory.createCoinvestedPositionClone(salt, trustedForwarder, args));
@@ -199,7 +200,8 @@ contract CoinvestedPositionDistributionTest is Test {
             snapshotId: _snapshotId,
             currency: IERC20(address(_currency)),
             totalCurrencyAmount: totalCurrency,
-            reassignAfter: reassignAfter
+            reassignAfter: reassignAfter,
+            initialReassignments: new Reassignment[](0)
         });
         address cloneAddr = distributionFactory.predictCloneAddress(salt, trustedForwarder, args);
         _currency.mint(currencyProvider, totalCurrency);
@@ -876,7 +878,8 @@ contract CoinvestedPositionDistributionTest is Test {
             snapshotId: snapshotId,
             currency: IERC20(address(token)),
             totalCurrencyAmount: 100e18,
-            reassignAfter: reassignAfter
+            reassignAfter: reassignAfter,
+            initialReassignments: new Reassignment[](0)
         });
         address cloneAddr = distributionFactory.predictCloneAddress(bytes32("DI-XII"), trustedForwarder, args);
         vm.prank(admin);
@@ -987,7 +990,8 @@ contract CoinvestedPositionDistributionTest is Test {
                         leadInvestors: leadInvestors,
                         basePrice: BASE_PRICE_EURC,
                         baseCurrency: IERC20(address(eurc)),
-                        token: fuzzToken
+                        token: fuzzToken,
+                        lockedUntil: 0
                     });
                 coinvestedPositionFuzz = CoinvestedPosition(
                     coinvestedPositionFactory.createCoinvestedPositionClone(
@@ -1012,7 +1016,8 @@ contract CoinvestedPositionDistributionTest is Test {
                 snapshotId: snapFuzz,
                 currency: IERC20(address(usdc)),
                 totalCurrencyAmount: uint256(totalCurrencyAmount),
-                reassignAfter: reassignAfter
+                reassignAfter: reassignAfter,
+                initialReassignments: new Reassignment[](0)
             });
             address cloneAddr = distributionFactory.predictCloneAddress(
                 bytes32("DI-XI-dist"),

@@ -9,6 +9,7 @@ import "../contracts/interfaces/IFeeSettings.sol";
 import "../contracts/factories/CrowdinvestingCloneFactory.sol";
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/factories/PrivateOfferFactory.sol";
+import "../contracts/factories/TimeLockCloneFactory.sol";
 import "./resources/FakePaymentToken.sol";
 import "./resources/CloneCreators.sol";
 
@@ -86,7 +87,7 @@ contract FeeSettingsIntegrationTest is Test {
         crowdinvestingCloneFactory = new CrowdinvestingCloneFactory(address(crowdinvestingLogic));
 
         // using a fake vesting clone factory here because we don't need this functionality for this test
-        privateOfferFactory = new PrivateOfferFactory(VestingCloneFactory(address(294)));
+        privateOfferFactory = new PrivateOfferFactory(TimeLockCloneFactory(address(294)));
     }
 
     function testMintUsesCustomFeeAndCollector(address _customFeeCollector) public {
