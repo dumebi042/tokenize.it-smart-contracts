@@ -30,14 +30,17 @@ contract tokenProxyFactoryTest is Test {
 
     function setUp() public {
         allowList = createAllowList(trustedForwarder, feeSettingsAndAllowListOwner);
-        Fees memory fees = Fees(100, 100, 100, 0);
         feeSettings = createFeeSettings(
             trustedForwarder,
             feeSettingsAndAllowListOwner,
-            fees,
-            feeSettingsAndAllowListOwner,
-            feeSettingsAndAllowListOwner,
-            feeSettingsAndAllowListOwner
+            buildFeeTypes(
+                100,
+                100,
+                100,
+                feeSettingsAndAllowListOwner,
+                feeSettingsAndAllowListOwner,
+                feeSettingsAndAllowListOwner
+            )
         );
         vm.stopPrank();
 
@@ -164,10 +167,14 @@ contract tokenProxyFactoryTest is Test {
         FeeSettings _feeSettings = createFeeSettings(
             trustedForwarder,
             address(this),
-            Fees(100, 100, 100, 0),
-            feeSettingsAndAllowListOwner,
-            feeSettingsAndAllowListOwner,
-            feeSettingsAndAllowListOwner
+            buildFeeTypes(
+                100,
+                100,
+                100,
+                feeSettingsAndAllowListOwner,
+                feeSettingsAndAllowListOwner,
+                feeSettingsAndAllowListOwner
+            )
         );
 
         Token clone = Token(
@@ -231,10 +238,14 @@ contract tokenProxyFactoryTest is Test {
         FeeSettings _feeSettings = createFeeSettings(
             trustedForwarder,
             address(this),
-            Fees(100, 100, 100, 0),
-            feeSettingsAndAllowListOwner,
-            feeSettingsAndAllowListOwner,
-            feeSettingsAndAllowListOwner
+            buildFeeTypes(
+                100,
+                100,
+                100,
+                feeSettingsAndAllowListOwner,
+                feeSettingsAndAllowListOwner,
+                feeSettingsAndAllowListOwner
+            )
         );
 
         Token _token = Token(
@@ -283,10 +294,14 @@ contract tokenProxyFactoryTest is Test {
         FeeSettings _feeSettings = createFeeSettings(
             trustedForwarder,
             address(this),
-            Fees(100, 100, 100, 0),
-            feeSettingsAndAllowListOwner,
-            feeSettingsAndAllowListOwner,
-            feeSettingsAndAllowListOwner
+            buildFeeTypes(
+                100,
+                100,
+                100,
+                feeSettingsAndAllowListOwner,
+                feeSettingsAndAllowListOwner,
+                feeSettingsAndAllowListOwner
+            )
         );
 
         Token _token = Token(

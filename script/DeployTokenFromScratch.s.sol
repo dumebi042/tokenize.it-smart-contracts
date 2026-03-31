@@ -8,6 +8,7 @@ import "../contracts/factories/FeeSettingsCloneFactory.sol";
 import "../contracts/factories/AllowListCloneFactory.sol";
 import "../contracts/factories/PrivateOfferFactory.sol";
 import "../contracts/factories/TokenProxyFactory.sol";
+import "../contracts/interfaces/IFeeSettings.sol";
 
 contract DeployPlatform is Script {
     function setUp() public {}
@@ -45,17 +46,13 @@ contract DeployPlatform is Script {
         console.log("FeeSettingsCloneFactory deployed at: ", address(feeSettingsCloneFactory));
 
         console.log("Deploying FeeSettings contract...");
-        Fees memory fees = Fees(100, 100, 100, 0);
+        FeeSettings.FeeTypeInit[] memory feeTypes = new FeeSettings.FeeTypeInit[](4);
+        feeTypes[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN, 500, 100, platformColdWallet);
+        feeTypes[1] = FeeSettings.FeeTypeInit(FeeTypes.CROWDINVESTING, 1000, 100, platformColdWallet);
+        feeTypes[2] = FeeSettings.FeeTypeInit(FeeTypes.PRIVATE_OFFER, 500, 100, platformColdWallet);
+        feeTypes[3] = FeeSettings.FeeTypeInit(FeeTypes.SECONDARY_MARKET, 500, 0, platformColdWallet);
         FeeSettings feeSettings = FeeSettings(
-            feeSettingsCloneFactory.createFeeSettingsClone(
-                bytes32(0),
-                trustedForwarder,
-                platformAdminWallet,
-                fees,
-                platformColdWallet,
-                platformColdWallet,
-                platformColdWallet
-            )
+            feeSettingsCloneFactory.createFeeSettingsClone(bytes32(0), trustedForwarder, platformAdminWallet, feeTypes)
         );
         console.log("FeeSettings deployed at: ", address(feeSettings));
         feeSettings.transferOwnership(platformColdWallet);

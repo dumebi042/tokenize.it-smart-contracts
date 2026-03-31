@@ -9,7 +9,7 @@
 
 ### Naming
 
-- Constants: `ALL_CAPS_WITH_UNDERSCORES` (e.g., `MAX_TOKEN_FEE_NUMERATOR`, `MINTALLOWER_ROLE`)
+- Constants: `ALL_CAPS_WITH_UNDERSCORES` (e.g., `MAX_TOKEN_NUMERATOR`, `MINTALLOWER_ROLE`)
 - Events: PascalCase (e.g., `RequirementsChanged`)
 - Public state variables: camelCase (e.g., `allowList`, `mintingAllowance`)
 - Private/internal state variables: `_prefixedCamelCase`

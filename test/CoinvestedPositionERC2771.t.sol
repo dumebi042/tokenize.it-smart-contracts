@@ -21,8 +21,7 @@ contract CoinvestedPositionERC2771Test is CoinvestedPositionTestBase {
         buyer = vm.addr(buyerPrivateKey);
 
         allowList = createAllowList(trustedForwarder, admin);
-        Fees memory zeroFees = Fees(0, 0, 0, 0);
-        feeSettings = createFeeSettings(trustedForwarder, admin, zeroFees, admin, admin, admin);
+        feeSettings = createFeeSettings(trustedForwarder, admin, buildFeeTypes(0, 0, 0, admin, admin, admin));
 
         eurc = new FakePaymentToken(0, 6);
         vm.prank(admin);
