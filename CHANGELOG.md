@@ -1,45 +1,44 @@
-# Changelog
+# New contracts
 
-## Unreleased
-
-### New contract: `CoinvestedPosition`
+## `CoinvestedPosition`
 
 Holds tokens on behalf of a co-investor and sells them, splitting proceeds between the co-investor (_receiver_) and lead investors via _carry_.
 
-- **Base price:** EURO-denominated reference price recorded at initialization. After fees, the receiver is entitled to `basePrice` per token; any surplus is carry split among lead investors by `carryFraction`. If net proceeds don't cover `basePrice`, all proceeds go to the receiver.
-- **Currency flexibility:** All three distribution paths (`buy`, dividends, exit) accept any EURO token (`TRUSTED_CURRENCY | EURO_CURRENCY`). The currency used by `buy()` is a state variable the owner can update via `setCurrency()`.
+- **Base price:** Reference price per token recorded at initialization, denominated in `baseCurrency` (any trusted currency). After fees, the receiver is entitled to `basePrice` per token; any surplus is carry split among lead investors by `carryFraction`. If net proceeds don't cover `basePrice`, all proceeds go to the receiver.
+- **Currency flexibility:** All three distribution paths (`buy`, dividends, exit) accept any trusted currency (`TRUSTED_CURRENCY` bit set). The currency used by `buy()` is a state variable the owner can update via `setCurrency()`.
 - **Balance sweep:** Lead investor shares are paid first, then the contract's entire remaining currency balance is swept to `receiver`, including any accidentally sent funds.
+- includes a timelock feature
 
 ---
 
-### New contract: `TokenSwapBase`
+## `TokenSwapBase`
 
-Abstract base extracted from duplicated logic in `TokenSwap` and `CoinvestedPosition`, covering shared state, fee handling, price/receiver management, pause controls, and ERC-2771 support. Both contracts now extend it.
+Abstract base extracted from duplicated logic in `TokenSwap` and `CoinvestedPosition`, covering shared state, fee handling, price/receiver management and ERC-2771 support. Both contracts now extend it.
 
----
+## `Distribution`
 
-### New contract: `Distribution`
+Distributes a fixed currency amount among token holders proportional to their balance at a given snapshot. Supports direct claims and timelock contracts. An owner-only `reassign` function (available at deployment and after a configurable delay post-deployment) handles recovery cases. Deployed via an atomic clone-and-fund factory.
 
-Distributes a fixed currency amount among token holders proportional to their balance at a given snapshot. Supports direct claims and timelock contracts. An owner-only `reassign` function (available after a configurable delay post-deployment) handles recovery cases. Deployed via an atomic clone-and-fund factory.
+**Fee collection note:** All fees are collected at smart contract creation, not at claim time. There is no way to extract currency without fee payment, so collecting once upfront saves gas over bite-by-bite collection.
 
-## Fee collection
-
-Note that for Distributions, all fees are collected at smart contract creation instead of at claim time. Rationale: there is no way to extract the currency without a fee payment, so we might as well collect at the beginning and save gas because we do it only once instead of bite-by-bite.
-
-### New contract: `Exit`
+## `Exit`
 
 Allows token holders to redeem tokens for a fixed currency payout within a configurable duration after the exit date. Deployed via an atomic clone-and-fund factory.
 
----
+## `TimeLock`
 
-### New constant: `EURO_CURRENCY` in `AllowList`
+Holds ERC20 tokens on behalf of an owner and blocks withdrawals until a configurable timestamp.
 
-`uint256 constant EURO_CURRENCY = 2 ** 254` (bit 254) added alongside `TRUSTED_CURRENCY` (bit 255). Marks a currency as Euro-denominated; required by `CoinvestedPosition` for all currency inputs.
+- **`drain(token, recipient)`:** Transfers the full token balance to `recipient`. Reverts until `lockedUntil` has passed.
+- **`distributeDividends(distribution, recipient)`:** Claims this contract's share from a `Distribution` contract and forwards the proceeds to `recipient`. Not subject to the time lock — dividends can be claimed at any time.
 
----
+# Updates
 
-### Breaking change: `TRUSTED_CURRENCY` check relaxed to bitmask
+## `FeeSettings` (now V3)
 
-**Affected:** `Crowdinvesting`, `PrivateOffer`, `TokenSwap`
+`FeeSettings` now implements `IFeeSettingsV3` alongside `IFeeSettingsV1` and `IFeeSettingsV2`, adding a fully dynamic fee type registry while staying backwards compatible with existing callers.
 
-The currency allowList check changed from exact equality to a bitmask, allowing currency addresses to carry additional bits (e.g. `EURO_CURRENCY`) without being rejected. Existing deployments are affected when the attributes on the AllowList or the AllowList itself are updated.
+- **Dynamic fee types:** New fee types can be registered post-deployment via `registerFeeType(bytes32, uint32, uint32, address)` without a contract upgrade. Each type carries its own `maxNumerator`, `defaultNumerator`, and default collector. Querying an unregistered fee type returns a zero fee (no revert), so new contracts can safely use a fee type that an older `FeeSettings` deployment does not yet know about.
+- **Generic accessors (`IFeeSettingsV3`):** `fee(bytes32 feeType, uint256 amount, address token)` and `feeCollector(bytes32 feeType, address token)` work for any registered type.
+- **Backwards compatible:** All `IFeeSettingsV1` and `IFeeSettingsV2` named accessors (`tokenFee`, `crowdinvestingFee`, `privateOfferFee`, etc.) are preserved as thin wrappers over the V3 generics.
+- **Consumer-side backwards compatibility:** `Distribution`, `Exit`, `TokenSwap`, and `CoinvestedPosition` each detect V3 support via `supportsInterface` at runtime. If V3 is not available they fall back to `privateOfferFee` / `privateOfferFeeCollector` from `IFeeSettingsV2`. The V3 fee types used are `FeeTypes.DISTRIBUTION`, `FeeTypes.EXIT`, and `FeeTypes.SECONDARY_MARKET` (the last covering both swap contracts).
