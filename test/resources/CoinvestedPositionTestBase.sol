@@ -1,0 +1,46 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+pragma solidity 0.8.23;
+
+import "../../lib/forge-std/src/Test.sol";
+import "../../contracts/factories/TokenProxyFactory.sol";
+import "../../contracts/factories/CoinvestedPositionCloneFactory.sol";
+import "../../contracts/CoinvestedPosition.sol";
+import "../../contracts/FeeSettings.sol";
+import "./FakePaymentToken.sol";
+import "./CloneCreators.sol";
+
+abstract contract CoinvestedPositionTestBase is Test {
+    // ── Well-known addresses ──────────────────────────────────────────────────
+    address public constant admin = 0x0109709eCFa91a80626FF3989D68f67f5b1dD120;
+    address public constant owner = 0x6109709EcFA91A80626FF3989d68f67F5b1dd126;
+    address public constant receiver = 0x7109709eCfa91A80626Ff3989D68f67f5b1dD127;
+    address public constant leadA = 0x2109709EcFa91a80626Ff3989d68F67F5B1Dd122;
+    address public constant trustedForwarder = 0xa109709ecfA91A80626ff3989D68F67F5b1dD12a;
+    address public constant tokenReceiver = 0x5109709EcFA91a80626ff3989d68f67F5B1dD125;
+
+    // ── Test constants ────────────────────────────────────────────────────────
+    // 10% of uint64.max (floor)
+    uint64 public constant CARRY_10PCT = type(uint64).max / 10;
+
+    // ── Shared state ──────────────────────────────────────────────────────────
+    AllowList allowList;
+    IFeeSettingsV2 feeSettings;
+    Token token;
+    TokenProxyFactory tokenFactory;
+    FakePaymentToken eurc; // 6 decimals
+
+    // The clone deployed for most tests
+    CoinvestedPosition coinvestedPosition;
+
+    // ── Internal helpers ──────────────────────────────────────────────────────
+
+    /// Mint tokens to coinvestedPosition then set price and unpause
+    function _setupBuy(uint256 tokenAmount, uint256 tokenPrice) internal {
+        vm.prank(admin);
+        token.mint(address(coinvestedPosition), tokenAmount);
+        vm.prank(owner);
+        coinvestedPosition.setTokenPrice(tokenPrice);
+        vm.prank(owner);
+        coinvestedPosition.unpause();
+    }
+}

@@ -2,13 +2,33 @@
 via-ir = true # Enable the IR-based optimizer (yul)
 optimizer = true
 bytecode_hash = "none" # prevents compiler from attaching bytecode hash to contract metadata
+skip = ["test/ExitSafe.t.sol", "test/legacy/**", "test/backwards-compatibility/**"] # ExitSafe incompatible with via-ir; legacy/ and backwards-compatibility/ are only compiled under the backwards-compatibility profile
+
+[profile.release]
+via-ir = true
+optimizer = true
+bytecode_hash = "none"
+skip = ["test/**"]
 
 [profile.fastDev]
 via-ir = false # Enable the IR-based optimizer (yul)
 optimizer = true
 optimizer_runs = 10_000
+skip = ["test/legacy/**", "test/backwards-compatibility/**"]
 
 gas_reports = ["AllowList", "Crowdinvesting", "FeeSettings", "PrivateOffer", "PrivateOfferFactory", "Token"]
+
+[profile.backwards-compatibility]
+# Compiles and runs only test/backwards-compatibility/. Old contract bytecode is loaded at runtime
+# from npm artifacts via deployCode — no source compilation of legacy code, no remapping needed.
+test = "test/backwards-compatibility"
+via-ir = false
+optimizer = true
+optimizer_runs = 10_000
+# Override default skip: allow test/backwards-compatibility/** to compile; only exclude legacy sources
+skip = ["test/legacy/**"]
+# Allow deployCode to read pre-compiled artifact JSON files from installed npm packages
+fs_permissions = [{ access = "read", path = "./test/legacy/" }]
 
 [rpc_endpoints]
 goerli = "${GOERLI_RPC_URL}"

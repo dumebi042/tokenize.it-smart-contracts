@@ -7,6 +7,8 @@ import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/factories/CrowdinvestingCloneFactory.sol";
 import "./resources/CloneCreators.sol";
 import "../contracts/factories/PrivateOfferFactory.sol";
+import "../contracts/factories/TimeLockCloneFactory.sol";
+import "../contracts/TimeLock.sol";
 import "./resources/FakePaymentToken.sol";
 import "./resources/ERC2771Helper.sol";
 import "@opengsn/contracts/src/forwarder/Forwarder.sol"; // chose specific version to avoid import error: yarn add @opengsn/contracts@2.2.5
@@ -90,14 +92,17 @@ contract CompanySetUpTest is Test {
         companyAdmin = vm.addr(companyAdminPrivateKey);
 
         // set up FeeSettings
-        Fees memory fees = Fees(tokenFeeNumerator, paymentTokenFeeNumerator, paymentTokenFeeNumerator, 0);
         feeSettings = createFeeSettings(
-            address(8), // fake forwarder
+            address(8),
             platformAdmin,
-            fees,
-            platformFeeCollector,
-            platformFeeCollector,
-            platformFeeCollector
+            buildFeeTypes(
+                tokenFeeNumerator,
+                paymentTokenFeeNumerator,
+                paymentTokenFeeNumerator,
+                platformFeeCollector,
+                platformFeeCollector,
+                platformFeeCollector
+            )
         );
 
         // set up currency. In real life (irl) this would be a real currency, but for testing purposes we use a fake one.
@@ -126,9 +131,9 @@ contract CompanySetUpTest is Test {
         tokenFactory = new TokenProxyFactory(address(implementation));
 
         // set up PrivateOfferFactory. Again, this is done here only because we need the forwarder address.
-        Vesting vestingImplementation = new Vesting(address(forwarder));
-        VestingCloneFactory vestingCloneFactory = new VestingCloneFactory(address(vestingImplementation));
-        privateOfferFactory = new PrivateOfferFactory(vestingCloneFactory);
+        TimeLock timeLockImplementation = new TimeLock();
+        TimeLockCloneFactory timeLockCloneFactory = new TimeLockCloneFactory(address(timeLockImplementation));
+        privateOfferFactory = new PrivateOfferFactory(timeLockCloneFactory);
 
         // launch the company token. The platform deploys the contract. There is no need to transfer ownership, because the token is never controlled by the address that deployed it.
         // Instead, it is immediately controlled by the address provided in the constructor, which is the companyAdmin in this case.

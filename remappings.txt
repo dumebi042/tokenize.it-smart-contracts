@@ -1,0 +1,2 @@
+@safe-global/=node_modules/@safe-global/
+node_modules/@safe-global/safe-contracts/contracts/interfaces/IERC165.sol=node_modules/@openzeppelin/contracts/utils/introspection/IERC165.sol

@@ -6,6 +6,8 @@ import "../lib/forge-std/src/console.sol";
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/PrivateOffer.sol";
 import "../contracts/factories/PrivateOfferFactory.sol";
+import "../contracts/factories/TimeLockCloneFactory.sol";
+import "../contracts/TimeLock.sol";
 import "./resources/CloneCreators.sol";
 import "./resources/FakePaymentToken.sol";
 
@@ -33,9 +35,9 @@ contract PrivateOfferTimeLockTest is Test {
     uint256 requirements = 92785934;
 
     function setUp() public {
-        Vesting vestingImplementation = new Vesting(trustedForwarder);
-        VestingCloneFactory vestingCloneFactory = new VestingCloneFactory(address(vestingImplementation));
-        privateOfferFactory = new PrivateOfferFactory(vestingCloneFactory);
+        TimeLock timeLockImplementation = new TimeLock();
+        TimeLockCloneFactory timeLockCloneFactory = new TimeLockCloneFactory(address(timeLockImplementation));
+        privateOfferFactory = new PrivateOfferFactory(timeLockCloneFactory);
 
         vm.prank(paymentTokenProvider);
         currency = new FakePaymentToken(0, 18);
@@ -44,8 +46,11 @@ contract PrivateOfferTimeLockTest is Test {
         list.set(tokenReceiver, requirements);
         list.set(address(currency), TRUSTED_CURRENCY);
 
-        Fees memory fees = Fees(100, 100, 100, 0);
-        feeSettings = createFeeSettings(trustedForwarder, address(this), fees, admin, admin, admin);
+        feeSettings = createFeeSettings(
+            trustedForwarder,
+            address(this),
+            buildFeeTypes(100, 100, 100, admin, admin, admin)
+        );
 
         Token implementation = new Token(trustedForwarder);
         TokenProxyFactory tokenCloneFactory = new TokenProxyFactory(address(implementation));
@@ -64,30 +69,15 @@ contract PrivateOfferTimeLockTest is Test {
     }
 
     /**
-     *
      * @param salt can be used to generate different addresses
-     * @param releaseStartTime when to start releasing tokens
-     * @param attemptTime try to release tokens after this amount of time
-     * @param releaseDuration how long the releasing of tokens should take
+     * @param lockedUntil unix timestamp before which drain() is blocked
+     * @param attemptTime try to drain tokens at this timestamp (must be before lockedUntil)
      */
-    function testPrivateOfferWithTimeLock(
-        bytes32 salt,
-        uint64 releaseStartTime,
-        uint64 releaseDuration,
-        uint64 attemptTime
-    ) public {
-        vm.assume(releaseStartTime > attemptTime);
-        vm.assume(releaseDuration < 20 * 365 * 24 * 60 * 60); // 20 years
-        vm.assume(type(uint64).max - releaseDuration - 1 - block.timestamp > releaseStartTime);
-        vm.assume(attemptTime < releaseStartTime + releaseDuration);
-        vm.assume(attemptTime > 1);
-        vm.assume(releaseStartTime > 1);
-
-        // reference all times to current time. Important for when testing with mainnet forks.
-        uint64 testStartTime = uint64(block.timestamp);
-        attemptTime += testStartTime;
-        releaseStartTime += testStartTime;
-        assertTrue(testStartTime < releaseStartTime, "testStartTime >= releaseStartTime");
+    function testPrivateOfferWithTimeLock(bytes32 salt, uint64 lockedUntil, uint64 attemptTime) public {
+        vm.assume(lockedUntil > block.timestamp + 1);
+        vm.assume(lockedUntil < type(uint64).max / 2);
+        vm.assume(attemptTime > block.timestamp);
+        vm.assume(attemptTime < lockedUntil);
 
         PrivateOfferArguments memory arguments = PrivateOfferArguments(
             currencyPayer,
@@ -105,15 +95,7 @@ contract PrivateOfferTimeLockTest is Test {
 
         // predict addresses
         (address expectedInviteAddress, address expectedTimeLockAddress) = privateOfferFactory
-            .predictPrivateOfferAndTimeLockAddress(
-                salt,
-                arguments,
-                releaseStartTime,
-                0,
-                releaseDuration,
-                admin,
-                trustedForwarder
-            );
+            .predictPrivateOfferAndTimeLockAddress(salt, arguments, lockedUntil, admin);
 
         // add time lock and token receiver to the allow list
         list.set(expectedTimeLockAddress, requirements);
@@ -132,7 +114,6 @@ contract PrivateOfferTimeLockTest is Test {
         currency.approve(expectedInviteAddress, currencyAmount);
 
         // make sure balances are as expected before deployment
-
         assertEq(currency.balanceOf(currencyPayer), currencyAmount, "currencyPayer wrong balance before deployment");
         assertEq(currency.balanceOf(currencyReceiver), 0, "currencyReceiver wrong balance before deployment");
         assertEq(currency.balanceOf(expectedTimeLockAddress), 0, "timeLock wrong currency balance before deployment");
@@ -142,26 +123,15 @@ contract PrivateOfferTimeLockTest is Test {
             "feeCollector currency balance before deployment: %s",
             currency.balanceOf(token.feeSettings().privateOfferFeeCollector(address(token)))
         );
+
         // measure and log gas
         uint256 gasBefore = gasleft();
-        // deploy private offer
-        Vesting timeLock = Vesting(
-            privateOfferFactory.deployPrivateOfferWithTimeLock(
-                salt,
-                arguments,
-                releaseStartTime,
-                0,
-                releaseDuration,
-                admin,
-                trustedForwarder
-            )
+        // deploy private offer and time lock
+        TimeLock timeLock = TimeLock(
+            privateOfferFactory.deployPrivateOfferWithTimeLock(salt, arguments, lockedUntil, admin)
         );
         uint256 gasAfter = gasleft();
         console.log("gas used: %s", gasBefore - gasAfter);
-
-        //require(false);
-
-        //assertEq(inviteAddress, expectedInviteAddress, "deployed contract address is not correct");
 
         console.log("payer balance: %s", currency.balanceOf(currencyPayer));
         console.log("receiver balance: %s", currency.balanceOf(currencyReceiver));
@@ -196,24 +166,22 @@ contract PrivateOfferTimeLockTest is Test {
         /*
          * PrivateOffer worked properly, now test the time lock
          */
-        // immediate release should not work
+        // drain before lock expires should revert
         assertEq(token.balanceOf(tokenReceiver), 0, "investor vault should have no tokens");
-        vm.prank(tokenReceiver);
-        timeLock.release(uint64(1));
-        assertEq(token.balanceOf(tokenReceiver), 0, "investor vault should still have no tokens");
+        vm.prank(admin);
+        vm.expectRevert("timelock has not expired");
+        timeLock.drain(IERC20(address(token)), tokenReceiver);
 
-        // too early release should not work
+        // drain at attemptTime (still before lockedUntil) should also revert
         vm.warp(attemptTime);
-        vm.prank(tokenReceiver);
-        timeLock.release(uint64(1));
-        assertEq(token.balanceOf(tokenReceiver), 0, "investor vault should still be empty");
+        vm.prank(admin);
+        vm.expectRevert("timelock has not expired");
+        timeLock.drain(IERC20(address(token)), tokenReceiver);
 
-        // not testing the linear release time here because it's already tested in the vesting wallet tests
-
-        // release all tokens after release duration has passed
-        vm.warp(releaseStartTime + releaseDuration + 1);
-        vm.prank(tokenReceiver);
-        timeLock.release(uint64(1));
+        // drain after lock expires transfers all tokens to recipient
+        vm.warp(lockedUntil);
+        vm.prank(admin);
+        timeLock.drain(IERC20(address(token)), tokenReceiver);
         assertEq(token.balanceOf(tokenReceiver), arguments.tokenAmount, "investor vault should have all tokens");
     }
 }

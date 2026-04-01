@@ -6,7 +6,10 @@ import "../lib/forge-std/src/console.sol";
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/PrivateOffer.sol";
 import "../contracts/factories/PrivateOfferFactory.sol";
+import "../contracts/factories/TimeLockCloneFactory.sol";
+import "../contracts/TimeLock.sol";
 import "./resources/CloneCreators.sol";
+import "../contracts/interfaces/IFeeSettings.sol";
 import "./resources/FakePaymentToken.sol";
 
 contract PrivateOfferTest is Test {
@@ -45,9 +48,9 @@ contract PrivateOfferTest is Test {
     uint256 requirements = 92785934;
 
     function setUp() public {
-        Vesting vestingImplementation = new Vesting(trustedForwarder);
-        VestingCloneFactory vestingCloneFactory = new VestingCloneFactory(address(vestingImplementation));
-        factory = new PrivateOfferFactory(vestingCloneFactory);
+        TimeLock timeLockImplementation = new TimeLock();
+        TimeLockCloneFactory timeLockCloneFactory = new TimeLockCloneFactory(address(timeLockImplementation));
+        factory = new PrivateOfferFactory(timeLockCloneFactory);
 
         vm.prank(paymentTokenProvider);
         currency = new FakePaymentToken(0, 18);
@@ -57,14 +60,10 @@ contract PrivateOfferTest is Test {
         list.set(tokenHolder, requirements);
         list.set(address(currency), TRUSTED_CURRENCY);
 
-        Fees memory fees = Fees(100, 100, 100, 0);
         feeSettings = createFeeSettings(
             trustedForwarder,
             address(this),
-            fees,
-            wrongFeeReceiver,
-            wrongFeeReceiver,
-            admin
+            buildFeeTypes(100, 100, 100, wrongFeeReceiver, wrongFeeReceiver, admin)
         );
 
         Token implementation = new Token(trustedForwarder);
@@ -313,9 +312,13 @@ contract PrivateOfferTest is Test {
         address expectedAddress = factory.predictPrivateOfferAddress(salt, arguments);
 
         // set fees to 0, otherwise extra tokens are minted which causes an overflow
-        Fees memory fees = Fees(0, 0, 0, 0);
-        FeeSettings(address(token.feeSettings())).planFeeChange(fees);
-        FeeSettings(address(token.feeSettings())).executeFeeChange();
+        FeeSettings _feeSettings = FeeSettings(address(token.feeSettings()));
+        _feeSettings.planFeeChange(FeeTypes.CROWDINVESTING, 0, uint64(block.timestamp));
+        _feeSettings.planFeeChange(FeeTypes.PRIVATE_OFFER, 0, uint64(block.timestamp));
+        _feeSettings.planFeeChange(FeeTypes.TOKEN, 0, uint64(block.timestamp));
+        _feeSettings.executeFeeChange(FeeTypes.TOKEN);
+        _feeSettings.executeFeeChange(FeeTypes.CROWDINVESTING);
+        _feeSettings.executeFeeChange(FeeTypes.PRIVATE_OFFER);
 
         vm.prank(admin);
         token.increaseMintingAllowance(expectedAddress, _tokenBuyAmount);
@@ -464,7 +467,7 @@ contract PrivateOfferTest is Test {
     }
 
     function testInvalidCurrency(uint256 _attributes) public {
-        vm.assume(_attributes != TRUSTED_CURRENCY);
+        vm.assume(_attributes & TRUSTED_CURRENCY != TRUSTED_CURRENCY);
 
         // remove trusted currency from allowlist
         list.set(address(currency), _attributes);

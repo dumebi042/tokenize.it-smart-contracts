@@ -69,14 +69,10 @@ contract CrowdinvestingTransferTest is Test {
         list.set(tokenHolder, 0x0);
         vm.stopPrank();
 
-        Fees memory fees = Fees(100, 100, 100, 100);
         feeSettings = createFeeSettings(
             trustedForwarder,
             address(this),
-            fees,
-            wrongFeeReceiver,
-            admin,
-            wrongFeeReceiver
+            buildFeeTypes(100, 100, 100, wrongFeeReceiver, admin, wrongFeeReceiver)
         );
 
         // create token
@@ -1284,7 +1280,7 @@ contract CrowdinvestingTransferTest is Test {
 
     //     function testSettingInvalidCurrencyReverts(address someCurrency, uint256 currencyAttributes) public {
     //         vm.assume(someCurrency != address(0));
-    //         vm.assume(currencyAttributes != TRUSTED_CURRENCY);
+    //         vm.assume(currencyAttributes & TRUSTED_CURRENCY != TRUSTED_CURRENCY);
     //         vm.prank(owner);
     //         list.set(someCurrency, currencyAttributes);
 

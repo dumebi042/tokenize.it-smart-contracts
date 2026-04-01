@@ -52,15 +52,18 @@ contract TokenERC2771Test is Test {
         allowList = createAllowList(trustedForwarder, platformAdmin);
 
         // deploy fee settings
-        Fees memory fees = Fees(tokenFeeNumerator, crowdinvestingFeeNumerator, privateOfferFeeNumerator, 0);
         vm.prank(platformAdmin);
         feeSettings = createFeeSettings(
             trustedForwarder,
             address(this),
-            fees,
-            feeCollector,
-            feeCollector,
-            feeCollector
+            buildFeeTypes(
+                tokenFeeNumerator,
+                crowdinvestingFeeNumerator,
+                privateOfferFeeNumerator,
+                feeCollector,
+                feeCollector,
+                feeCollector
+            )
         );
 
         // deploy helper functions (only for testing with foundry)
