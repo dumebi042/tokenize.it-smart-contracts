@@ -1091,8 +1091,6 @@ contract CoinvestedPositionExitTest is Test {
         if (uint256(minCurrencyAmount) > received) {
             vm.expectRevert("received less than _minCurrencyAmount");
         }
-        coinvestedPositionFuzz.distributeExit(IERC20(address(eurc)),
-            uint256(minCurrencyAmount)
-        );
+        coinvestedPositionFuzz.distributeExit(IERC20(address(eurc)), uint256(minCurrencyAmount));
     }
 }

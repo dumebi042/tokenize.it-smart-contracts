@@ -45,11 +45,7 @@ contract TimeLockDistributeExitTest is Test {
 
         // Infrastructure
         allowList = createAllowList(trustedForwarder, admin);
-        feeSettings = createFeeSettings(
-            trustedForwarder,
-            admin,
-            buildFeeTypes(0, 0, 0, admin, admin, admin)
-        );
+        feeSettings = createFeeSettings(trustedForwarder, admin, buildFeeTypes(0, 0, 0, admin, admin, admin));
 
         eurc = new FakePaymentToken(0, 6);
 
@@ -116,7 +112,11 @@ contract TimeLockDistributeExitTest is Test {
         timeLock.distributeExit(token, recipient);
 
         assertEq(token.balanceOf(address(timeLock)), 0, "timeLock should have no tokens after exit");
-        assertEq(eurc.balanceOf(recipient), (TOKEN_AMOUNT * 200e6) / (10 ** token.decimals()), "recipient got wrong amount");
+        assertEq(
+            eurc.balanceOf(recipient),
+            (TOKEN_AMOUNT * 200e6) / (10 ** token.decimals()),
+            "recipient got wrong amount"
+        );
     }
 
     /// drain() still blocks before lockedUntil (unchanged behavior)
