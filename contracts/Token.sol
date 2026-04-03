@@ -10,7 +10,6 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import "./AllowList.sol";
 import "./interfaces/IFeeSettings.sol";
-import "./IExit.sol";
 
 /**
  * @title tokenize.it Token
@@ -112,9 +111,6 @@ contract Token is
      */
     uint256 public version;
 
-    /// @notice The canonical exit contract for this token. Set by DEFAULT_ADMIN_ROLE.
-    IExit public exit;
-
     /// @param newRequirements The new requirements that will be enforced from now on.
     event RequirementsChanged(uint newRequirements);
     /// @param newAllowList The AllowList contract that is in use from now on.
@@ -123,8 +119,6 @@ contract Token is
     event NewFeeSettingsSuggested(IFeeSettingsV2 indexed suggestedFeeSettings);
     /// @param newFeeSettings The FeeSettings contract that is in use from now on.
     event FeeSettingsChanged(IFeeSettingsV2 indexed newFeeSettings);
-    /// @param newExit The exit contract registered for this token.
-    event ExitChanged(IExit indexed newExit);
     /// @param minter The address for which the minting allowance has been changed.
     /// @param newAllowance The new minting allowance for the address (does not include fees).
     event MintingAllowanceChanged(address indexed minter, uint256 newAllowance);
@@ -204,16 +198,6 @@ contract Token is
         require(address(_allowList) != address(0), "AllowList must not be zero address");
         allowList = _allowList;
         emit AllowListChanged(_allowList);
-    }
-
-    /**
-     * @notice Register the canonical exit contract for this token.
-     * @param _exit exit contract address; must not be zero
-     */
-    function setExit(IExit _exit) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(address(_exit) != address(0), "Exit must not be zero address");
-        exit = _exit;
-        emit ExitChanged(_exit);
     }
 
     /**

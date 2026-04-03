@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./IDistribution.sol";
 import "./TimeLockMaster.sol";
-import "./Token.sol";
 
 /**
  * @title TimeLock
@@ -27,7 +26,6 @@ contract TimeLock is Initializable, OwnableUpgradeable {
 
     event Drained(IERC20 indexed token, address indexed recipient, uint256 amount);
     event DividendsDistributed(IDistribution indexed distribution, IERC20 indexed currency, address indexed recipient);
-    event ExitDistributed(Token indexed token, IExit indexed exit, address indexed recipient);
 
     /**
      * This contract will be used through clones, so the constructor only initializes
@@ -63,23 +61,6 @@ contract TimeLock is Initializable, OwnableUpgradeable {
         IERC20 dividendCurrency = _dist.currency();
         _dist.claim(_recipient);
         emit DividendsDistributed(_dist, dividendCurrency, _recipient);
-    }
-
-    /**
-     * @notice Claim exit proceeds for this contract's full token balance and forward to _recipient.
-     * @dev Fetches the canonical exit from _token.exit(). Not restricted by lockedUntil.
-     * @param _token the token held by this contract
-     * @param _recipient address to receive the exit proceeds
-     */
-    function distributeExit(Token _token, address _recipient) external onlyOwner {
-        require(_recipient != address(0), "recipient can not be zero address");
-        IExit exit = _token.exit();
-        require(address(exit) != address(0), "no exit registered on token");
-        uint256 tokenBalance = _token.balanceOf(address(this));
-        require(tokenBalance > 0, "no tokens to exit");
-        IERC20(address(_token)).approve(address(exit), tokenBalance);
-        exit.claim(tokenBalance, _recipient);
-        emit ExitDistributed(_token, exit, _recipient);
     }
 
     /**

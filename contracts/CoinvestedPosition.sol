@@ -219,26 +219,31 @@ contract CoinvestedPosition is TokenSwapBase {
 
     /**
      * @notice Claim exit proceeds for this contract's full token balance and split them among the receiver and lead investors.
-     * @dev Fetches the exit contract from token.exit(). Transfers all held tokens to the Exit contract in exchange for currency.
+     * @dev Blocked until lockedUntil has passed or timeLockMaster is unlocked.
      *      If proceeds < base, receiver gets everything.
      *      Carry is split among lead investors by carryFraction; remainder goes to receiver.
-     *      Any trusted token (TRUSTED_CURRENCY) may be used, independent of the currency used for buy().
+     *      Any trusted token (TRUSTED_CURRENCY) may be used, independent of the currency stored for buy().
+     * @param _exit the exit contract to claim from
      * @param _exitCurrency the EURO token paid out by the exit
      * @param _minCurrencyAmount minimum currency the call must receive; reverts if proceeds fall short.
      *      This guards against faulty or malicious exit contracts.
      */
-    function distributeExit(IERC20 _exitCurrency, uint256 _minCurrencyAmount) external onlyOwner nonReentrant {
+    function distributeExit(
+        IExit _exit,
+        IERC20 _exitCurrency,
+        uint256 _minCurrencyAmount
+    ) external onlyOwner nonReentrant {
+        require(block.timestamp >= lockedUntil || timeLockMaster.isUnlocked(), "timelock has not expired");
+        require(address(_exit) != address(0), "exit can not be zero address");
         require(
             token.allowList().map(address(_exitCurrency)) == TRUSTED_CURRENCY,
             "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
         );
-        IExit exit = token.exit();
-        require(address(exit) != address(0), "no exit registered on token");
         uint256 tokenBalance = token.balanceOf(address(this));
         require(tokenBalance > 0, "no tokens to claim");
-        IERC20(address(token)).approve(address(exit), tokenBalance);
+        IERC20(address(token)).approve(address(_exit), tokenBalance);
         uint256 before = _exitCurrency.balanceOf(address(this));
-        exit.claim(tokenBalance, address(this));
+        _exit.claim(tokenBalance, address(this));
         uint256 received = _exitCurrency.balanceOf(address(this)) - before;
         require(received >= _minCurrencyAmount, "received less than _minCurrencyAmount");
         uint256 basePayout = _scaleToDecimals(
