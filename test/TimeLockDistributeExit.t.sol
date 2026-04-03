@@ -1,0 +1,178 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+pragma solidity 0.8.23;
+
+import "../lib/forge-std/src/Test.sol";
+
+import "../contracts/factories/TokenProxyFactory.sol";
+import "../contracts/factories/TimeLockCloneFactory.sol";
+import "../contracts/factories/ExitCloneFactory.sol";
+import "../contracts/TimeLock.sol";
+import "../contracts/Exit.sol";
+import "../contracts/Token.sol";
+import "./resources/CloneCreators.sol";
+import "./resources/FakePaymentToken.sol";
+
+/**
+ * @title TimeLockDistributeExitTest
+ * @notice Tests for TimeLock.distributeExit(), which claims exit proceeds bypassing lockedUntil.
+ */
+contract TimeLockDistributeExitTest is Test {
+    address public constant admin = 0x0109709eCFa91a80626FF3989D68f67f5b1dD120;
+    address public constant owner = 0x6109709EcFA91A80626FF3989d68f67F5b1dd126;
+    address public constant recipient = 0x7109709eCfa91A80626Ff3989D68f67f5b1dD127;
+    address public constant currencyProvider = 0x5109709EcFA91a80626ff3989d68f67F5B1dD125;
+    address public constant trustedForwarder = 0xa109709ecfA91A80626ff3989D68F67F5b1dD12a;
+
+    uint256 public constant TOKEN_AMOUNT = 200e18;
+
+    uint64 public claimStart;
+    uint64 public drainStart;
+    uint64 public lockedUntil;
+
+    AllowList allowList;
+    IFeeSettingsV2 feeSettings;
+    Token token;
+    FakePaymentToken eurc;
+
+    TimeLock timeLock;
+    Exit exitLogic;
+    ExitCloneFactory exitFactory;
+
+    function setUp() public {
+        claimStart = uint64(block.timestamp + 1 days);
+        drainStart = uint64(block.timestamp + 30 days);
+        lockedUntil = uint64(block.timestamp + 365 days);
+
+        // Infrastructure
+        allowList = createAllowList(trustedForwarder, admin);
+        feeSettings = createFeeSettings(trustedForwarder, admin, buildFeeTypes(0, 0, 0, admin, admin, admin));
+
+        eurc = new FakePaymentToken(0, 6);
+
+        vm.prank(admin);
+        allowList.set(address(eurc), TRUSTED_CURRENCY);
+
+        // Token (requirements=0 so timeLock can freely transfer tokens)
+        address tokenLogic = address(new Token(trustedForwarder));
+        TokenProxyFactory tokenFactory = new TokenProxyFactory(tokenLogic);
+        token = Token(
+            tokenFactory.createTokenProxy(0, trustedForwarder, feeSettings, admin, allowList, 0, "TestToken", "TTK")
+        );
+        vm.startPrank(admin);
+        token.grantRole(token.MINTALLOWER_ROLE(), admin);
+        vm.stopPrank();
+
+        // TimeLock (locked for 1 year)
+        TimeLock timeLockLogic = new TimeLock();
+        TimeLockCloneFactory timeLockFactory = new TimeLockCloneFactory(address(timeLockLogic));
+        timeLock = TimeLock(timeLockFactory.createTimeLockClone(bytes32(0), owner, lockedUntil));
+
+        // Allow timeLock to hold token (requires allowList entry since token's requirements=0, no entry needed)
+        // Mint tokens directly to timeLock
+        vm.prank(admin);
+        token.mint(address(timeLock), TOKEN_AMOUNT);
+
+        // Exit factory
+        exitLogic = new Exit(trustedForwarder);
+        exitFactory = new ExitCloneFactory(address(exitLogic));
+    }
+
+    function _deployExit(uint256 pricePerToken) internal returns (Exit) {
+        uint256 totalCurrency = (TOKEN_AMOUNT * pricePerToken) / (10 ** token.decimals());
+        ExitInitializerArguments memory args = ExitInitializerArguments({
+            owner: owner,
+            token: token,
+            currency: IERC20(address(eurc)),
+            pricePerToken: pricePerToken,
+            claimStart: claimStart,
+            drainStart: drainStart,
+            totalCurrencyAmount: totalCurrency
+        });
+        address cloneAddr = exitFactory.predictCloneAddress(bytes32("exit"), trustedForwarder, args);
+        eurc.mint(currencyProvider, totalCurrency);
+        vm.prank(currencyProvider);
+        eurc.approve(cloneAddr, totalCurrency);
+        return Exit(exitFactory.createExitClone(bytes32("exit"), trustedForwarder, currencyProvider, args));
+    }
+
+    // ── distributeExit bypasses lockedUntil ──────────────────────────────────
+
+    /// distributeExit works before lockedUntil has passed
+    function testDistributeExitBeforeLockedUntil() public {
+        Exit exitContract = _deployExit(200e6);
+
+        vm.prank(admin);
+        token.setExit(IExit(address(exitContract)));
+
+        // Still locked (lockedUntil = now + 365 days)
+        assertLt(block.timestamp, lockedUntil, "should still be locked");
+
+        vm.warp(claimStart);
+        vm.prank(owner);
+        timeLock.distributeExit(token, recipient);
+
+        assertEq(token.balanceOf(address(timeLock)), 0, "timeLock should have no tokens after exit");
+        assertEq(
+            eurc.balanceOf(recipient),
+            (TOKEN_AMOUNT * 200e6) / (10 ** token.decimals()),
+            "recipient got wrong amount"
+        );
+    }
+
+    /// drain() still blocks before lockedUntil (unchanged behavior)
+    function testDrainStillBlockedBeforeLockedUntil() public {
+        vm.prank(owner);
+        vm.expectRevert("timelock has not expired");
+        timeLock.drain(IERC20(address(token)), recipient);
+    }
+
+    // ── Revert cases ─────────────────────────────────────────────────────────
+
+    /// Reverts when no exit is registered on the token
+    function testDistributeExitRevertsIfNoExitRegistered() public {
+        vm.warp(claimStart);
+        vm.prank(owner);
+        vm.expectRevert("no exit registered on token");
+        timeLock.distributeExit(token, recipient);
+    }
+
+    /// Reverts when recipient is zero address
+    function testDistributeExitRevertsIfRecipientZero() public {
+        Exit exitContract = _deployExit(200e6);
+        vm.prank(admin);
+        token.setExit(IExit(address(exitContract)));
+
+        vm.warp(claimStart);
+        vm.prank(owner);
+        vm.expectRevert("recipient can not be zero address");
+        timeLock.distributeExit(token, address(0));
+    }
+
+    /// Only owner can call distributeExit
+    function testDistributeExitRevertsIfNotOwner() public {
+        Exit exitContract = _deployExit(200e6);
+        vm.prank(admin);
+        token.setExit(IExit(address(exitContract)));
+
+        vm.warp(claimStart);
+        vm.expectRevert("Ownable: caller is not the owner");
+        timeLock.distributeExit(token, recipient);
+    }
+
+    /// Reverts when timeLock holds no tokens
+    function testDistributeExitRevertsIfNoTokens() public {
+        Exit exitContract = _deployExit(200e6);
+        vm.prank(admin);
+        token.setExit(IExit(address(exitContract)));
+
+        // Drain all tokens first (after lock expires)
+        vm.warp(lockedUntil);
+        vm.prank(owner);
+        timeLock.drain(IERC20(address(token)), recipient);
+
+        vm.warp(claimStart + lockedUntil);
+        vm.prank(owner);
+        vm.expectRevert("no tokens to exit");
+        timeLock.distributeExit(token, recipient);
+    }
+}
