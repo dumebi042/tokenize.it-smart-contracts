@@ -4,6 +4,7 @@ pragma solidity 0.8.23;
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
+import "./TimeLockMaster.sol";
 import "./TokenSwapBase.sol";
 import "./IDistribution.sol";
 import "./IExit.sol";
@@ -30,6 +31,8 @@ struct CoinvestedPositionInitializerArguments {
     Token token;
     /// unix timestamp before which unpause() is blocked; 0 means no lock
     uint64 lockedUntil;
+    /// master unlock contract; if its isUnlocked() returns true, the lockedUntil constraint is bypassed
+    TimeLockMaster timeLockMaster;
 }
 
 /**
@@ -56,6 +59,8 @@ contract CoinvestedPosition is TokenSwapBase {
     uint8 public basePriceDecimals;
     /// unix timestamp before which unpause() is blocked; 0 means no lock
     uint64 public lockedUntil;
+    /// master unlock contract; if its isUnlocked() returns true, the lockedUntil constraint is bypassed
+    TimeLockMaster public timeLockMaster;
 
     /**
      * This constructor creates a logic contract that is used to clone new contracts.
@@ -85,9 +90,11 @@ contract CoinvestedPosition is TokenSwapBase {
             carryFractionsSum += _arguments.leadInvestors[i].carryFraction; // reverts on overflow
             leadInvestors.push(_arguments.leadInvestors[i]);
         }
+        require(address(_arguments.timeLockMaster) != address(0), "timeLockMaster can not be zero address");
         basePrice = _arguments.basePrice;
         basePriceDecimals = IERC20Metadata(address(_arguments.baseCurrency)).decimals();
         lockedUntil = _arguments.lockedUntil;
+        timeLockMaster = _arguments.timeLockMaster;
 
         // Pausing the contract prevents an immediate sell of the tokens. Once they should be sold, update price and unpause.
         _pause();
@@ -98,7 +105,7 @@ contract CoinvestedPosition is TokenSwapBase {
      */
     function unpause() external override onlyOwner {
         require(tokenPrice != 0, "tokenPrice must be set before unpausing");
-        require(block.timestamp >= lockedUntil, "timelock has not expired");
+        require(block.timestamp >= lockedUntil || timeLockMaster.isUnlocked(), "timelock has not expired");
         _unpause();
     }
 

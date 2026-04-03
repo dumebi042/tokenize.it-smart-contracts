@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./IDistribution.sol";
+import "./TimeLockMaster.sol";
 import "./Token.sol";
 
 /**
@@ -21,6 +22,8 @@ contract TimeLock is Initializable, OwnableUpgradeable {
 
     /// unix timestamp before which drain() is blocked; 0 means no lock
     uint64 public lockedUntil;
+    /// master unlock contract; if its isUnlocked() returns true, the lockedUntil constraint is bypassed
+    TimeLockMaster public timeLockMaster;
 
     event Drained(IERC20 indexed token, address indexed recipient, uint256 amount);
     event DividendsDistributed(IDistribution indexed distribution, IERC20 indexed currency, address indexed recipient);
@@ -38,13 +41,16 @@ contract TimeLock is Initializable, OwnableUpgradeable {
      * @notice Sets up the TimeLock.
      * @param _owner owner of the contract
      * @param _lockedUntil unix timestamp before which drain() is blocked; 0 means no lock
+     * @param _timeLockMaster master unlock contract; calling unlock() on it bypasses lockedUntil
      */
-    function initialize(address _owner, uint64 _lockedUntil) public initializer {
+    function initialize(address _owner, uint64 _lockedUntil, TimeLockMaster _timeLockMaster) public initializer {
         require(_owner != address(0), "owner can not be zero address");
         require(_lockedUntil > block.timestamp, "lockedUntil must be in the future");
+        require(address(_timeLockMaster) != address(0), "timeLockMaster can not be zero address");
         __Ownable_init();
         _transferOwnership(_owner);
         lockedUntil = _lockedUntil;
+        timeLockMaster = _timeLockMaster;
     }
 
     /**
@@ -82,7 +88,7 @@ contract TimeLock is Initializable, OwnableUpgradeable {
      * @param _recipient address to send the tokens to
      */
     function drain(IERC20 _token, address _recipient) external onlyOwner {
-        require(block.timestamp >= lockedUntil, "timelock has not expired");
+        require(block.timestamp >= lockedUntil || timeLockMaster.isUnlocked(), "timelock has not expired");
         require(_recipient != address(0), "recipient can not be zero address");
         uint256 balance = _token.balanceOf(address(this));
         require(balance > 0, "no tokens to drain");
