@@ -69,7 +69,7 @@ contract TimeLock is Initializable, OwnableUpgradeable {
      * @param _recipient address to send the tokens to
      */
     function drain(IERC20 _token, address _recipient) external onlyOwner {
-        require(block.timestamp >= lockedUntil || timeLockMaster.isUnlocked(), "timelock has not expired");
+        require(block.timestamp >= lockedUntil || address(timeLockMaster.exit()) != address(0), "timelock has not expired");
         require(_recipient != address(0), "recipient can not be zero address");
         uint256 balance = _token.balanceOf(address(this));
         require(balance > 0, "no tokens to drain");
