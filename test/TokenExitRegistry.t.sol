@@ -4,8 +4,8 @@ pragma solidity 0.8.23;
 import "../lib/forge-std/src/Test.sol";
 
 import "../contracts/factories/TokenProxyFactory.sol";
-import "../contracts/factories/TimeLockMasterCloneFactory.sol";
-import "../contracts/TimeLockMaster.sol";
+import "../contracts/factories/TokenExitRegistryCloneFactory.sol";
+import "../contracts/TokenExitRegistry.sol";
 import "../contracts/IExit.sol";
 import "../contracts/Token.sol";
 import "./resources/CloneCreators.sol";
@@ -17,10 +17,10 @@ contract FakeExit {
 }
 
 /**
- * @title TimeLockMasterTest
- * @notice Tests for TimeLockMaster and TimeLockMasterCloneFactory.
+ * @title TokenExitRegistryTest
+ * @notice Tests for TokenExitRegistry and TokenExitRegistryCloneFactory.
  */
-contract TimeLockMasterTest is Test {
+contract TokenExitRegistryTest is Test {
     address public constant admin = 0x0109709eCFa91a80626FF3989D68f67f5b1dD120;
     address public constant nonAdmin = 0x1109709ecFA91a80626ff3989D68f67F5B1Dd121;
     address public constant trustedForwarder = 0xa109709ecfA91A80626ff3989D68F67F5b1dD12a;
@@ -29,7 +29,7 @@ contract TimeLockMasterTest is Test {
     IFeeSettingsV2 feeSettings;
     Token token;
     TokenProxyFactory tokenFactory;
-    TimeLockMasterCloneFactory timeLockMasterFactory;
+    TokenExitRegistryCloneFactory tokenExitRegistryFactory;
 
     function setUp() public {
         allowList = createAllowList(trustedForwarder, admin);
@@ -41,8 +41,8 @@ contract TimeLockMasterTest is Test {
             tokenFactory.createTokenProxy(0, trustedForwarder, feeSettings, admin, allowList, 0, "TestToken", "TTK")
         );
 
-        TimeLockMaster timeLockMasterLogic = new TimeLockMaster();
-        timeLockMasterFactory = new TimeLockMasterCloneFactory(address(timeLockMasterLogic));
+        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry();
+        tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(address(tokenExitRegistryLogic));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -50,35 +50,35 @@ contract TimeLockMasterTest is Test {
     // ─────────────────────────────────────────────────────────────────────────
 
     function testInitializeHappyPath() public {
-        TimeLockMaster timeLockMaster = TimeLockMaster(
-            timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token)
+        TokenExitRegistry tokenExitRegistry = TokenExitRegistry(
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token)
         );
 
-        assertEq(address(timeLockMaster.token()), address(token), "token not set");
-        assertEq(address(timeLockMaster.exit()), address(0), "exit should be zero initially");
+        assertEq(address(tokenExitRegistry.token()), address(token), "token not set");
+        assertEq(address(tokenExitRegistry.exit()), address(0), "exit should be zero initially");
     }
 
     function testInitializeRevertsIfTokenIsZero() public {
         // Attempt to create a clone with zero token address — factory should revert
         vm.expectRevert("token can not be zero address");
-        timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), Token(address(0)));
+        tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), Token(address(0)));
     }
 
     function testLogicContractCannotBeReinitialized() public {
         // The logic contract constructor calls _disableInitializers();
         // deploying it via new is fine (factory pattern), but calling initialize on
         // a newly deployed logic contract should be blocked.
-        TimeLockMaster logicContract = new TimeLockMaster();
+        TokenExitRegistry logicContract = new TokenExitRegistry();
         vm.expectRevert("Initializable: contract is already initialized");
         logicContract.initialize(token);
     }
 
     function testCloneCannotBeReinitializedAfterFactory() public {
-        TimeLockMaster timeLockMaster = TimeLockMaster(
-            timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token)
+        TokenExitRegistry tokenExitRegistry = TokenExitRegistry(
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token)
         );
         vm.expectRevert("Initializable: contract is already initialized");
-        timeLockMaster.initialize(token);
+        tokenExitRegistry.initialize(token);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -86,58 +86,58 @@ contract TimeLockMasterTest is Test {
     // ─────────────────────────────────────────────────────────────────────────
 
     function testSetExitHappyPath() public {
-        TimeLockMaster timeLockMaster = TimeLockMaster(
-            timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token)
+        TokenExitRegistry tokenExitRegistry = TokenExitRegistry(
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token)
         );
         FakeExit fakeExit = new FakeExit();
 
         vm.prank(admin);
-        vm.expectEmit(true, false, false, false, address(timeLockMaster));
-        emit TimeLockMaster.ExitSet(IExit(address(fakeExit)));
-        timeLockMaster.setExit(IExit(address(fakeExit)));
+        vm.expectEmit(true, false, false, false, address(tokenExitRegistry));
+        emit TokenExitRegistry.ExitSet(IExit(address(fakeExit)));
+        tokenExitRegistry.setExit(IExit(address(fakeExit)));
 
-        assertEq(address(timeLockMaster.exit()), address(fakeExit), "exit not set correctly");
+        assertEq(address(tokenExitRegistry.exit()), address(fakeExit), "exit not set correctly");
     }
 
     function testSetExitRevertsIfCallerIsNotTokenAdmin() public {
-        TimeLockMaster timeLockMaster = TimeLockMaster(
-            timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token)
+        TokenExitRegistry tokenExitRegistry = TokenExitRegistry(
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token)
         );
         FakeExit fakeExit = new FakeExit();
 
         vm.prank(nonAdmin);
         vm.expectRevert("caller is not token admin");
-        timeLockMaster.setExit(IExit(address(fakeExit)));
+        tokenExitRegistry.setExit(IExit(address(fakeExit)));
     }
 
     function testSetExitRevertsIfExitIsZeroAddress() public {
-        TimeLockMaster timeLockMaster = TimeLockMaster(
-            timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token)
+        TokenExitRegistry tokenExitRegistry = TokenExitRegistry(
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token)
         );
 
         vm.prank(admin);
         vm.expectRevert("exit can not be zero address");
-        timeLockMaster.setExit(IExit(address(0)));
+        tokenExitRegistry.setExit(IExit(address(0)));
     }
 
     function testSetExitRevertsIfAlreadySet() public {
-        TimeLockMaster timeLockMaster = TimeLockMaster(
-            timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token)
+        TokenExitRegistry tokenExitRegistry = TokenExitRegistry(
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token)
         );
         FakeExit fakeExit1 = new FakeExit();
         FakeExit fakeExit2 = new FakeExit();
 
         vm.prank(admin);
-        timeLockMaster.setExit(IExit(address(fakeExit1)));
+        tokenExitRegistry.setExit(IExit(address(fakeExit1)));
 
         vm.prank(admin);
         vm.expectRevert("exit has already been set");
-        timeLockMaster.setExit(IExit(address(fakeExit2)));
+        tokenExitRegistry.setExit(IExit(address(fakeExit2)));
     }
 
     function testSetExitOnlyCallableByRoleHolder() public {
-        TimeLockMaster timeLockMaster = TimeLockMaster(
-            timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token)
+        TokenExitRegistry tokenExitRegistry = TokenExitRegistry(
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token)
         );
         FakeExit fakeExit = new FakeExit();
 
@@ -148,31 +148,31 @@ contract TimeLockMasterTest is Test {
 
         // Now nonAdmin can set exit
         vm.prank(nonAdmin);
-        timeLockMaster.setExit(IExit(address(fakeExit)));
+        tokenExitRegistry.setExit(IExit(address(fakeExit)));
 
-        assertEq(address(timeLockMaster.exit()), address(fakeExit), "exit not set by new admin");
+        assertEq(address(tokenExitRegistry.exit()), address(fakeExit), "exit not set by new admin");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // ── TimeLockMasterCloneFactory ────────────────────────────────────────────
+    // ── TokenExitRegistryCloneFactory ────────────────────────────────────────
     // ─────────────────────────────────────────────────────────────────────────
 
     function testFactoryCreatesCloneWithCorrectToken() public {
-        TimeLockMaster timeLockMaster = TimeLockMaster(
-            timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token)
+        TokenExitRegistry tokenExitRegistry = TokenExitRegistry(
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token)
         );
-        assertEq(address(timeLockMaster.token()), address(token));
+        assertEq(address(tokenExitRegistry.token()), address(token));
     }
 
     function testFactoryPredictCloneAddressMatchesActual() public {
-        address predicted = timeLockMasterFactory.predictCloneAddress(bytes32(0), token);
-        address actual = timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token);
+        address predicted = tokenExitRegistryFactory.predictCloneAddress(bytes32(0), token);
+        address actual = tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token);
         assertEq(predicted, actual, "predicted address does not match actual");
     }
 
     function testFactoryDeterministicAddress_RawSaltChanges() public {
-        address a1 = timeLockMasterFactory.predictCloneAddress(bytes32(0), token);
-        address a2 = timeLockMasterFactory.predictCloneAddress(bytes32(uint256(1)), token);
+        address a1 = tokenExitRegistryFactory.predictCloneAddress(bytes32(0), token);
+        address a2 = tokenExitRegistryFactory.predictCloneAddress(bytes32(uint256(1)), token);
         assertFalse(a1 == a2, "different raw salts should give different addresses");
     }
 
@@ -189,21 +189,21 @@ contract TimeLockMasterTest is Test {
                 "TT2"
             )
         );
-        address a1 = timeLockMasterFactory.predictCloneAddress(bytes32(0), token);
-        address a2 = timeLockMasterFactory.predictCloneAddress(bytes32(0), token2);
+        address a1 = tokenExitRegistryFactory.predictCloneAddress(bytes32(0), token);
+        address a2 = tokenExitRegistryFactory.predictCloneAddress(bytes32(0), token2);
         assertFalse(a1 == a2, "different tokens should give different addresses");
     }
 
     function testFactorySecondDeploymentWithSameSaltReverts() public {
-        timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token);
+        tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token);
         vm.expectRevert("ERC1167: create2 failed");
-        timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token);
+        tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token);
     }
 
     function testFactoryEmitsNewCloneEvent() public {
-        address predicted = timeLockMasterFactory.predictCloneAddress(bytes32(0), token);
-        vm.expectEmit(true, false, false, false, address(timeLockMasterFactory));
+        address predicted = tokenExitRegistryFactory.predictCloneAddress(bytes32(0), token);
+        vm.expectEmit(true, false, false, false, address(tokenExitRegistryFactory));
         emit CloneFactory.NewClone(predicted);
-        timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token);
+        tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token);
     }
 }

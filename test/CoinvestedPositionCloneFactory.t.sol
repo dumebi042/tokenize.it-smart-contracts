@@ -4,9 +4,9 @@ pragma solidity 0.8.23;
 import "../lib/forge-std/src/Test.sol";
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/factories/CoinvestedPositionCloneFactory.sol";
-import "../contracts/factories/TimeLockMasterCloneFactory.sol";
+import "../contracts/factories/TokenExitRegistryCloneFactory.sol";
 import "../contracts/CoinvestedPosition.sol";
-import "../contracts/TimeLockMaster.sol";
+import "../contracts/TokenExitRegistry.sol";
 import "./resources/FakePaymentToken.sol";
 import "./resources/CloneCreators.sol";
 
@@ -24,7 +24,7 @@ contract CoinvestedPositionCloneFactoryTest is Test {
     AllowList allowList;
     FakePaymentToken currency;
     Token token;
-    TimeLockMaster timeLockMaster;
+    TokenExitRegistry tokenExitRegistry;
     CoinvestedPositionCloneFactory factory;
     TokenProxyFactory tokenFactory;
 
@@ -47,9 +47,9 @@ contract CoinvestedPositionCloneFactoryTest is Test {
 
         factory = new CoinvestedPositionCloneFactory(address(new CoinvestedPosition(trustedForwarder)));
 
-        TimeLockMaster timeLockMasterLogic = new TimeLockMaster();
-        TimeLockMasterCloneFactory timeLockMasterFactory = new TimeLockMasterCloneFactory(address(timeLockMasterLogic));
-        timeLockMaster = TimeLockMaster(timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token));
+        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry();
+        TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(address(tokenExitRegistryLogic));
+        tokenExitRegistry = TokenExitRegistry(tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token));
     }
 
     /// @dev Returns baseline arguments with two lead investors.
@@ -67,7 +67,7 @@ contract CoinvestedPositionCloneFactoryTest is Test {
                 baseCurrency: IERC20(address(currency)),
                 token: token,
                 lockedUntil: 0,
-                timeLockMaster: timeLockMaster
+                tokenExitRegistry: tokenExitRegistry
             });
     }
 

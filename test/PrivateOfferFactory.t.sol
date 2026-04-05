@@ -8,9 +8,9 @@ import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/PrivateOffer.sol";
 import "../contracts/factories/PrivateOfferFactory.sol";
 import "../contracts/factories/TimeLockCloneFactory.sol";
-import "../contracts/factories/TimeLockMasterCloneFactory.sol";
+import "../contracts/factories/TokenExitRegistryCloneFactory.sol";
 import "../contracts/TimeLock.sol";
-import "../contracts/TimeLockMaster.sol";
+import "../contracts/TokenExitRegistry.sol";
 import "./resources/CloneCreators.sol";
 import "./resources/ERC20MintableByAnyone.sol";
 
@@ -18,7 +18,7 @@ contract PrivateOfferFactoryTest is Test {
     event Deploy(address indexed privateOffer);
 
     PrivateOfferFactory factory;
-    TimeLockMaster timeLockMaster;
+    TokenExitRegistry tokenExitRegistry;
 
     AllowList list;
     FeeSettings feeSettings;
@@ -62,9 +62,9 @@ contract PrivateOfferFactoryTest is Test {
             tokenCloneFactory.createTokenProxy(0, trustedForwarder, feeSettings, admin, list, 0x0, "token", "TOK")
         );
 
-        TimeLockMaster timeLockMasterLogic = new TimeLockMaster();
-        TimeLockMasterCloneFactory timeLockMasterFactory = new TimeLockMasterCloneFactory(address(timeLockMasterLogic));
-        timeLockMaster = TimeLockMaster(timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token));
+        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry();
+        TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(address(tokenExitRegistryLogic));
+        tokenExitRegistry = TokenExitRegistry(tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token));
     }
 
     function testDeployContract(bytes32 _salt) public {
@@ -140,7 +140,7 @@ contract PrivateOfferFactoryTest is Test {
             arguments,
             _lockedUntil,
             timeLockOwner,
-            timeLockMaster
+            tokenExitRegistry
         );
 
         console.log("expectedPrivateOffer", expectedPrivateOffer);
@@ -167,7 +167,7 @@ contract PrivateOfferFactoryTest is Test {
 
         // deploy contracts
         assertEq(
-            factory.deployPrivateOfferWithTimeLock(salt, arguments, _lockedUntil, timeLockOwner, timeLockMaster),
+            factory.deployPrivateOfferWithTimeLock(salt, arguments, _lockedUntil, timeLockOwner, tokenExitRegistry),
             expectedTimeLock
         );
 

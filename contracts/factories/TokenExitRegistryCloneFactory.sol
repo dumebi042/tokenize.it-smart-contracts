@@ -4,26 +4,26 @@ pragma solidity 0.8.23;
 
 import "@openzeppelin/contracts/proxy/Clones.sol";
 
-import "../TimeLockMaster.sol";
+import "../TokenExitRegistry.sol";
 import "../Token.sol";
 import "./CloneFactory.sol";
 
 /**
- * @title TimeLockMasterCloneFactory
+ * @title TokenExitRegistryCloneFactory
  * @author malteish
- * @notice Use this contract to create deterministic clones of TimeLockMaster contracts
+ * @notice Use this contract to create deterministic clones of TokenExitRegistry contracts
  */
-contract TimeLockMasterCloneFactory is CloneFactory {
+contract TokenExitRegistryCloneFactory is CloneFactory {
     constructor(address _implementation) CloneFactory(_implementation) {}
 
     /**
-     * @notice Create a new TimeLockMaster clone and initialize it.
+     * @notice Create a new TokenExitRegistry clone and initialize it.
      * @param _rawSalt influences the address of the clone, but not the initialization
-     * @param _token the token whose DEFAULT_ADMIN_ROLE controls the new TimeLockMaster
+     * @param _token the token whose DEFAULT_ADMIN_ROLE controls the new TokenExitRegistry
      */
-    function createTimeLockMasterClone(bytes32 _rawSalt, Token _token) external returns (address) {
+    function createTokenExitRegistryClone(bytes32 _rawSalt, Token _token) external returns (address) {
         bytes32 salt = _getSalt(_rawSalt, _token);
-        TimeLockMaster clone = TimeLockMaster(Clones.cloneDeterministic(implementation, salt));
+        TokenExitRegistry clone = TokenExitRegistry(Clones.cloneDeterministic(implementation, salt));
         clone.initialize(_token);
         emit NewClone(address(clone));
         return address(clone);
@@ -32,7 +32,7 @@ contract TimeLockMasterCloneFactory is CloneFactory {
     /**
      * @notice Return the address a clone would have if created with these parameters.
      * @param _rawSalt influences the address of the clone, but not the initialization
-     * @param _token the token whose DEFAULT_ADMIN_ROLE controls the new TimeLockMaster
+     * @param _token the token whose DEFAULT_ADMIN_ROLE controls the new TokenExitRegistry
      */
     function predictCloneAddress(bytes32 _rawSalt, Token _token) external view returns (address) {
         bytes32 salt = _getSalt(_rawSalt, _token);

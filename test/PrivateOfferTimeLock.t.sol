@@ -7,15 +7,15 @@ import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/PrivateOffer.sol";
 import "../contracts/factories/PrivateOfferFactory.sol";
 import "../contracts/factories/TimeLockCloneFactory.sol";
-import "../contracts/factories/TimeLockMasterCloneFactory.sol";
+import "../contracts/factories/TokenExitRegistryCloneFactory.sol";
 import "../contracts/TimeLock.sol";
-import "../contracts/TimeLockMaster.sol";
+import "../contracts/TokenExitRegistry.sol";
 import "./resources/CloneCreators.sol";
 import "./resources/FakePaymentToken.sol";
 
 contract PrivateOfferTimeLockTest is Test {
     PrivateOfferFactory privateOfferFactory;
-    TimeLockMaster timeLockMaster;
+    TokenExitRegistry tokenExitRegistry;
 
     AllowList list;
     FeeSettings feeSettings;
@@ -70,9 +70,9 @@ contract PrivateOfferTimeLockTest is Test {
             )
         );
 
-        TimeLockMaster timeLockMasterLogic = new TimeLockMaster();
-        TimeLockMasterCloneFactory timeLockMasterFactory = new TimeLockMasterCloneFactory(address(timeLockMasterLogic));
-        timeLockMaster = TimeLockMaster(timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token));
+        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry();
+        TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(address(tokenExitRegistryLogic));
+        tokenExitRegistry = TokenExitRegistry(tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token));
     }
 
     /**
@@ -102,7 +102,7 @@ contract PrivateOfferTimeLockTest is Test {
 
         // predict addresses
         (address expectedInviteAddress, address expectedTimeLockAddress) = privateOfferFactory
-            .predictPrivateOfferAndTimeLockAddress(salt, arguments, lockedUntil, admin, timeLockMaster);
+            .predictPrivateOfferAndTimeLockAddress(salt, arguments, lockedUntil, admin, tokenExitRegistry);
 
         // add time lock and token receiver to the allow list
         list.set(expectedTimeLockAddress, requirements);
@@ -135,7 +135,7 @@ contract PrivateOfferTimeLockTest is Test {
         uint256 gasBefore = gasleft();
         // deploy private offer and time lock
         TimeLock timeLock = TimeLock(
-            privateOfferFactory.deployPrivateOfferWithTimeLock(salt, arguments, lockedUntil, admin, timeLockMaster)
+            privateOfferFactory.deployPrivateOfferWithTimeLock(salt, arguments, lockedUntil, admin, tokenExitRegistry)
         );
         uint256 gasAfter = gasleft();
         console.log("gas used: %s", gasBefore - gasAfter);

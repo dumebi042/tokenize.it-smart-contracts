@@ -36,9 +36,9 @@ contract CoinvestedPositionERC2771Test is CoinvestedPositionTestBase {
         token.grantRole(token.MINTALLOWER_ROLE(), admin);
         vm.stopPrank();
 
-        TimeLockMaster timeLockMasterLogic = new TimeLockMaster();
-        TimeLockMasterCloneFactory timeLockMasterFactory = new TimeLockMasterCloneFactory(address(timeLockMasterLogic));
-        timeLockMaster = TimeLockMaster(timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token));
+        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry();
+        TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(address(tokenExitRegistryLogic));
+        tokenExitRegistry = TokenExitRegistry(tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token));
 
         coinvestedPosition = _deployCoinvestedPosition(trustedForwarder);
 
@@ -64,7 +64,7 @@ contract CoinvestedPositionERC2771Test is CoinvestedPositionTestBase {
             baseCurrency: IERC20(address(eurc)),
             token: token,
             lockedUntil: 0,
-            timeLockMaster: timeLockMaster
+            tokenExitRegistry: tokenExitRegistry
         });
         return CoinvestedPosition(freshFactory.createCoinvestedPositionClone(bytes32(0), forwarder, args));
     }

@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./IDistribution.sol";
-import "./TimeLockMaster.sol";
+import "./TokenExitRegistry.sol";
 
 /**
  * @title TimeLock
@@ -21,8 +21,8 @@ contract TimeLock is Initializable, OwnableUpgradeable {
 
     /// unix timestamp before which drain() is blocked; 0 means no lock
     uint64 public lockedUntil;
-    /// master unlock contract; if its exit() is set, the lockedUntil constraint is bypassed
-    TimeLockMaster public timeLockMaster;
+    /// registry contract; if its exit() is set, the lockedUntil constraint is bypassed
+    TokenExitRegistry public tokenExitRegistry;
 
     event Drained(IERC20 indexed token, address indexed recipient, uint256 amount);
     event DividendsDistributed(IDistribution indexed distribution, IERC20 indexed currency, address indexed recipient);
@@ -40,16 +40,16 @@ contract TimeLock is Initializable, OwnableUpgradeable {
      * @notice Sets up the TimeLock.
      * @param _owner owner of the contract
      * @param _lockedUntil unix timestamp before which drain() is blocked; 0 means no lock
-     * @param _timeLockMaster master unlock contract; setting exit on it bypasses lockedUntil
+     * @param _tokenExitRegistry registry contract; setting exit on it bypasses lockedUntil
      */
-    function initialize(address _owner, uint64 _lockedUntil, TimeLockMaster _timeLockMaster) public initializer {
+    function initialize(address _owner, uint64 _lockedUntil, TokenExitRegistry _tokenExitRegistry) public initializer {
         require(_owner != address(0), "owner can not be zero address");
         require(_lockedUntil > block.timestamp, "lockedUntil must be in the future");
-        require(address(_timeLockMaster) != address(0), "timeLockMaster can not be zero address");
+        require(address(_tokenExitRegistry) != address(0), "tokenExitRegistry can not be zero address");
         __Ownable_init();
         _transferOwnership(_owner);
         lockedUntil = _lockedUntil;
-        timeLockMaster = _timeLockMaster;
+        tokenExitRegistry = _tokenExitRegistry;
     }
 
     /**
@@ -66,15 +66,15 @@ contract TimeLock is Initializable, OwnableUpgradeable {
 
     /**
      * @notice Claim exit proceeds for this contract's full token balance and forward to _recipient.
-     * @dev Requires timeLockMaster.exit() to be set. Approves the exit contract, calls claim(),
+     * @dev Requires tokenExitRegistry.exit() to be set. Approves the exit contract, calls claim(),
      *      and forwards all received currency to _recipient.
      * @param _recipient address to receive the exit proceeds
      */
     function distributeExit(address _recipient) external onlyOwner {
-        IExit exit = timeLockMaster.exit();
-        require(address(exit) != address(0), "no exit set in timeLockMaster");
+        IExit exit = tokenExitRegistry.exit();
+        require(address(exit) != address(0), "no exit set in tokenExitRegistry");
         require(_recipient != address(0), "recipient can not be zero address");
-        Token token = timeLockMaster.token();
+        Token token = tokenExitRegistry.token();
         uint256 tokenBalance = token.balanceOf(address(this));
         require(tokenBalance > 0, "no tokens to exit");
         IERC20(address(token)).approve(address(exit), tokenBalance);

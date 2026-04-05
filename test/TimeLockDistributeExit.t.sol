@@ -5,10 +5,10 @@ import "../lib/forge-std/src/Test.sol";
 
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/factories/TimeLockCloneFactory.sol";
-import "../contracts/factories/TimeLockMasterCloneFactory.sol";
+import "../contracts/factories/TokenExitRegistryCloneFactory.sol";
 import "../contracts/factories/ExitCloneFactory.sol";
 import "../contracts/TimeLock.sol";
-import "../contracts/TimeLockMaster.sol";
+import "../contracts/TokenExitRegistry.sol";
 import "../contracts/Exit.sol";
 import "../contracts/Token.sol";
 import "./resources/CloneCreators.sol";
@@ -36,7 +36,7 @@ contract TimeLockDistributeExitTest is Test {
     Token token;
     FakePaymentToken eurc;
 
-    TimeLockMaster timeLockMaster;
+    TokenExitRegistry tokenExitRegistry;
     TimeLock timeLock;
     Exit exitLogic;
     ExitCloneFactory exitFactory;
@@ -65,18 +65,18 @@ contract TimeLockDistributeExitTest is Test {
         token.grantRole(token.MINTALLOWER_ROLE(), admin);
         vm.stopPrank();
 
-        // TimeLockMaster
-        TimeLockMaster timeLockMasterLogic = new TimeLockMaster();
-        TimeLockMasterCloneFactory timeLockMasterFactory = new TimeLockMasterCloneFactory(
-            address(timeLockMasterLogic)
+        // TokenExitRegistry
+        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry();
+        TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(
+            address(tokenExitRegistryLogic)
         );
-        timeLockMaster = TimeLockMaster(timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token));
+        tokenExitRegistry = TokenExitRegistry(tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token));
 
         // TimeLock (locked for 1 year)
         TimeLock timeLockLogic = new TimeLock();
         TimeLockCloneFactory timeLockFactory = new TimeLockCloneFactory(address(timeLockLogic));
         timeLock = TimeLock(
-            timeLockFactory.createTimeLockClone(bytes32(0), owner, lockedUntil, timeLockMaster)
+            timeLockFactory.createTimeLockClone(bytes32(0), owner, lockedUntil, tokenExitRegistry)
         );
 
         // Mint tokens directly to timeLock
@@ -113,7 +113,7 @@ contract TimeLockDistributeExitTest is Test {
         Exit exitContract = _deployExit(200e6);
 
         vm.prank(admin);
-        timeLockMaster.setExit(IExit(address(exitContract)));
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
 
         // Still locked (lockedUntil = now + 365 days)
         assertLt(block.timestamp, lockedUntil, "should still be locked");
@@ -143,7 +143,7 @@ contract TimeLockDistributeExitTest is Test {
         Exit exitContract = _deployExit(200e6);
 
         vm.prank(admin);
-        timeLockMaster.setExit(IExit(address(exitContract)));
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
 
         vm.prank(owner);
         vm.expectRevert("timelock has not expired");
@@ -152,11 +152,11 @@ contract TimeLockDistributeExitTest is Test {
 
     // ── Revert cases ─────────────────────────────────────────────────────────
 
-    /// Reverts when no exit is set in timeLockMaster
+    /// Reverts when no exit is set in tokenExitRegistry
     function testDistributeExitRevertsIfNoExitRegistered() public {
         vm.warp(claimStart);
         vm.prank(owner);
-        vm.expectRevert("no exit set in timeLockMaster");
+        vm.expectRevert("no exit set in tokenExitRegistry");
         timeLock.distributeExit(recipient);
     }
 
@@ -164,7 +164,7 @@ contract TimeLockDistributeExitTest is Test {
     function testDistributeExitRevertsIfRecipientZero() public {
         Exit exitContract = _deployExit(200e6);
         vm.prank(admin);
-        timeLockMaster.setExit(IExit(address(exitContract)));
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
 
         vm.warp(claimStart);
         vm.prank(owner);
@@ -176,7 +176,7 @@ contract TimeLockDistributeExitTest is Test {
     function testDistributeExitRevertsIfNotOwner() public {
         Exit exitContract = _deployExit(200e6);
         vm.prank(admin);
-        timeLockMaster.setExit(IExit(address(exitContract)));
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
 
         vm.warp(claimStart);
         vm.expectRevert("Ownable: caller is not the owner");
@@ -196,7 +196,7 @@ contract TimeLockDistributeExitTest is Test {
 
         // Now set exit and try distributeExit — should revert because no tokens remain
         vm.prank(admin);
-        timeLockMaster.setExit(IExit(address(exitContract)));
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
 
         vm.warp(lockedUntil + 1 days);
         vm.prank(owner);

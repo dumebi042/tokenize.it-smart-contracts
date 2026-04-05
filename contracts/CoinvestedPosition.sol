@@ -4,7 +4,7 @@ pragma solidity 0.8.23;
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import "./TimeLockMaster.sol";
+import "./TokenExitRegistry.sol";
 import "./TokenSwapBase.sol";
 import "./IDistribution.sol";
 import "./IExit.sol";
@@ -31,8 +31,8 @@ struct CoinvestedPositionInitializerArguments {
     Token token;
     /// unix timestamp before which unpause() is blocked; 0 means no lock
     uint64 lockedUntil;
-    /// master unlock contract; if its isUnlocked() returns true, the lockedUntil constraint is bypassed
-    TimeLockMaster timeLockMaster;
+    /// registry contract; if its exit() is set, the lockedUntil constraint is bypassed
+    TokenExitRegistry tokenExitRegistry;
 }
 
 /**
@@ -59,8 +59,8 @@ contract CoinvestedPosition is TokenSwapBase {
     uint8 public basePriceDecimals;
     /// unix timestamp before which unpause() is blocked; 0 means no lock
     uint64 public lockedUntil;
-    /// master unlock contract; if its isUnlocked() returns true, the lockedUntil constraint is bypassed
-    TimeLockMaster public timeLockMaster;
+    /// registry contract; if its exit() is set, the lockedUntil constraint is bypassed
+    TokenExitRegistry public tokenExitRegistry;
 
     /**
      * This constructor creates a logic contract that is used to clone new contracts.
@@ -90,11 +90,11 @@ contract CoinvestedPosition is TokenSwapBase {
             carryFractionsSum += _arguments.leadInvestors[i].carryFraction; // reverts on overflow
             leadInvestors.push(_arguments.leadInvestors[i]);
         }
-        require(address(_arguments.timeLockMaster) != address(0), "timeLockMaster can not be zero address");
+        require(address(_arguments.tokenExitRegistry) != address(0), "tokenExitRegistry can not be zero address");
         basePrice = _arguments.basePrice;
         basePriceDecimals = IERC20Metadata(address(_arguments.baseCurrency)).decimals();
         lockedUntil = _arguments.lockedUntil;
-        timeLockMaster = _arguments.timeLockMaster;
+        tokenExitRegistry = _arguments.tokenExitRegistry;
 
         // Pausing the contract prevents an immediate sell of the tokens. Once they should be sold, update price and unpause.
         _pause();
@@ -219,7 +219,7 @@ contract CoinvestedPosition is TokenSwapBase {
 
     /**
      * @notice Claim exit proceeds for this contract's full token balance and split them among the receiver and lead investors.
-     * @dev Requires timeLockMaster.exit() to be set; that also acts as the unlock signal.
+     * @dev Requires tokenExitRegistry.exit() to be set; that also acts as the unlock signal.
      *      If proceeds < base, receiver gets everything.
      *      Carry is split among lead investors by carryFraction; remainder goes to receiver.
      *      Any trusted token (TRUSTED_CURRENCY) may be used, independent of the currency stored for buy().
@@ -231,8 +231,8 @@ contract CoinvestedPosition is TokenSwapBase {
         IERC20 _exitCurrency,
         uint256 _minCurrencyAmount
     ) external onlyOwner nonReentrant {
-        IExit exit = timeLockMaster.exit();
-        require(address(exit) != address(0), "no exit set in timeLockMaster");
+        IExit exit = tokenExitRegistry.exit();
+        require(address(exit) != address(0), "no exit set in tokenExitRegistry");
         require(
             token.allowList().map(address(_exitCurrency)) == TRUSTED_CURRENCY,
             "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"

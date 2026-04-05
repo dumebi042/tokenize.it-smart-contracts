@@ -7,15 +7,15 @@ import "./IExit.sol";
 import "./Token.sol";
 
 /**
- * @title TimeLockMaster
+ * @title TokenExitRegistry
  * @author malteish
  * @notice Provides a centralized exit and unlock signal for all TimeLock and CoinvestedPosition
  *         contracts of a specific token. Once setExit() is called by a token DEFAULT_ADMIN_ROLE,
  *         all connected lockup contracts treat their lockedUntil time constraint as expired and
  *         use the stored exit contract for claiming exit proceeds.
  */
-contract TimeLockMaster is Initializable {
-    /// @notice The token this master is associated with. Used for access control.
+contract TokenExitRegistry is Initializable {
+    /// @notice The token this registry is associated with. Used for access control.
     Token public token;
 
     /// @notice The authorized exit contract. Non-zero value signals that the timelock is bypassed.
@@ -33,7 +33,7 @@ contract TimeLockMaster is Initializable {
     }
 
     /**
-     * @notice Sets up the TimeLockMaster.
+     * @notice Sets up the TokenExitRegistry.
      * @param _token the token whose DEFAULT_ADMIN_ROLE controls this contract
      */
     function initialize(Token _token) public initializer {

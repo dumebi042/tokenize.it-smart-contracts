@@ -82,10 +82,10 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         logic = new CoinvestedPosition(trustedForwarder);
         factory = new CoinvestedPositionCloneFactory(address(logic));
 
-        // TimeLockMaster
-        TimeLockMaster timeLockMasterLogic = new TimeLockMaster();
-        TimeLockMasterCloneFactory timeLockMasterFactory = new TimeLockMasterCloneFactory(address(timeLockMasterLogic));
-        timeLockMaster = TimeLockMaster(timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token));
+        // TokenExitRegistry
+        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry();
+        TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(address(tokenExitRegistryLogic));
+        tokenExitRegistry = TokenExitRegistry(tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token));
 
         // Deploy default clone: basePrice=100e6 EURc, 10%+5% carry
         coinvestedPosition = _deployCoinvestedPosition(bytes32(0), 100e6, eurc, _defaultLeadInvestors());
@@ -116,7 +116,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             baseCurrency: IERC20(address(baseCurrency)),
             token: token,
             lockedUntil: 0,
-            timeLockMaster: timeLockMaster
+            tokenExitRegistry: tokenExitRegistry
         });
         return CoinvestedPosition(factory.createCoinvestedPositionClone(salt, trustedForwarder, args));
     }
@@ -142,7 +142,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             baseCurrency: IERC20(address(eurc)),
             token: token,
             lockedUntil: 0,
-            timeLockMaster: timeLockMaster
+            tokenExitRegistry: tokenExitRegistry
         });
 
         CoinvestedPosition localLogic = new CoinvestedPosition(trustedForwarder);
@@ -213,7 +213,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             baseCurrency: IERC20(address(fuzzCurrency)),
             token: token,
             lockedUntil: 0,
-            timeLockMaster: timeLockMaster
+            tokenExitRegistry: tokenExitRegistry
         });
         CoinvestedPosition fuzzPosition = CoinvestedPosition(
             factory.createCoinvestedPositionClone(salt, trustedForwarder, args)
@@ -244,7 +244,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             baseCurrency: IERC20(address(nonTrusted)),
             token: token,
             lockedUntil: 0,
-            timeLockMaster: timeLockMaster
+            tokenExitRegistry: tokenExitRegistry
         });
         vm.expectRevert("currency needs to be on the allowlist with TRUSTED_CURRENCY attribute");
         factory.createCoinvestedPositionClone(bytes32("nonTrusted"), trustedForwarder, args);
@@ -262,7 +262,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             baseCurrency: IERC20(address(noBit)),
             token: token,
             lockedUntil: 0,
-            timeLockMaster: timeLockMaster
+            tokenExitRegistry: tokenExitRegistry
         });
         vm.expectRevert();
         factory.createCoinvestedPositionClone(bytes32("noBit"), trustedForwarder, args);
@@ -283,7 +283,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             baseCurrency: IERC20(address(eurc)),
             token: token,
             lockedUntil: 0,
-            timeLockMaster: timeLockMaster
+            tokenExitRegistry: tokenExitRegistry
         });
         vm.expectRevert("There must be at least one lead investor");
         factory.createCoinvestedPositionClone(bytes32("emptyLead"), trustedForwarder, args);
@@ -300,7 +300,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             baseCurrency: IERC20(address(eurc)),
             token: token,
             lockedUntil: 0,
-            timeLockMaster: timeLockMaster
+            tokenExitRegistry: tokenExitRegistry
         });
         vm.expectRevert("lead investor can not be zero address");
         factory.createCoinvestedPositionClone(bytes32("zeroLead"), trustedForwarder, args);
@@ -317,7 +317,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             baseCurrency: IERC20(address(eurc)),
             token: token,
             lockedUntil: 0,
-            timeLockMaster: timeLockMaster
+            tokenExitRegistry: tokenExitRegistry
         });
         vm.expectRevert("lead investor carry fraction can not be zero");
         factory.createCoinvestedPositionClone(bytes32("zeroCarry"), trustedForwarder, args);
@@ -336,7 +336,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             baseCurrency: IERC20(address(eurc)),
             token: token,
             lockedUntil: 0,
-            timeLockMaster: timeLockMaster
+            tokenExitRegistry: tokenExitRegistry
         });
         vm.expectRevert("panic: arithmetic underflow or overflow (0x11)"); // arithmetic overflow
         factory.createCoinvestedPositionClone(bytes32("overflow"), trustedForwarder, args);
@@ -585,7 +585,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             baseCurrency: IERC20(address(eurc)),
             token: tokenWithFee,
             lockedUntil: 0,
-            timeLockMaster: timeLockMaster
+            tokenExitRegistry: tokenExitRegistry
         });
         CoinvestedPosition coinvestedPositionWithFee = CoinvestedPosition(
             factory.createCoinvestedPositionClone(bytes32("fee"), trustedForwarder, args)
@@ -655,7 +655,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             baseCurrency: IERC20(address(eurc)),
             token: tokenHighFee,
             lockedUntil: 0,
-            timeLockMaster: timeLockMaster
+            tokenExitRegistry: tokenExitRegistry
         });
         CoinvestedPosition coinvestedPositionHighFee = CoinvestedPosition(
             factory.createCoinvestedPositionClone(bytes32("highFee"), trustedForwarder, args)
@@ -1431,7 +1431,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             baseCurrency: IERC20(address(malicious)),
             token: token,
             lockedUntil: 0,
-            timeLockMaster: timeLockMaster
+            tokenExitRegistry: tokenExitRegistry
         });
         CoinvestedPosition coinvestedPositionMalicious = CoinvestedPosition(
             factory.createCoinvestedPositionClone(bytes32("mal"), trustedForwarder, args)

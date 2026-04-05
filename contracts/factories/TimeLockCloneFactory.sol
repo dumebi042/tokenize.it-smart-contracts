@@ -5,7 +5,7 @@ pragma solidity 0.8.23;
 import "@openzeppelin/contracts/proxy/Clones.sol";
 
 import "../TimeLock.sol";
-import "../TimeLockMaster.sol";
+import "../TokenExitRegistry.sol";
 import "./CloneFactory.sol";
 
 /**
@@ -21,17 +21,17 @@ contract TimeLockCloneFactory is CloneFactory {
      * @param _rawSalt influences the address of the clone, but not the initialization
      * @param _owner owner of the new TimeLock
      * @param _lockedUntil unix timestamp before which drain() is blocked
-     * @param _timeLockMaster master unlock contract; setting exit on it bypasses lockedUntil
+     * @param _tokenExitRegistry registry contract; setting exit on it bypasses lockedUntil
      */
     function createTimeLockClone(
         bytes32 _rawSalt,
         address _owner,
         uint64 _lockedUntil,
-        TimeLockMaster _timeLockMaster
+        TokenExitRegistry _tokenExitRegistry
     ) external returns (address) {
-        bytes32 salt = _getSalt(_rawSalt, _owner, _lockedUntil, _timeLockMaster);
+        bytes32 salt = _getSalt(_rawSalt, _owner, _lockedUntil, _tokenExitRegistry);
         TimeLock clone = TimeLock(Clones.cloneDeterministic(implementation, salt));
-        clone.initialize(_owner, _lockedUntil, _timeLockMaster);
+        clone.initialize(_owner, _lockedUntil, _tokenExitRegistry);
         emit NewClone(address(clone));
         return address(clone);
     }
@@ -41,15 +41,15 @@ contract TimeLockCloneFactory is CloneFactory {
      * @param _rawSalt influences the address of the clone, but not the initialization
      * @param _owner owner of the new TimeLock
      * @param _lockedUntil unix timestamp before which drain() is blocked
-     * @param _timeLockMaster master unlock contract; setting exit on it bypasses lockedUntil
+     * @param _tokenExitRegistry registry contract; setting exit on it bypasses lockedUntil
      */
     function predictCloneAddress(
         bytes32 _rawSalt,
         address _owner,
         uint64 _lockedUntil,
-        TimeLockMaster _timeLockMaster
+        TokenExitRegistry _tokenExitRegistry
     ) external view returns (address) {
-        bytes32 salt = _getSalt(_rawSalt, _owner, _lockedUntil, _timeLockMaster);
+        bytes32 salt = _getSalt(_rawSalt, _owner, _lockedUntil, _tokenExitRegistry);
         return Clones.predictDeterministicAddress(implementation, salt);
     }
 
@@ -60,8 +60,8 @@ contract TimeLockCloneFactory is CloneFactory {
         bytes32 _rawSalt,
         address _owner,
         uint64 _lockedUntil,
-        TimeLockMaster _timeLockMaster
+        TokenExitRegistry _tokenExitRegistry
     ) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_rawSalt, _owner, _lockedUntil, _timeLockMaster));
+        return keccak256(abi.encode(_rawSalt, _owner, _lockedUntil, _tokenExitRegistry));
     }
 }
