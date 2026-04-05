@@ -3,6 +3,7 @@ pragma solidity 0.8.23;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -16,7 +17,7 @@ import "./TokenExitRegistry.sol";
  *      token to any recipient after lockedUntil has passed.
  * @dev Uses clone/proxy pattern. Constructor disables initializers, separate initialize().
  */
-contract TimeLock is Initializable, OwnableUpgradeable {
+contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeable {
     using SafeERC20 for IERC20;
 
     /// unix timestamp before which drain() is blocked; 0 means no lock
@@ -31,8 +32,9 @@ contract TimeLock is Initializable, OwnableUpgradeable {
     /**
      * This contract will be used through clones, so the constructor only initializes
      * the logic contract.
+     * @param _trustedForwarder This address can execute transactions in the name of any other address
      */
-    constructor() {
+    constructor(address _trustedForwarder) ERC2771ContextUpgradeable(_trustedForwarder) {
         _disableInitializers();
     }
 
@@ -94,5 +96,22 @@ contract TimeLock is Initializable, OwnableUpgradeable {
         require(balance > 0, "no tokens to drain");
         _token.safeTransfer(_recipient, balance);
         emit Drained(_token, _recipient, balance);
+    }
+
+    function _msgSender() internal view override(ContextUpgradeable, ERC2771ContextUpgradeable) returns (address) {
+        return ERC2771ContextUpgradeable._msgSender();
+    }
+
+    function _msgData() internal view override(ContextUpgradeable, ERC2771ContextUpgradeable) returns (bytes calldata) {
+        return ERC2771ContextUpgradeable._msgData();
+    }
+
+    function _contextSuffixLength()
+        internal
+        view
+        override(ContextUpgradeable, ERC2771ContextUpgradeable)
+        returns (uint256)
+    {
+        return ERC2771ContextUpgradeable._contextSuffixLength();
     }
 }

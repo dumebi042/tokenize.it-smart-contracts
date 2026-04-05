@@ -45,7 +45,7 @@ contract PrivateOfferFactoryTest is Test {
     bytes32 public constant salt = bytes32("234");
 
     function setUp() public {
-        TimeLock timeLockImplementation = new TimeLock();
+        TimeLock timeLockImplementation = new TimeLock(trustedForwarder);
         TimeLockCloneFactory timeLockCloneFactory = new TimeLockCloneFactory(address(timeLockImplementation));
         factory = new PrivateOfferFactory(timeLockCloneFactory);
         currency = new ERC20MintableByAnyone("currency", "CUR");
@@ -62,11 +62,11 @@ contract PrivateOfferFactoryTest is Test {
             tokenCloneFactory.createTokenProxy(0, trustedForwarder, feeSettings, admin, list, 0x0, "token", "TOK")
         );
 
-        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry();
+        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry(trustedForwarder);
         TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(
             address(tokenExitRegistryLogic)
         );
-        tokenExitRegistry = TokenExitRegistry(tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token));
+        tokenExitRegistry = TokenExitRegistry(tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token));
     }
 
     function testDeployContract(bytes32 _salt) public {
@@ -142,7 +142,8 @@ contract PrivateOfferFactoryTest is Test {
             arguments,
             _lockedUntil,
             timeLockOwner,
-            tokenExitRegistry
+            tokenExitRegistry,
+            trustedForwarder
         );
 
         console.log("expectedPrivateOffer", expectedPrivateOffer);
@@ -169,7 +170,7 @@ contract PrivateOfferFactoryTest is Test {
 
         // deploy contracts
         assertEq(
-            factory.deployPrivateOfferWithTimeLock(salt, arguments, _lockedUntil, timeLockOwner, tokenExitRegistry),
+            factory.deployPrivateOfferWithTimeLock(salt, arguments, _lockedUntil, timeLockOwner, tokenExitRegistry, trustedForwarder),
             expectedTimeLock
         );
 

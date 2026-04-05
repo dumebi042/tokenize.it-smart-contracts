@@ -47,11 +47,11 @@ contract CoinvestedPositionCloneFactoryTest is Test {
 
         factory = new CoinvestedPositionCloneFactory(address(new CoinvestedPosition(trustedForwarder)));
 
-        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry();
+        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry(trustedForwarder);
         TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(
             address(tokenExitRegistryLogic)
         );
-        tokenExitRegistry = TokenExitRegistry(tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token));
+        tokenExitRegistry = TokenExitRegistry(tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token));
     }
 
     /// @dev Returns baseline arguments with two lead investors.

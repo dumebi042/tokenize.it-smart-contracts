@@ -19,11 +19,20 @@ contract TokenExitRegistryCloneFactory is CloneFactory {
     /**
      * @notice Create a new TokenExitRegistry clone and initialize it.
      * @param _rawSalt influences the address of the clone, but not the initialization
+     * @param _trustedForwarder can not be changed, but is checked for security
      * @param _token the token whose DEFAULT_ADMIN_ROLE controls the new TokenExitRegistry
      */
-    function createTokenExitRegistryClone(bytes32 _rawSalt, Token _token) external returns (address) {
-        bytes32 salt = _getSalt(_rawSalt, _token);
+    function createTokenExitRegistryClone(
+        bytes32 _rawSalt,
+        address _trustedForwarder,
+        Token _token
+    ) external returns (address) {
+        bytes32 salt = _getSalt(_rawSalt, _trustedForwarder, _token);
         TokenExitRegistry clone = TokenExitRegistry(Clones.cloneDeterministic(implementation, salt));
+        require(
+            clone.isTrustedForwarder(_trustedForwarder),
+            "TokenExitRegistryCloneFactory: Unexpected trustedForwarder"
+        );
         clone.initialize(_token);
         emit NewClone(address(clone));
         return address(clone);
@@ -32,17 +41,18 @@ contract TokenExitRegistryCloneFactory is CloneFactory {
     /**
      * @notice Return the address a clone would have if created with these parameters.
      * @param _rawSalt influences the address of the clone, but not the initialization
+     * @param _trustedForwarder can not be changed, but is checked for security
      * @param _token the token whose DEFAULT_ADMIN_ROLE controls the new TokenExitRegistry
      */
-    function predictCloneAddress(bytes32 _rawSalt, Token _token) external view returns (address) {
-        bytes32 salt = _getSalt(_rawSalt, _token);
+    function predictCloneAddress(bytes32 _rawSalt, address _trustedForwarder, Token _token) external view returns (address) {
+        bytes32 salt = _getSalt(_rawSalt, _trustedForwarder, _token);
         return Clones.predictDeterministicAddress(implementation, salt);
     }
 
     /**
      * @notice generates a salt from all input parameters
      */
-    function _getSalt(bytes32 _rawSalt, Token _token) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_rawSalt, _token));
+    function _getSalt(bytes32 _rawSalt, address _trustedForwarder, Token _token) internal pure returns (bytes32) {
+        return keccak256(abi.encode(_rawSalt, _trustedForwarder, _token));
     }
 }

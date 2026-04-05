@@ -19,18 +19,21 @@ contract TimeLockCloneFactory is CloneFactory {
     /**
      * @notice Create a new TimeLock clone and initialize it.
      * @param _rawSalt influences the address of the clone, but not the initialization
+     * @param _trustedForwarder can not be changed, but is checked for security
      * @param _owner owner of the new TimeLock
      * @param _lockedUntil unix timestamp before which drain() is blocked
-     * @param _tokenExitRegistry registry contract; setting exit on it bypasses lockedUntil
+     * @param _tokenExitRegistry registry contract used to look up the exit
      */
     function createTimeLockClone(
         bytes32 _rawSalt,
+        address _trustedForwarder,
         address _owner,
         uint64 _lockedUntil,
         TokenExitRegistry _tokenExitRegistry
     ) external returns (address) {
-        bytes32 salt = _getSalt(_rawSalt, _owner, _lockedUntil, _tokenExitRegistry);
+        bytes32 salt = _getSalt(_rawSalt, _trustedForwarder, _owner, _lockedUntil, _tokenExitRegistry);
         TimeLock clone = TimeLock(Clones.cloneDeterministic(implementation, salt));
+        require(clone.isTrustedForwarder(_trustedForwarder), "TimeLockCloneFactory: Unexpected trustedForwarder");
         clone.initialize(_owner, _lockedUntil, _tokenExitRegistry);
         emit NewClone(address(clone));
         return address(clone);
@@ -39,17 +42,19 @@ contract TimeLockCloneFactory is CloneFactory {
     /**
      * @notice Return the address a clone would have if created with these parameters.
      * @param _rawSalt influences the address of the clone, but not the initialization
+     * @param _trustedForwarder can not be changed, but is checked for security
      * @param _owner owner of the new TimeLock
      * @param _lockedUntil unix timestamp before which drain() is blocked
-     * @param _tokenExitRegistry registry contract; setting exit on it bypasses lockedUntil
+     * @param _tokenExitRegistry registry contract used to look up the exit
      */
     function predictCloneAddress(
         bytes32 _rawSalt,
+        address _trustedForwarder,
         address _owner,
         uint64 _lockedUntil,
         TokenExitRegistry _tokenExitRegistry
     ) external view returns (address) {
-        bytes32 salt = _getSalt(_rawSalt, _owner, _lockedUntil, _tokenExitRegistry);
+        bytes32 salt = _getSalt(_rawSalt, _trustedForwarder, _owner, _lockedUntil, _tokenExitRegistry);
         return Clones.predictDeterministicAddress(implementation, salt);
     }
 
@@ -58,10 +63,11 @@ contract TimeLockCloneFactory is CloneFactory {
      */
     function _getSalt(
         bytes32 _rawSalt,
+        address _trustedForwarder,
         address _owner,
         uint64 _lockedUntil,
         TokenExitRegistry _tokenExitRegistry
     ) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_rawSalt, _owner, _lockedUntil, _tokenExitRegistry));
+        return keccak256(abi.encode(_rawSalt, _trustedForwarder, _owner, _lockedUntil, _tokenExitRegistry));
     }
 }

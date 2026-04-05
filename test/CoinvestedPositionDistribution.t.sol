@@ -138,11 +138,11 @@ contract CoinvestedPositionDistributionTest is Test {
         distributionFactory = new DistributionCloneFactory(address(distributionLogic));
 
         // TokenExitRegistry
-        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry();
+        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry(trustedForwarder);
         TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(
             address(tokenExitRegistryLogic)
         );
-        tokenExitRegistry = TokenExitRegistry(tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token));
+        tokenExitRegistry = TokenExitRegistry(tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token));
 
         // Deploy default CoinvestedPosition (base currency = EURc, leadA=10%, leadB=5%)
         coinvestedPosition = _deployCoinvestedPosition(bytes32(0), BASE_PRICE_EURC, eurc, _defaultLeadInvestors());

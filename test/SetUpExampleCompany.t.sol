@@ -131,7 +131,7 @@ contract CompanySetUpTest is Test {
         tokenFactory = new TokenProxyFactory(address(implementation));
 
         // set up PrivateOfferFactory. Again, this is done here only because we need the forwarder address.
-        TimeLock timeLockImplementation = new TimeLock();
+        TimeLock timeLockImplementation = new TimeLock(address(forwarder));
         TimeLockCloneFactory timeLockCloneFactory = new TimeLockCloneFactory(address(timeLockImplementation));
         privateOfferFactory = new PrivateOfferFactory(timeLockCloneFactory);
 

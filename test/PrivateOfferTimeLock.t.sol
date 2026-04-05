@@ -38,7 +38,7 @@ contract PrivateOfferTimeLockTest is Test {
     uint256 requirements = 92785934;
 
     function setUp() public {
-        TimeLock timeLockImplementation = new TimeLock();
+        TimeLock timeLockImplementation = new TimeLock(trustedForwarder);
         TimeLockCloneFactory timeLockCloneFactory = new TimeLockCloneFactory(address(timeLockImplementation));
         privateOfferFactory = new PrivateOfferFactory(timeLockCloneFactory);
 
@@ -70,11 +70,11 @@ contract PrivateOfferTimeLockTest is Test {
             )
         );
 
-        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry();
+        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry(trustedForwarder);
         TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(
             address(tokenExitRegistryLogic)
         );
-        tokenExitRegistry = TokenExitRegistry(tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token));
+        tokenExitRegistry = TokenExitRegistry(tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token));
     }
 
     /**
@@ -104,7 +104,7 @@ contract PrivateOfferTimeLockTest is Test {
 
         // predict addresses
         (address expectedInviteAddress, address expectedTimeLockAddress) = privateOfferFactory
-            .predictPrivateOfferAndTimeLockAddress(salt, arguments, lockedUntil, admin, tokenExitRegistry);
+            .predictPrivateOfferAndTimeLockAddress(salt, arguments, lockedUntil, admin, tokenExitRegistry, trustedForwarder);
 
         // add time lock and token receiver to the allow list
         list.set(expectedTimeLockAddress, requirements);
@@ -137,7 +137,7 @@ contract PrivateOfferTimeLockTest is Test {
         uint256 gasBefore = gasleft();
         // deploy private offer and time lock
         TimeLock timeLock = TimeLock(
-            privateOfferFactory.deployPrivateOfferWithTimeLock(salt, arguments, lockedUntil, admin, tokenExitRegistry)
+            privateOfferFactory.deployPrivateOfferWithTimeLock(salt, arguments, lockedUntil, admin, tokenExitRegistry, trustedForwarder)
         );
         uint256 gasAfter = gasleft();
         console.log("gas used: %s", gasBefore - gasAfter);

@@ -118,9 +118,9 @@ contract CoinvestedPositionExitTest is Test {
         exitFactory = new ExitCloneFactory(address(exitLogic));
 
         // TokenExitRegistry
-        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry();
+        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry(trustedForwarder);
         tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(address(tokenExitRegistryLogic));
-        tokenExitRegistry = TokenExitRegistry(tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token));
+        tokenExitRegistry = TokenExitRegistry(tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token));
 
         // Deploy default CoinvestedPosition
         coinvestedPosition = _deployCp(bytes32(0), BASE_PRICE_EURC, eurc, _defaultLeadInvestors());
@@ -623,7 +623,7 @@ contract CoinvestedPositionExitTest is Test {
         vm.stopPrank();
 
         TokenExitRegistry tokenExitRegistryForFeeToken = TokenExitRegistry(
-            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32("fee_token"), tokenWithFee)
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32("fee_token"), trustedForwarder, tokenWithFee)
         );
 
         CoinvestedPositionInitializerArguments memory coinvestedPositionArgs = CoinvestedPositionInitializerArguments({

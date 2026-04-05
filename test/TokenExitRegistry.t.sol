@@ -41,7 +41,7 @@ contract TokenExitRegistryTest is Test {
             tokenFactory.createTokenProxy(0, trustedForwarder, feeSettings, admin, allowList, 0, "TestToken", "TTK")
         );
 
-        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry();
+        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry(trustedForwarder);
         tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(address(tokenExitRegistryLogic));
     }
 
@@ -51,7 +51,7 @@ contract TokenExitRegistryTest is Test {
 
     function testInitializeHappyPath() public {
         TokenExitRegistry tokenExitRegistry = TokenExitRegistry(
-            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token)
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token)
         );
 
         assertEq(address(tokenExitRegistry.token()), address(token), "token not set");
@@ -61,21 +61,21 @@ contract TokenExitRegistryTest is Test {
     function testInitializeRevertsIfTokenIsZero() public {
         // Attempt to create a clone with zero token address — factory should revert
         vm.expectRevert("token can not be zero address");
-        tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), Token(address(0)));
+        tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, Token(address(0)));
     }
 
     function testLogicContractCannotBeReinitialized() public {
         // The logic contract constructor calls _disableInitializers();
         // deploying it via new is fine (factory pattern), but calling initialize on
         // a newly deployed logic contract should be blocked.
-        TokenExitRegistry logicContract = new TokenExitRegistry();
+        TokenExitRegistry logicContract = new TokenExitRegistry(trustedForwarder);
         vm.expectRevert("Initializable: contract is already initialized");
         logicContract.initialize(token);
     }
 
     function testCloneCannotBeReinitializedAfterFactory() public {
         TokenExitRegistry tokenExitRegistry = TokenExitRegistry(
-            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token)
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token)
         );
         vm.expectRevert("Initializable: contract is already initialized");
         tokenExitRegistry.initialize(token);
@@ -87,7 +87,7 @@ contract TokenExitRegistryTest is Test {
 
     function testSetExitHappyPath() public {
         TokenExitRegistry tokenExitRegistry = TokenExitRegistry(
-            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token)
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token)
         );
         FakeExit fakeExit = new FakeExit();
 
@@ -101,7 +101,7 @@ contract TokenExitRegistryTest is Test {
 
     function testSetExitRevertsIfCallerIsNotTokenAdmin() public {
         TokenExitRegistry tokenExitRegistry = TokenExitRegistry(
-            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token)
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token)
         );
         FakeExit fakeExit = new FakeExit();
 
@@ -112,7 +112,7 @@ contract TokenExitRegistryTest is Test {
 
     function testSetExitRevertsIfExitIsZeroAddress() public {
         TokenExitRegistry tokenExitRegistry = TokenExitRegistry(
-            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token)
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token)
         );
 
         vm.prank(admin);
@@ -122,7 +122,7 @@ contract TokenExitRegistryTest is Test {
 
     function testSetExitRevertsIfAlreadySet() public {
         TokenExitRegistry tokenExitRegistry = TokenExitRegistry(
-            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token)
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token)
         );
         FakeExit fakeExit1 = new FakeExit();
         FakeExit fakeExit2 = new FakeExit();
@@ -137,7 +137,7 @@ contract TokenExitRegistryTest is Test {
 
     function testSetExitOnlyCallableByRoleHolder() public {
         TokenExitRegistry tokenExitRegistry = TokenExitRegistry(
-            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token)
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token)
         );
         FakeExit fakeExit = new FakeExit();
 
@@ -159,20 +159,20 @@ contract TokenExitRegistryTest is Test {
 
     function testFactoryCreatesCloneWithCorrectToken() public {
         TokenExitRegistry tokenExitRegistry = TokenExitRegistry(
-            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token)
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token)
         );
         assertEq(address(tokenExitRegistry.token()), address(token));
     }
 
     function testFactoryPredictCloneAddressMatchesActual() public {
-        address predicted = tokenExitRegistryFactory.predictCloneAddress(bytes32(0), token);
-        address actual = tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token);
+        address predicted = tokenExitRegistryFactory.predictCloneAddress(bytes32(0), trustedForwarder, token);
+        address actual = tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token);
         assertEq(predicted, actual, "predicted address does not match actual");
     }
 
     function testFactoryDeterministicAddress_RawSaltChanges() public {
-        address a1 = tokenExitRegistryFactory.predictCloneAddress(bytes32(0), token);
-        address a2 = tokenExitRegistryFactory.predictCloneAddress(bytes32(uint256(1)), token);
+        address a1 = tokenExitRegistryFactory.predictCloneAddress(bytes32(0), trustedForwarder, token);
+        address a2 = tokenExitRegistryFactory.predictCloneAddress(bytes32(uint256(1)), trustedForwarder, token);
         assertFalse(a1 == a2, "different raw salts should give different addresses");
     }
 
@@ -189,21 +189,21 @@ contract TokenExitRegistryTest is Test {
                 "TT2"
             )
         );
-        address a1 = tokenExitRegistryFactory.predictCloneAddress(bytes32(0), token);
-        address a2 = tokenExitRegistryFactory.predictCloneAddress(bytes32(0), token2);
+        address a1 = tokenExitRegistryFactory.predictCloneAddress(bytes32(0), trustedForwarder, token);
+        address a2 = tokenExitRegistryFactory.predictCloneAddress(bytes32(0), trustedForwarder, token2);
         assertFalse(a1 == a2, "different tokens should give different addresses");
     }
 
     function testFactorySecondDeploymentWithSameSaltReverts() public {
-        tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token);
+        tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token);
         vm.expectRevert("ERC1167: create2 failed");
-        tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token);
+        tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token);
     }
 
     function testFactoryEmitsNewCloneEvent() public {
-        address predicted = tokenExitRegistryFactory.predictCloneAddress(bytes32(0), token);
+        address predicted = tokenExitRegistryFactory.predictCloneAddress(bytes32(0), trustedForwarder, token);
         vm.expectEmit(true, false, false, false, address(tokenExitRegistryFactory));
         emit CloneFactory.NewClone(predicted);
-        tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token);
+        tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token);
     }
 }
