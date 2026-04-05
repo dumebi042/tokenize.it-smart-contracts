@@ -122,6 +122,7 @@ contract PrivateOfferFactoryTest is Test {
         vm.assume(tokenReceiver != address(0));
         vm.assume(timeLockOwner != address(0));
         vm.assume(tokenReceiver != timeLockOwner);
+        vm.assume(timeLockOwner != trustedForwarder);
 
         // mint currency to buyer
         currency.mint(buyer, currencyAmount);
