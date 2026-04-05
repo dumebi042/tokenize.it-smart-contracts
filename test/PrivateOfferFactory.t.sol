@@ -199,18 +199,15 @@ contract PrivateOfferFactoryTest is Test {
         assertEq(token.balanceOf(tokenReceiver), 0, "Token receiver has wrong token balance");
         assertEq(token.balanceOf(expectedTimeLock), tokenAmount, "TimeLock contract has wrong token balance");
 
-        // evaluate cast before prank to avoid consuming the prank via a staticcall
-        IERC20 tokenAsIERC20 = IERC20(address(token));
-
         // try to drain before lock expires — must revert
         vm.prank(timeLockOwner);
         vm.expectRevert("timelock has not expired");
-        timeLockContract.drain(tokenAsIERC20, tokenReceiver);
+        timeLockContract.drain(IERC20(address(token)), tokenReceiver);
 
         // drain after lock expires
         vm.warp(_lockedUntil);
         vm.prank(timeLockOwner);
-        timeLockContract.drain(tokenAsIERC20, tokenReceiver);
+        timeLockContract.drain(IERC20(address(token)), tokenReceiver);
         assertEq(token.balanceOf(tokenReceiver), tokenAmount, "Token receiver has wrong token balance after drain");
     }
 }
