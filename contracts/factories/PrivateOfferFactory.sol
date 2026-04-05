@@ -55,7 +55,13 @@ contract PrivateOfferFactory {
     ) external returns (address) {
         // deploy the time lock contract
         TimeLock timeLock = TimeLock(
-            timeLockCloneFactory.createTimeLockClone(_rawSalt, _trustedForwarder, _timeLockOwner, _lockedUntil, _tokenExitRegistry)
+            timeLockCloneFactory.createTimeLockClone(
+                _rawSalt,
+                _trustedForwarder,
+                _timeLockOwner,
+                _lockedUntil,
+                _tokenExitRegistry
+            )
         );
 
         // route token delivery through the time lock

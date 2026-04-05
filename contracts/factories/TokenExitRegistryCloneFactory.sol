@@ -44,7 +44,11 @@ contract TokenExitRegistryCloneFactory is CloneFactory {
      * @param _trustedForwarder can not be changed, but is checked for security
      * @param _token the token whose DEFAULT_ADMIN_ROLE controls the new TokenExitRegistry
      */
-    function predictCloneAddress(bytes32 _rawSalt, address _trustedForwarder, Token _token) external view returns (address) {
+    function predictCloneAddress(
+        bytes32 _rawSalt,
+        address _trustedForwarder,
+        Token _token
+    ) external view returns (address) {
         bytes32 salt = _getSalt(_rawSalt, _trustedForwarder, _token);
         return Clones.predictDeterministicAddress(implementation, salt);
     }

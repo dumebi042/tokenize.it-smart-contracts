@@ -66,7 +66,9 @@ contract PrivateOfferFactoryTest is Test {
         TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(
             address(tokenExitRegistryLogic)
         );
-        tokenExitRegistry = TokenExitRegistry(tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token));
+        tokenExitRegistry = TokenExitRegistry(
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token)
+        );
     }
 
     function testDeployContract(bytes32 _salt) public {
@@ -170,7 +172,14 @@ contract PrivateOfferFactoryTest is Test {
 
         // deploy contracts
         assertEq(
-            factory.deployPrivateOfferWithTimeLock(salt, arguments, _lockedUntil, timeLockOwner, tokenExitRegistry, trustedForwarder),
+            factory.deployPrivateOfferWithTimeLock(
+                salt,
+                arguments,
+                _lockedUntil,
+                timeLockOwner,
+                tokenExitRegistry,
+                trustedForwarder
+            ),
             expectedTimeLock
         );
 

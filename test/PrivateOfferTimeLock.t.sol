@@ -74,7 +74,9 @@ contract PrivateOfferTimeLockTest is Test {
         TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(
             address(tokenExitRegistryLogic)
         );
-        tokenExitRegistry = TokenExitRegistry(tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token));
+        tokenExitRegistry = TokenExitRegistry(
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token)
+        );
     }
 
     /**
@@ -104,7 +106,14 @@ contract PrivateOfferTimeLockTest is Test {
 
         // predict addresses
         (address expectedInviteAddress, address expectedTimeLockAddress) = privateOfferFactory
-            .predictPrivateOfferAndTimeLockAddress(salt, arguments, lockedUntil, admin, tokenExitRegistry, trustedForwarder);
+            .predictPrivateOfferAndTimeLockAddress(
+                salt,
+                arguments,
+                lockedUntil,
+                admin,
+                tokenExitRegistry,
+                trustedForwarder
+            );
 
         // add time lock and token receiver to the allow list
         list.set(expectedTimeLockAddress, requirements);
@@ -137,7 +146,14 @@ contract PrivateOfferTimeLockTest is Test {
         uint256 gasBefore = gasleft();
         // deploy private offer and time lock
         TimeLock timeLock = TimeLock(
-            privateOfferFactory.deployPrivateOfferWithTimeLock(salt, arguments, lockedUntil, admin, tokenExitRegistry, trustedForwarder)
+            privateOfferFactory.deployPrivateOfferWithTimeLock(
+                salt,
+                arguments,
+                lockedUntil,
+                admin,
+                tokenExitRegistry,
+                trustedForwarder
+            )
         );
         uint256 gasAfter = gasleft();
         console.log("gas used: %s", gasBefore - gasAfter);
