@@ -21,11 +21,12 @@ contract TimeLock is Initializable, OwnableUpgradeable {
 
     /// unix timestamp before which drain() is blocked; 0 means no lock
     uint64 public lockedUntil;
-    /// master unlock contract; if its isUnlocked() returns true, the lockedUntil constraint is bypassed
+    /// master unlock contract; if its exit() is set, the lockedUntil constraint is bypassed
     TimeLockMaster public timeLockMaster;
 
     event Drained(IERC20 indexed token, address indexed recipient, uint256 amount);
     event DividendsDistributed(IDistribution indexed distribution, IERC20 indexed currency, address indexed recipient);
+    event ExitDistributed(IExit indexed exit, address indexed recipient, uint256 tokenAmount);
 
     /**
      * This contract will be used through clones, so the constructor only initializes
@@ -39,7 +40,7 @@ contract TimeLock is Initializable, OwnableUpgradeable {
      * @notice Sets up the TimeLock.
      * @param _owner owner of the contract
      * @param _lockedUntil unix timestamp before which drain() is blocked; 0 means no lock
-     * @param _timeLockMaster master unlock contract; calling unlock() on it bypasses lockedUntil
+     * @param _timeLockMaster master unlock contract; setting exit on it bypasses lockedUntil
      */
     function initialize(address _owner, uint64 _lockedUntil, TimeLockMaster _timeLockMaster) public initializer {
         require(_owner != address(0), "owner can not be zero address");
@@ -61,6 +62,24 @@ contract TimeLock is Initializable, OwnableUpgradeable {
         IERC20 dividendCurrency = _dist.currency();
         _dist.claim(_recipient);
         emit DividendsDistributed(_dist, dividendCurrency, _recipient);
+    }
+
+    /**
+     * @notice Claim exit proceeds for this contract's full token balance and forward to _recipient.
+     * @dev Requires timeLockMaster.exit() to be set. Approves the exit contract, calls claim(),
+     *      and forwards all received currency to _recipient.
+     * @param _recipient address to receive the exit proceeds
+     */
+    function distributeExit(address _recipient) external onlyOwner {
+        IExit exit = timeLockMaster.exit();
+        require(address(exit) != address(0), "no exit set in timeLockMaster");
+        require(_recipient != address(0), "recipient can not be zero address");
+        Token token = timeLockMaster.token();
+        uint256 tokenBalance = token.balanceOf(address(this));
+        require(tokenBalance > 0, "no tokens to exit");
+        IERC20(address(token)).approve(address(exit), tokenBalance);
+        exit.claim(tokenBalance, _recipient);
+        emit ExitDistributed(exit, _recipient, tokenBalance);
     }
 
     /**
