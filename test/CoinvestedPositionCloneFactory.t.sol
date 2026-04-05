@@ -48,7 +48,9 @@ contract CoinvestedPositionCloneFactoryTest is Test {
         factory = new CoinvestedPositionCloneFactory(address(new CoinvestedPosition(trustedForwarder)));
 
         TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry();
-        TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(address(tokenExitRegistryLogic));
+        TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(
+            address(tokenExitRegistryLogic)
+        );
         tokenExitRegistry = TokenExitRegistry(tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token));
     }
 

@@ -669,7 +669,11 @@ contract CoinvestedPositionExitTest is Test {
 
     /// V: distributeExit does NOT apply fees — full received amount is distributed
     function testV_NoFeeDeductedInDistributeExit() public {
-        (Token tokenWithFee, CoinvestedPosition coinvestedPositionFee, TokenExitRegistry tokenExitRegistryForFeeToken) = _deployFeeTokenAndCp();
+        (
+            Token tokenWithFee,
+            CoinvestedPosition coinvestedPositionFee,
+            TokenExitRegistry tokenExitRegistryForFeeToken
+        ) = _deployFeeTokenAndCp();
         Exit exitContract = _deployFeeExit(tokenWithFee);
 
         uint256 beforeA = eurc.balanceOf(leadA);

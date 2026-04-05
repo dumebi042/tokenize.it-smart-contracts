@@ -87,7 +87,12 @@ contract PrivateOfferFactory {
         address _timeLockOwner,
         TokenExitRegistry _tokenExitRegistry
     ) public view returns (address privateOfferAddress, address timeLockAddress) {
-        timeLockAddress = timeLockCloneFactory.predictCloneAddress(_rawSalt, _timeLockOwner, _lockedUntil, _tokenExitRegistry);
+        timeLockAddress = timeLockCloneFactory.predictCloneAddress(
+            _rawSalt,
+            _timeLockOwner,
+            _lockedUntil,
+            _tokenExitRegistry
+        );
 
         PrivateOfferArguments memory arguments = _arguments;
         arguments.tokenReceiver = timeLockAddress;

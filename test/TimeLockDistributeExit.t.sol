@@ -75,9 +75,7 @@ contract TimeLockDistributeExitTest is Test {
         // TimeLock (locked for 1 year)
         TimeLock timeLockLogic = new TimeLock();
         TimeLockCloneFactory timeLockFactory = new TimeLockCloneFactory(address(timeLockLogic));
-        timeLock = TimeLock(
-            timeLockFactory.createTimeLockClone(bytes32(0), owner, lockedUntil, tokenExitRegistry)
-        );
+        timeLock = TimeLock(timeLockFactory.createTimeLockClone(bytes32(0), owner, lockedUntil, tokenExitRegistry));
 
         // Mint tokens directly to timeLock
         vm.prank(admin);

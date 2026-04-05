@@ -37,7 +37,9 @@ contract CoinvestedPositionERC2771Test is CoinvestedPositionTestBase {
         vm.stopPrank();
 
         TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry();
-        TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(address(tokenExitRegistryLogic));
+        TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(
+            address(tokenExitRegistryLogic)
+        );
         tokenExitRegistry = TokenExitRegistry(tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), token));
 
         coinvestedPosition = _deployCoinvestedPosition(trustedForwarder);

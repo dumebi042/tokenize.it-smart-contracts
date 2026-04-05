@@ -227,10 +227,7 @@ contract CoinvestedPosition is TokenSwapBase {
      * @param _minCurrencyAmount minimum currency the call must receive; reverts if proceeds fall short.
      *      This guards against faulty or malicious exit contracts.
      */
-    function distributeExit(
-        IERC20 _exitCurrency,
-        uint256 _minCurrencyAmount
-    ) external onlyOwner nonReentrant {
+    function distributeExit(IERC20 _exitCurrency, uint256 _minCurrencyAmount) external onlyOwner nonReentrant {
         IExit exit = tokenExitRegistry.exit();
         require(address(exit) != address(0), "no exit set in tokenExitRegistry");
         require(
