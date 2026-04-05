@@ -5,8 +5,10 @@ import "../lib/forge-std/src/Test.sol";
 
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/factories/TimeLockCloneFactory.sol";
+import "../contracts/factories/TimeLockMasterCloneFactory.sol";
 import "../contracts/factories/ExitCloneFactory.sol";
 import "../contracts/TimeLock.sol";
+import "../contracts/TimeLockMaster.sol";
 import "../contracts/Exit.sol";
 import "../contracts/Token.sol";
 import "./resources/CloneCreators.sol";
@@ -34,6 +36,7 @@ contract TimeLockDistributeExitTest is Test {
     Token token;
     FakePaymentToken eurc;
 
+    TimeLockMaster timeLockMaster;
     TimeLock timeLock;
     Exit exitLogic;
     ExitCloneFactory exitFactory;
@@ -62,12 +65,20 @@ contract TimeLockDistributeExitTest is Test {
         token.grantRole(token.MINTALLOWER_ROLE(), admin);
         vm.stopPrank();
 
+        // TimeLockMaster
+        TimeLockMaster timeLockMasterLogic = new TimeLockMaster();
+        TimeLockMasterCloneFactory timeLockMasterFactory = new TimeLockMasterCloneFactory(
+            address(timeLockMasterLogic)
+        );
+        timeLockMaster = TimeLockMaster(timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token));
+
         // TimeLock (locked for 1 year)
         TimeLock timeLockLogic = new TimeLock();
         TimeLockCloneFactory timeLockFactory = new TimeLockCloneFactory(address(timeLockLogic));
-        timeLock = TimeLock(timeLockFactory.createTimeLockClone(bytes32(0), owner, lockedUntil));
+        timeLock = TimeLock(
+            timeLockFactory.createTimeLockClone(bytes32(0), owner, lockedUntil, timeLockMaster)
+        );
 
-        // Allow timeLock to hold token (requires allowList entry since token's requirements=0, no entry needed)
         // Mint tokens directly to timeLock
         vm.prank(admin);
         token.mint(address(timeLock), TOKEN_AMOUNT);
@@ -102,14 +113,14 @@ contract TimeLockDistributeExitTest is Test {
         Exit exitContract = _deployExit(200e6);
 
         vm.prank(admin);
-        token.setExit(IExit(address(exitContract)));
+        timeLockMaster.setExit(IExit(address(exitContract)));
 
         // Still locked (lockedUntil = now + 365 days)
         assertLt(block.timestamp, lockedUntil, "should still be locked");
 
         vm.warp(claimStart);
         vm.prank(owner);
-        timeLock.distributeExit(token, recipient);
+        timeLock.distributeExit(recipient);
 
         assertEq(token.balanceOf(address(timeLock)), 0, "timeLock should have no tokens after exit");
         assertEq(
@@ -119,8 +130,21 @@ contract TimeLockDistributeExitTest is Test {
         );
     }
 
-    /// drain() still blocks before lockedUntil (unchanged behavior)
+    /// drain() still blocks before lockedUntil (when no exit is set)
     function testDrainStillBlockedBeforeLockedUntil() public {
+        // No exit is set — drain must be blocked
+        vm.prank(owner);
+        vm.expectRevert("timelock has not expired");
+        timeLock.drain(IERC20(address(token)), recipient);
+    }
+
+    /// drain() is still blocked before lockedUntil even after setExit is called
+    function testDrainStillBlockedAfterExitSet() public {
+        Exit exitContract = _deployExit(200e6);
+
+        vm.prank(admin);
+        timeLockMaster.setExit(IExit(address(exitContract)));
+
         vm.prank(owner);
         vm.expectRevert("timelock has not expired");
         timeLock.drain(IERC20(address(token)), recipient);
@@ -128,51 +152,55 @@ contract TimeLockDistributeExitTest is Test {
 
     // ── Revert cases ─────────────────────────────────────────────────────────
 
-    /// Reverts when no exit is registered on the token
+    /// Reverts when no exit is set in timeLockMaster
     function testDistributeExitRevertsIfNoExitRegistered() public {
         vm.warp(claimStart);
         vm.prank(owner);
-        vm.expectRevert("no exit registered on token");
-        timeLock.distributeExit(token, recipient);
+        vm.expectRevert("no exit set in timeLockMaster");
+        timeLock.distributeExit(recipient);
     }
 
     /// Reverts when recipient is zero address
     function testDistributeExitRevertsIfRecipientZero() public {
         Exit exitContract = _deployExit(200e6);
         vm.prank(admin);
-        token.setExit(IExit(address(exitContract)));
+        timeLockMaster.setExit(IExit(address(exitContract)));
 
         vm.warp(claimStart);
         vm.prank(owner);
         vm.expectRevert("recipient can not be zero address");
-        timeLock.distributeExit(token, address(0));
+        timeLock.distributeExit(address(0));
     }
 
     /// Only owner can call distributeExit
     function testDistributeExitRevertsIfNotOwner() public {
         Exit exitContract = _deployExit(200e6);
         vm.prank(admin);
-        token.setExit(IExit(address(exitContract)));
+        timeLockMaster.setExit(IExit(address(exitContract)));
 
         vm.warp(claimStart);
         vm.expectRevert("Ownable: caller is not the owner");
-        timeLock.distributeExit(token, recipient);
+        timeLock.distributeExit(recipient);
     }
 
-    /// Reverts when timeLock holds no tokens
+    /// Reverts when timeLock holds no tokens (drain after lock expires, then try distributeExit)
     function testDistributeExitRevertsIfNoTokens() public {
         Exit exitContract = _deployExit(200e6);
-        vm.prank(admin);
-        token.setExit(IExit(address(exitContract)));
 
-        // Drain all tokens first (after lock expires)
+        // Drain all tokens after lockedUntil has passed
         vm.warp(lockedUntil);
         vm.prank(owner);
         timeLock.drain(IERC20(address(token)), recipient);
 
-        vm.warp(claimStart + lockedUntil);
+        assertEq(token.balanceOf(address(timeLock)), 0, "timeLock should have no tokens after drain");
+
+        // Now set exit and try distributeExit — should revert because no tokens remain
+        vm.prank(admin);
+        timeLockMaster.setExit(IExit(address(exitContract)));
+
+        vm.warp(lockedUntil + 1 days);
         vm.prank(owner);
         vm.expectRevert("no tokens to exit");
-        timeLock.distributeExit(token, recipient);
+        timeLock.distributeExit(recipient);
     }
 }

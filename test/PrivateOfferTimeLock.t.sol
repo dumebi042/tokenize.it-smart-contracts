@@ -7,12 +7,15 @@ import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/PrivateOffer.sol";
 import "../contracts/factories/PrivateOfferFactory.sol";
 import "../contracts/factories/TimeLockCloneFactory.sol";
+import "../contracts/factories/TimeLockMasterCloneFactory.sol";
 import "../contracts/TimeLock.sol";
+import "../contracts/TimeLockMaster.sol";
 import "./resources/CloneCreators.sol";
 import "./resources/FakePaymentToken.sol";
 
 contract PrivateOfferTimeLockTest is Test {
     PrivateOfferFactory privateOfferFactory;
+    TimeLockMaster timeLockMaster;
 
     AllowList list;
     FeeSettings feeSettings;
@@ -66,6 +69,10 @@ contract PrivateOfferTimeLockTest is Test {
                 "TOK"
             )
         );
+
+        TimeLockMaster timeLockMasterLogic = new TimeLockMaster();
+        TimeLockMasterCloneFactory timeLockMasterFactory = new TimeLockMasterCloneFactory(address(timeLockMasterLogic));
+        timeLockMaster = TimeLockMaster(timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token));
     }
 
     /**
@@ -95,7 +102,7 @@ contract PrivateOfferTimeLockTest is Test {
 
         // predict addresses
         (address expectedInviteAddress, address expectedTimeLockAddress) = privateOfferFactory
-            .predictPrivateOfferAndTimeLockAddress(salt, arguments, lockedUntil, admin);
+            .predictPrivateOfferAndTimeLockAddress(salt, arguments, lockedUntil, admin, timeLockMaster);
 
         // add time lock and token receiver to the allow list
         list.set(expectedTimeLockAddress, requirements);
@@ -128,7 +135,7 @@ contract PrivateOfferTimeLockTest is Test {
         uint256 gasBefore = gasleft();
         // deploy private offer and time lock
         TimeLock timeLock = TimeLock(
-            privateOfferFactory.deployPrivateOfferWithTimeLock(salt, arguments, lockedUntil, admin)
+            privateOfferFactory.deployPrivateOfferWithTimeLock(salt, arguments, lockedUntil, admin, timeLockMaster)
         );
         uint256 gasAfter = gasleft();
         console.log("gas used: %s", gasBefore - gasAfter);

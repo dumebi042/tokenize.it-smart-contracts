@@ -4,7 +4,9 @@ pragma solidity 0.8.23;
 import "../lib/forge-std/src/Test.sol";
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/factories/CoinvestedPositionCloneFactory.sol";
+import "../contracts/factories/TimeLockMasterCloneFactory.sol";
 import "../contracts/CoinvestedPosition.sol";
+import "../contracts/TimeLockMaster.sol";
 import "./resources/FakePaymentToken.sol";
 import "./resources/CloneCreators.sol";
 
@@ -22,6 +24,7 @@ contract CoinvestedPositionCloneFactoryTest is Test {
     AllowList allowList;
     FakePaymentToken currency;
     Token token;
+    TimeLockMaster timeLockMaster;
     CoinvestedPositionCloneFactory factory;
     TokenProxyFactory tokenFactory;
 
@@ -43,6 +46,10 @@ contract CoinvestedPositionCloneFactoryTest is Test {
         );
 
         factory = new CoinvestedPositionCloneFactory(address(new CoinvestedPosition(trustedForwarder)));
+
+        TimeLockMaster timeLockMasterLogic = new TimeLockMaster();
+        TimeLockMasterCloneFactory timeLockMasterFactory = new TimeLockMasterCloneFactory(address(timeLockMasterLogic));
+        timeLockMaster = TimeLockMaster(timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token));
     }
 
     /// @dev Returns baseline arguments with two lead investors.
@@ -59,7 +66,8 @@ contract CoinvestedPositionCloneFactoryTest is Test {
                 basePrice: EXAMPLE_BASE_PRICE,
                 baseCurrency: IERC20(address(currency)),
                 token: token,
-                lockedUntil: 0
+                lockedUntil: 0,
+                timeLockMaster: timeLockMaster
             });
     }
 

@@ -105,7 +105,7 @@ contract CoinvestedPosition is TokenSwapBase {
      */
     function unpause() external override onlyOwner {
         require(tokenPrice != 0, "tokenPrice must be set before unpausing");
-        require(block.timestamp >= lockedUntil || address(timeLockMaster.exit()) != address(0), "timelock has not expired");
+        require(block.timestamp >= lockedUntil, "timelock has not expired");
         _unpause();
     }
 

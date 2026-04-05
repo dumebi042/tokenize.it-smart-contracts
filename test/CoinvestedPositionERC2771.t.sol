@@ -36,6 +36,10 @@ contract CoinvestedPositionERC2771Test is CoinvestedPositionTestBase {
         token.grantRole(token.MINTALLOWER_ROLE(), admin);
         vm.stopPrank();
 
+        TimeLockMaster timeLockMasterLogic = new TimeLockMaster();
+        TimeLockMasterCloneFactory timeLockMasterFactory = new TimeLockMasterCloneFactory(address(timeLockMasterLogic));
+        timeLockMaster = TimeLockMaster(timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token));
+
         coinvestedPosition = _deployCoinvestedPosition(trustedForwarder);
 
         erc2771Helper = new ERC2771Helper();
@@ -59,7 +63,8 @@ contract CoinvestedPositionERC2771Test is CoinvestedPositionTestBase {
             basePrice: BASE_PRICE,
             baseCurrency: IERC20(address(eurc)),
             token: token,
-            lockedUntil: 0
+            lockedUntil: 0,
+            timeLockMaster: timeLockMaster
         });
         return CoinvestedPosition(freshFactory.createCoinvestedPositionClone(bytes32(0), forwarder, args));
     }

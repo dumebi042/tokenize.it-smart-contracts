@@ -6,9 +6,11 @@ import "../lib/forge-std/src/Test.sol";
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/factories/CoinvestedPositionCloneFactory.sol";
 import "../contracts/factories/DistributionCloneFactory.sol";
+import "../contracts/factories/TimeLockMasterCloneFactory.sol";
 import "../contracts/CoinvestedPosition.sol";
 import "../contracts/Distribution.sol";
 import "../contracts/FeeSettings.sol";
+import "../contracts/TimeLockMaster.sol";
 import "./resources/FakePaymentToken.sol";
 import "./resources/CloneCreators.sol";
 
@@ -80,6 +82,7 @@ contract CoinvestedPositionDistributionTest is Test {
     /// EURe: 18 decimals — alternative dividend currency (TRUSTED | EURO)
     FakePaymentToken eure;
 
+    TimeLockMaster timeLockMaster;
     CoinvestedPosition coinvestedPositionLogic;
     CoinvestedPositionCloneFactory coinvestedPositionFactory;
 
@@ -134,6 +137,11 @@ contract CoinvestedPositionDistributionTest is Test {
         distributionLogic = new Distribution(trustedForwarder);
         distributionFactory = new DistributionCloneFactory(address(distributionLogic));
 
+        // TimeLockMaster
+        TimeLockMaster timeLockMasterLogic = new TimeLockMaster();
+        TimeLockMasterCloneFactory timeLockMasterFactory = new TimeLockMasterCloneFactory(address(timeLockMasterLogic));
+        timeLockMaster = TimeLockMaster(timeLockMasterFactory.createTimeLockMasterClone(bytes32(0), token));
+
         // Deploy default CoinvestedPosition (base currency = EURc, leadA=10%, leadB=5%)
         coinvestedPosition = _deployCoinvestedPosition(bytes32(0), BASE_PRICE_EURC, eurc, _defaultLeadInvestors());
 
@@ -172,7 +180,8 @@ contract CoinvestedPositionDistributionTest is Test {
             basePrice: basePrice,
             baseCurrency: IERC20(address(baseCurrency)),
             token: token,
-            lockedUntil: 0
+            lockedUntil: 0,
+            timeLockMaster: timeLockMaster
         });
         return
             CoinvestedPosition(coinvestedPositionFactory.createCoinvestedPositionClone(salt, trustedForwarder, args));
@@ -993,7 +1002,8 @@ contract CoinvestedPositionDistributionTest is Test {
                         basePrice: BASE_PRICE_EURC,
                         baseCurrency: IERC20(address(eurc)),
                         token: fuzzToken,
-                        lockedUntil: 0
+                        lockedUntil: 0,
+                        timeLockMaster: timeLockMaster
                     });
                 coinvestedPositionFuzz = CoinvestedPosition(
                     coinvestedPositionFactory.createCoinvestedPositionClone(
