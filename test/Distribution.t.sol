@@ -501,6 +501,14 @@ contract DistributionTest is Test {
         }
     }
 
+    function testReassignToZeroAddressReverts() public {
+        vm.warp(reassignOrDrainAfter);
+        uint256 amount = dist.eligible(holderA);
+        vm.expectRevert("to can not be zero address");
+        vm.prank(owner);
+        dist.reassign(holderA, address(0), amount);
+    }
+
     function testReassignZeroAmountReverts() public {
         vm.warp(reassignOrDrainAfter);
         vm.expectRevert("amount must be positive");

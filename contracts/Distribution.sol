@@ -119,6 +119,7 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     }
 
     function _reassign(address _from, address _to, uint256 _amount) internal {
+        require(_to != address(0), "to can not be zero address");
         require(_amount > 0, "amount must be positive");
         require(_amount <= eligible(_from), "amount exceeds eligible");
         paidOut[_from] += _amount;
