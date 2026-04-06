@@ -697,6 +697,52 @@ contract ExitTest is Test {
         }
     }
 
+    // ========== E_Eligible. eligible() ==========
+
+    function testEligibleReturnsCorrectAmountForHolder() public view {
+        uint256 expectedCurrency = (TOKEN_SUPPLY * PRICE_PER_TOKEN) / 1e18;
+        assertEq(
+            exitContract.eligible(holder),
+            expectedCurrency,
+            "eligible should return full currency for full token balance"
+        );
+    }
+
+    function testEligibleZeroForAddressWithNoTokens() public view {
+        assertEq(exitContract.eligible(address(0xdead)), 0, "eligible should be zero for address with no tokens");
+    }
+
+    function testEligibleDecreasesAfterClaim() public {
+        vm.warp(claimStart);
+        uint256 claimAmt = 10e18;
+        uint256 eligibleBefore = exitContract.eligible(holder);
+        vm.prank(holder);
+        exitContract.claim(claimAmt, recipient, 0);
+        uint256 eligibleAfter = exitContract.eligible(holder);
+        uint256 claimedCurrency = (claimAmt * PRICE_PER_TOKEN) / 1e18;
+        assertEq(
+            eligibleAfter,
+            eligibleBefore - claimedCurrency,
+            "eligible should decrease by claimed currency amount"
+        );
+    }
+
+    function testEligibleZeroAfterFullClaim() public {
+        vm.warp(claimStart);
+        vm.prank(holder);
+        exitContract.claim(TOKEN_SUPPLY, recipient, 0);
+        assertEq(exitContract.eligible(holder), 0, "eligible should be zero after full claim");
+    }
+
+    function testFuzzEligible(uint128 tokenBalance) public {
+        vm.assume(tokenBalance > 0);
+        address testHolder = address(0xABCD);
+        vm.prank(admin);
+        token.mint(testHolder, tokenBalance);
+        uint256 expectedCurrency = (uint256(tokenBalance) * PRICE_PER_TOKEN) / 1e18;
+        assertEq(exitContract.eligible(testHolder), expectedCurrency, "eligible fuzz mismatch");
+    }
+
     function testDrainWithFeeReflectsCorrectRemainder() public {
         (Exit feeExit, IFeeSettingsV2 feeSettingsWithFee, Token feeToken) = _deployExitWithNonZeroFee();
         uint256 claimAmt = 10e18;

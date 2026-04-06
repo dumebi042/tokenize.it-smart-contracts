@@ -73,6 +73,10 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         _arguments.currency.safeTransferFrom(_currencyProvider, address(this), _arguments.totalCurrencyAmount);
     }
 
+    function eligible(address _holder) public view returns (uint256) {
+        return (token.balanceOf(_holder) * pricePerToken) / 10 ** token.decimals();
+    }
+
     function claim(uint256 _tokenAmount, address _recipient, uint256 _minPayout) external {
         _claim(_msgSender(), _tokenAmount, _recipient, _minPayout);
     }
