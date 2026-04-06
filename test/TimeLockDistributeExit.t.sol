@@ -121,7 +121,8 @@ contract TimeLockDistributeExitTest is Test {
         eurc.mint(currencyProvider, totalCurrency);
         vm.prank(currencyProvider);
         eurc.approve(cloneAddr, totalCurrency);
-        return Exit(exitFactory.createExitClone(bytes32("exit"), trustedForwarder, currencyProvider, args, totalCurrency));
+        return
+            Exit(exitFactory.createExitClone(bytes32("exit"), trustedForwarder, currencyProvider, args, totalCurrency));
     }
 
     // ── claimExit bypasses lockedUntil ──────────────────────────────────

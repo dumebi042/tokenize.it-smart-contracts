@@ -582,7 +582,9 @@ contract ExitTest is Test {
         currency.mint(currencyProvider, TOTAL_CURRENCY);
         vm.prank(currencyProvider);
         currency.approve(cloneAddr, TOTAL_CURRENCY);
-        feeExit = Exit(factory.createExitClone(bytes32("feeExit"), trustedForwarder, currencyProvider, args, TOTAL_CURRENCY));
+        feeExit = Exit(
+            factory.createExitClone(bytes32("feeExit"), trustedForwarder, currencyProvider, args, TOTAL_CURRENCY)
+        );
 
         vm.prank(holder);
         feeToken.approve(address(feeExit), TOKEN_SUPPLY);

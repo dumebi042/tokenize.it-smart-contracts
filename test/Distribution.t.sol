@@ -96,7 +96,10 @@ contract DistributionTest is Test {
             vm.prank(currencyProvider);
             currency.approve(cloneAddr, initialFunding);
         }
-        return Distribution(factory.createDistributionClone(salt, trustedForwarder, currencyProvider, args, initialFunding));
+        return
+            Distribution(
+                factory.createDistributionClone(salt, trustedForwarder, currencyProvider, args, initialFunding)
+            );
     }
 
     // ========== D1. Constructor / Logic Contract ==========
@@ -395,7 +398,10 @@ contract DistributionTest is Test {
             vm.prank(currencyProvider);
             currency.approve(cloneAddr, initialFunding);
         }
-        return Distribution(factory.createDistributionClone(salt, trustedForwarder, currencyProvider, args, initialFunding));
+        return
+            Distribution(
+                factory.createDistributionClone(salt, trustedForwarder, currencyProvider, args, initialFunding)
+            );
     }
 
     // ========== D5. drain() ==========
@@ -809,7 +815,15 @@ contract DistributionTest is Test {
         currency.mint(currencyProvider, TOTAL_CURRENCY);
         vm.prank(currencyProvider);
         currency.approve(cloneAddr, TOTAL_CURRENCY);
-        d = Distribution(factory.createDistributionClone(bytes32("feeDist"), trustedForwarder, currencyProvider, args, TOTAL_CURRENCY));
+        d = Distribution(
+            factory.createDistributionClone(
+                bytes32("feeDist"),
+                trustedForwarder,
+                currencyProvider,
+                args,
+                TOTAL_CURRENCY
+            )
+        );
     }
 
     function testNoFeeAtInitialization() public {
@@ -820,7 +834,7 @@ contract DistributionTest is Test {
 
     function testFeeDeductedAtClaimTime() public {
         Distribution d = _deployDistWithNonZeroFee();
-        uint256 grossA = SUPPLY_A * PRICE_PER_TOKEN / 1e18; // 120e6
+        uint256 grossA = (SUPPLY_A * PRICE_PER_TOKEN) / 1e18; // 120e6
         uint256 expectedFee = grossA / 100; // 1% of gross
         uint256 expectedNet = grossA - expectedFee; // 118.8e6
 
@@ -848,9 +862,9 @@ contract DistributionTest is Test {
     function testEligibleDeductsFee() public {
         Distribution d = _deployDistWithNonZeroFee();
         // eligible() deducts the 1% fee, returning net payout amount
-        uint256 grossA = SUPPLY_A * PRICE_PER_TOKEN / 1e18; // 120e6
-        uint256 grossB = SUPPLY_B * PRICE_PER_TOKEN / 1e18; // 60e6
-        uint256 grossC = SUPPLY_C * PRICE_PER_TOKEN / 1e18; // 20e6
+        uint256 grossA = (SUPPLY_A * PRICE_PER_TOKEN) / 1e18; // 120e6
+        uint256 grossB = (SUPPLY_B * PRICE_PER_TOKEN) / 1e18; // 60e6
+        uint256 grossC = (SUPPLY_C * PRICE_PER_TOKEN) / 1e18; // 20e6
         assertEq(d.eligible(holderA), grossA - grossA / 100, "holderA eligible should be net after fee");
         assertEq(d.eligible(holderB), grossB - grossB / 100, "holderB eligible should be net after fee");
         assertEq(d.eligible(holderC), grossC - grossC / 100, "holderC eligible should be net after fee");
@@ -893,7 +907,7 @@ contract DistributionTest is Test {
     /// With a fee, minPayout above eligible() (i.e. the gross amount) reverts
     function testClaimMinPayoutAboveEligibleWithFeeReverts() public {
         Distribution d = _deployDistWithNonZeroFee();
-        uint256 gross = SUPPLY_A * PRICE_PER_TOKEN / 1e18; // 120e6, before fee
+        uint256 gross = (SUPPLY_A * PRICE_PER_TOKEN) / 1e18; // 120e6, before fee
         vm.prank(holderA);
         vm.expectRevert("payout below minimum");
         d.claim(holderA, gross); // gross > eligible() (net)
@@ -914,9 +928,9 @@ contract DistributionTest is Test {
 
     function testFuzzReassignAndClaimWithFee(uint256 amount) public {
         Distribution d = _deployDistWithNonZeroFee();
-        uint256 grossA = SUPPLY_A * PRICE_PER_TOKEN / 1e18; // 120e6
-        uint256 grossB = SUPPLY_B * PRICE_PER_TOKEN / 1e18; // 60e6
-        uint256 grossC = SUPPLY_C * PRICE_PER_TOKEN / 1e18; // 20e6
+        uint256 grossA = (SUPPLY_A * PRICE_PER_TOKEN) / 1e18; // 120e6
+        uint256 grossB = (SUPPLY_B * PRICE_PER_TOKEN) / 1e18; // 60e6
+        uint256 grossC = (SUPPLY_C * PRICE_PER_TOKEN) / 1e18; // 20e6
 
         amount = bound(amount, 1, grossA); // can reassign up to full gross allocation
 

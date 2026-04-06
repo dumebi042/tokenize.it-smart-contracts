@@ -665,7 +665,16 @@ contract CoinvestedPositionExitTest is Test {
         eurc.mint(currencyProvider, totalCurrency);
         vm.prank(currencyProvider);
         eurc.approve(cloneAddr, totalCurrency);
-        return Exit(exitFactory.createExitClone(bytes32("v_exit"), trustedForwarder, currencyProvider, exitArgs, totalCurrency));
+        return
+            Exit(
+                exitFactory.createExitClone(
+                    bytes32("v_exit"),
+                    trustedForwarder,
+                    currencyProvider,
+                    exitArgs,
+                    totalCurrency
+                )
+            );
     }
 
     /// V: claimExit does NOT apply fees — full received amount is distributed
@@ -866,7 +875,13 @@ contract CoinvestedPositionExitTest is Test {
         vm.prank(currencyProvider);
         eurc.approve(cloneAddr, totalCurrency);
         Exit exitContract = Exit(
-            exitFactory.createExitClone(bytes32("fuzz_a_exit"), trustedForwarder, currencyProvider, exitArgs, totalCurrency)
+            exitFactory.createExitClone(
+                bytes32("fuzz_a_exit"),
+                trustedForwarder,
+                currencyProvider,
+                exitArgs,
+                totalCurrency
+            )
         );
 
         uint256 beforeA = eurc.balanceOf(leadA);

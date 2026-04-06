@@ -228,7 +228,15 @@ contract CoinvestedPositionDistributionTest is Test {
             _currency.approve(cloneAddr, initialFunding);
         }
         return
-            Distribution(distributionFactory.createDistributionClone(salt, trustedForwarder, currencyProvider, args, initialFunding));
+            Distribution(
+                distributionFactory.createDistributionClone(
+                    salt,
+                    trustedForwarder,
+                    currencyProvider,
+                    args,
+                    initialFunding
+                )
+            );
     }
 
     /// @dev Compute expected lead-investor payout: floor(carryFraction * received / uint64.max)
@@ -940,7 +948,13 @@ contract CoinvestedPositionDistributionTest is Test {
         token.approve(cloneAddr, 100e18);
 
         vm.expectRevert("currency and token must be different");
-        distributionFactory.createDistributionClone(bytes32("DI-XII"), trustedForwarder, currencyProvider, args, 100e18);
+        distributionFactory.createDistributionClone(
+            bytes32("DI-XII"),
+            trustedForwarder,
+            currencyProvider,
+            args,
+            100e18
+        );
     }
 
     /// DI-XIII: _settle reverts when currency == held token, tested via a stub Distribution

@@ -86,7 +86,9 @@ contract ExitSafeTest is Test {
         currency.mint(currencyProvider, TOTAL_CURRENCY);
         vm.prank(currencyProvider);
         currency.approve(cloneAddr, TOTAL_CURRENCY);
-        exitContract = Exit(exitFactory.createExitClone(bytes32(0), trustedForwarder, currencyProvider, args, TOTAL_CURRENCY));
+        exitContract = Exit(
+            exitFactory.createExitClone(bytes32(0), trustedForwarder, currencyProvider, args, TOTAL_CURRENCY)
+        );
 
         // --- Deploy Gnosis Safe v1.4.1 with safeOwner as sole owner, threshold 1 ---
         Safe singleton = new Safe();

@@ -191,7 +191,13 @@ contract ExitCloneFactoryTest is Test {
         currency.mint(_currencyProvider, EXAMPLE_TOTAL_CURRENCY);
         vm.prank(_currencyProvider);
         currency.approve(predicted, EXAMPLE_TOTAL_CURRENCY);
-        address actual = factory.createExitClone(EXAMPLE_SALT, trustedForwarder, _currencyProvider, args, EXAMPLE_TOTAL_CURRENCY);
+        address actual = factory.createExitClone(
+            EXAMPLE_SALT,
+            trustedForwarder,
+            _currencyProvider,
+            args,
+            EXAMPLE_TOTAL_CURRENCY
+        );
         assertEq(predicted, actual);
     }
 
@@ -273,7 +279,13 @@ contract ExitCloneFactoryTest is Test {
         currency.mint(currencyProvider, EXAMPLE_TOTAL_CURRENCY);
         vm.prank(currencyProvider);
         currency.approve(cloneAddr, EXAMPLE_TOTAL_CURRENCY);
-        address actual = factory.createExitClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args, EXAMPLE_TOTAL_CURRENCY);
+        address actual = factory.createExitClone(
+            EXAMPLE_SALT,
+            trustedForwarder,
+            currencyProvider,
+            args,
+            EXAMPLE_TOTAL_CURRENCY
+        );
         assertEq(currency.balanceOf(actual), EXAMPLE_TOTAL_CURRENCY);
     }
 
