@@ -85,7 +85,7 @@ contract CoinvestedPositionCloneFactoryTest is Test {
 
     // ========== F1-CP. Address Prediction ==========
 
-    function testBothPredictOverloadsMatch() public {
+    function testBothPredictOverloadsMatch() public view {
         CoinvestedPositionInitializerArguments memory args = _baseArgs();
         bytes32 precomputed = keccak256(abi.encode(EXAMPLE_SALT, trustedForwarder, args));
 
@@ -111,21 +111,21 @@ contract CoinvestedPositionCloneFactoryTest is Test {
 
     // ========== F2-CP. Each Salt Parameter Changes the Address ==========
 
-    function testRawSaltChangesAddress() public {
+    function testRawSaltChangesAddress() public view {
         CoinvestedPositionInitializerArguments memory args = _baseArgs();
         address a1 = factory.predictCloneAddress(bytes32(uint256(1)), trustedForwarder, args);
         address a2 = factory.predictCloneAddress(bytes32(uint256(2)), trustedForwarder, args);
         assertFalse(a1 == a2);
     }
 
-    function testTrustedForwarderChangesAddress() public {
+    function testTrustedForwarderChangesAddress() public view {
         CoinvestedPositionInitializerArguments memory args = _baseArgs();
         address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
         address a2 = factory.predictCloneAddress(EXAMPLE_SALT, address(0x9999), args);
         assertFalse(a1 == a2);
     }
 
-    function testOwnerChangesAddress() public {
+    function testOwnerChangesAddress() public view {
         CoinvestedPositionInitializerArguments memory args = _baseArgs();
         address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
         args.owner = address(0x9999);
@@ -133,7 +133,7 @@ contract CoinvestedPositionCloneFactoryTest is Test {
         assertFalse(a1 == a2);
     }
 
-    function testReceiverChangesAddress() public {
+    function testReceiverChangesAddress() public view {
         CoinvestedPositionInitializerArguments memory args = _baseArgs();
         address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
         args.receiver = address(0x9999);
@@ -141,7 +141,7 @@ contract CoinvestedPositionCloneFactoryTest is Test {
         assertFalse(a1 == a2);
     }
 
-    function testBasePriceChangesAddress() public {
+    function testBasePriceChangesAddress() public view {
         CoinvestedPositionInitializerArguments memory args = _baseArgs();
         address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
         args.basePrice = EXAMPLE_BASE_PRICE + 1;
@@ -149,7 +149,7 @@ contract CoinvestedPositionCloneFactoryTest is Test {
         assertFalse(a1 == a2);
     }
 
-    function testBaseCurrencyChangesAddress() public {
+    function testBaseCurrencyChangesAddress() public view {
         CoinvestedPositionInitializerArguments memory args = _baseArgs();
         address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
         args.baseCurrency = IERC20(address(0x9999));
@@ -157,7 +157,7 @@ contract CoinvestedPositionCloneFactoryTest is Test {
         assertFalse(a1 == a2);
     }
 
-    function testTokenChangesAddress() public {
+    function testTokenChangesAddress() public view {
         CoinvestedPositionInitializerArguments memory args = _baseArgs();
         address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
         args.token = Token(address(0x9999));
@@ -165,7 +165,7 @@ contract CoinvestedPositionCloneFactoryTest is Test {
         assertFalse(a1 == a2);
     }
 
-    function testLeadInvestorsCarryFractionChangesAddress() public {
+    function testLeadInvestorsCarryFractionChangesAddress() public view {
         CoinvestedPositionInitializerArguments memory args = _baseArgs();
         address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
         args.leadInvestors[0].carryFraction = type(uint64).max / 10 + 1;
@@ -173,7 +173,7 @@ contract CoinvestedPositionCloneFactoryTest is Test {
         assertFalse(a1 == a2);
     }
 
-    function testLeadInvestorsLengthChangesAddress() public {
+    function testLeadInvestorsLengthChangesAddress() public view {
         CoinvestedPositionInitializerArguments memory args = _baseArgs();
         address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
 
@@ -214,7 +214,6 @@ contract CoinvestedPositionCloneFactoryTest is Test {
         assertEq(address(cp.currency()), address(args.baseCurrency));
         assertEq(address(cp.token()), address(args.token));
         assertEq(cp.basePrice(), args.basePrice);
-        assertEq(cp.basePriceDecimals(), 6); // FakePaymentToken has 6 decimals
         assertEq(cp.getLeadInvestorsCount(), 2);
         assertTrue(cp.paused()); // starts paused
         assertEq(cp.tokenPrice(), 0);

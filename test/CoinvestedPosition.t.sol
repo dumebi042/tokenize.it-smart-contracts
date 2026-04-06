@@ -160,7 +160,6 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         assertEq(address(logic.receiver()), address(0), "receiver");
         assertEq(logic.tokenPrice(), 0, "tokenPrice");
         assertEq(logic.basePrice(), 0, "basePrice");
-        assertEq(logic.basePriceDecimals(), 0, "basePriceDecimals");
         assertEq(logic.getLeadInvestorsCount(), 0, "leadInvestors length");
         assertEq(logic.owner(), address(0), "owner");
         // NOTE: logic contract starts unpaused (paused=false is the storage default).
@@ -179,7 +178,6 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         assertEq(address(coinvestedPosition.currency()), address(eurc), "currency");
         assertEq(address(coinvestedPosition.token()), address(token), "token");
         assertEq(coinvestedPosition.basePrice(), 100e6, "basePrice");
-        assertEq(coinvestedPosition.basePriceDecimals(), 6, "basePriceDecimals");
         assertEq(coinvestedPosition.getLeadInvestorsCount(), 2, "leadInvestors length");
         (address acc0, uint64 frac0) = coinvestedPosition.leadInvestors(0);
         assertEq(acc0, leadA, "leadA account");
@@ -187,17 +185,6 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         (address acc1, uint64 frac1) = coinvestedPosition.leadInvestors(1);
         assertEq(acc1, leadB, "leadB account");
         assertEq(frac1, CARRY_5PCT, "leadB fraction");
-    }
-
-    function testInitBasePriceDecimalsReflectsBaseCurrency() public {
-        // Deploy with 18-dec currency → basePriceDecimals = 18
-        CoinvestedPosition coinvestedPosition18 = _deployCoinvestedPosition(
-            bytes32("salt"),
-            100e18,
-            eure,
-            _defaultLeadInvestors()
-        );
-        assertEq(coinvestedPosition18.basePriceDecimals(), 18, "wrong basePriceDecimals");
     }
 
     function testFuzz_InitBasePriceDecimalsAndPriceStoredCorrectly(uint8 decimals, uint256 basePrice) public {
@@ -223,7 +210,6 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             factory.createCoinvestedPositionClone(salt, trustedForwarder, args)
         );
 
-        assertEq(fuzzPosition.basePriceDecimals(), decimals, "basePriceDecimals does not match currency decimals");
         assertEq(fuzzPosition.basePrice(), basePrice, "basePrice not stored as-is");
     }
 
@@ -328,10 +314,10 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
     }
 
     function testInitCarryFractionsSumOverflowReverts() public {
-        // Two investors each with uint64.max: sum overflows uint64 → arithmetic revert
+        // (max/2 + 1) + (max/2 + 1) = max + 1: sum overflows uint64 → arithmetic revert
         LeadInvestor[] memory leadInvestors = new LeadInvestor[](2);
-        leadInvestors[0] = LeadInvestor({account: leadA, carryFraction: type(uint64).max});
-        leadInvestors[1] = LeadInvestor({account: leadB, carryFraction: 1});
+        leadInvestors[0] = LeadInvestor({account: leadA, carryFraction: type(uint64).max / 2 + 1});
+        leadInvestors[1] = LeadInvestor({account: leadB, carryFraction: type(uint64).max / 2 + 1});
         CoinvestedPositionInitializerArguments memory args = CoinvestedPositionInitializerArguments({
             owner: owner,
             receiver: receiver,
@@ -365,14 +351,14 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
     function testSetCurrencyOnlyOwner() public {
         vm.prank(buyer);
         vm.expectRevert("Ownable: caller is not the owner");
-        coinvestedPosition.setCurrency(IERC20(address(eure)));
+        coinvestedPosition.setCurrency(IERC20(address(eure)), 1);
     }
 
     function testFuzz_SetCurrencyOnlyOwner(address caller) public {
         vm.assume(caller != owner && caller != address(0));
         vm.prank(caller);
         vm.expectRevert("Ownable: caller is not the owner");
-        coinvestedPosition.setCurrency(IERC20(address(eure)));
+        coinvestedPosition.setCurrency(IERC20(address(eure)), 1);
     }
 
     function testSetCurrencyNonTrustedReverts() public {
@@ -380,7 +366,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         // not on allowList → 0 attributes, no TRUSTED_CURRENCY bit
         vm.prank(owner);
         vm.expectRevert("currency needs to be on the allowlist with TRUSTED_CURRENCY attribute");
-        coinvestedPosition.setCurrency(IERC20(address(nonTrusted)));
+        coinvestedPosition.setCurrency(IERC20(address(nonTrusted)), 1);
     }
 
     function testFuzz_SetCurrencyValidAccepted(uint8 decimals) public {
@@ -389,23 +375,14 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         // Not on allowList yet → revert
         vm.prank(owner);
         vm.expectRevert();
-        coinvestedPosition.setCurrency(IERC20(address(newCurrency)));
+        coinvestedPosition.setCurrency(IERC20(address(newCurrency)), 1);
 
         // Add to allowList with TRUSTED_CURRENCY bit → accepted
         vm.prank(admin);
         allowList.set(address(newCurrency), TRUSTED_CURRENCY);
         vm.prank(owner);
-        coinvestedPosition.setCurrency(IERC20(address(newCurrency)));
+        coinvestedPosition.setCurrency(IERC20(address(newCurrency)), 1);
         assertEq(address(coinvestedPosition.currency()), address(newCurrency));
-    }
-
-    function testSetCurrencyDoesNotUpdateBasePriceDecimals() public {
-        uint8 decimalsBefore = coinvestedPosition.basePriceDecimals();
-        // Ensure eure has different decimals so the assertion is meaningful
-        assertTrue(eure.decimals() != decimalsBefore, "test requires new currency to have different decimals");
-        vm.prank(owner);
-        coinvestedPosition.setCurrency(IERC20(address(eure)));
-        assertEq(coinvestedPosition.basePriceDecimals(), decimalsBefore, "basePriceDecimals changed after setCurrency");
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -795,10 +772,9 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         // basePriceDecimals=6, setCurrency→EURe (18 dec), tokenPrice=200e18
         // scaledBasePrice = 100e6 scaled to 18 dec = 100e18
         // buy 2 tokens: paid=400e18, basePayout=200e18, carry=200e18
-        assertEq(coinvestedPosition.basePriceDecimals(), 6, "basePriceDecimals changed");
 
         vm.prank(owner);
-        coinvestedPosition.setCurrency(IERC20(address(eure)));
+        coinvestedPosition.setCurrency(IERC20(address(eure)), 100e18);
 
         vm.prank(admin);
         token.mint(address(coinvestedPosition), 10e18);
@@ -837,10 +813,8 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
             eure,
             _defaultLeadInvestors()
         );
-        assertEq(coinvestedPosition18.basePriceDecimals(), 18);
-
         vm.prank(owner);
-        coinvestedPosition18.setCurrency(IERC20(address(eurc)));
+        coinvestedPosition18.setCurrency(IERC20(address(eurc)), 100e6);
 
         vm.prank(admin);
         token.mint(address(coinvestedPosition18), 10e18);
@@ -930,7 +904,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         vm.prank(owner);
         coinvestedPosition.pause();
         vm.prank(owner);
-        coinvestedPosition.setCurrency(IERC20(address(eure)));
+        coinvestedPosition.setCurrency(IERC20(address(eure)), 100e18);
         vm.prank(owner);
         coinvestedPosition.setTokenPrice(200e18);
         vm.prank(owner);
@@ -1065,7 +1039,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
     function testSettleDifferentCurrencyNotSwept() public {
         // Active currency = EURe; a pre-existing EURc balance stays on the contract
         vm.prank(owner);
-        coinvestedPosition.setCurrency(IERC20(address(eure)));
+        coinvestedPosition.setCurrency(IERC20(address(eure)), 100e18);
 
         vm.prank(admin);
         token.mint(address(coinvestedPosition), 10e18);
@@ -1238,14 +1212,13 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         );
 
         // Assert initial state is stored correctly
-        assertEq(fuzzPosition.basePriceDecimals(), baseDecimals, "basePriceDecimals");
         assertEq(fuzzPosition.basePrice(), uint256(basePrice), "basePrice");
 
         // Switch currency to eure (18 dec) and set tokenPrice = 2× scaledBasePrice
         // so carry = scaledBasePrice (50% markup over base)
         uint256 tokenPrice = 2 * scaledBasePrice;
         vm.prank(owner);
-        fuzzPosition.setCurrency(IERC20(address(eure)));
+        fuzzPosition.setCurrency(IERC20(address(eure)), scaledBasePrice);
 
         vm.prank(admin);
         token.mint(address(fuzzPosition), 1e18);
@@ -1298,7 +1271,6 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         );
 
         // Assert initial state is stored correctly
-        assertEq(fuzzPosition.basePriceDecimals(), 18, "basePriceDecimals");
         assertEq(fuzzPosition.basePrice(), uint256(basePrice), "basePrice");
 
         // Create a fresh buy currency with fuzzed decimals and register it
@@ -1310,7 +1282,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         // so carry = scaledBasePrice (50% markup over base)
         uint256 tokenPrice = 2 * scaledBasePrice;
         vm.prank(owner);
-        fuzzPosition.setCurrency(IERC20(address(buyCurrency)));
+        fuzzPosition.setCurrency(IERC20(address(buyCurrency)), scaledBasePrice);
 
         vm.prank(admin);
         token.mint(address(fuzzPosition), 1e18);
@@ -1347,7 +1319,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         vm.assume(caller != address(0) && caller != owner);
         vm.prank(caller);
         vm.expectRevert("Ownable: caller is not the owner");
-        coinvestedPosition.setCurrency(IERC20(address(eure)));
+        coinvestedPosition.setCurrency(IERC20(address(eure)), 1);
     }
 
     function testFuzz_AccessControl_SetTokenPrice(address caller) public {
@@ -1393,28 +1365,14 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
     // ─────────────────────────────────────────────────────────────────────────
 
     function testBuyRevertsWhenCurrencyIsHeldToken() public {
-        // Give token TRUSTED_CURRENCY so setCurrency accepts it
+        // Give token TRUSTED_CURRENCY so the allowList check passes
         vm.prank(admin);
         allowList.set(address(token), TRUSTED_CURRENCY);
 
-        // Switch the sell currency to the equity token itself
-        vm.prank(owner);
-        coinvestedPosition.setCurrency(IERC20(address(token)));
-
-        // Mint tokens to cp and prepare for a buy
-        uint256 tokenPrice = 2e18; // 2 token per token (arbitrary, just needs currencyAmount > 0)
-        _setupBuy(10e18, tokenPrice);
-
-        // Mint equity token to buyer (requirements == 0 so no allowList entry needed)
-        uint256 cost = Math.ceilDiv(1e18 * tokenPrice, 10 ** token.decimals());
-        vm.prank(admin);
-        token.mint(buyer, cost);
-        vm.prank(buyer);
-        IERC20(address(token)).approve(address(coinvestedPosition), cost);
-
+        // setCurrency itself must reject the held token as currency
         vm.expectRevert("currency cannot be the held token");
-        vm.prank(buyer);
-        coinvestedPosition.buy(1e18, cost, tokenReceiver);
+        vm.prank(owner);
+        coinvestedPosition.setCurrency(IERC20(address(token)), 1);
     }
 
     function testReentrancyBuyReverts() public {
