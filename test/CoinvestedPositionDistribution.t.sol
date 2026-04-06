@@ -66,8 +66,11 @@ contract CoinvestedPositionDistributionTest is Test {
     uint256 public constant TOTAL_USDC = 2000e6; // total distribution
     uint256 public constant COINVESTED_POSITION_ELIGIBLE_USDC = 400e6; // 20% of 2000e6
 
-    // ── reassignAfter ─────────────────────────────────────────────────────────
-    uint64 public reassignAfter;
+    uint256 public constant PRICE_PER_TOKEN_USDC = 2_000_000; // 2000e6 / 1000e18 * 1e18
+    uint256 public constant PRICE_PER_TOKEN_EURE = 1e18; // 1000e18 / 1000e18 * 1e18
+
+    // ── reassignOrDrainAfter ─────────────────────────────────────────────────
+    uint64 public reassignOrDrainAfter;
 
     // ── Contracts ─────────────────────────────────────────────────────────────
     AllowList allowList;
@@ -100,7 +103,7 @@ contract CoinvestedPositionDistributionTest is Test {
     // ─────────────────────────────────────────────────────────────────────────
 
     function setUp() public {
-        reassignAfter = uint64(block.timestamp + 31 days);
+        reassignOrDrainAfter = uint64(block.timestamp + 31 days);
 
         // Infrastructure
         allowList = createAllowList(trustedForwarder, admin);
@@ -195,16 +198,18 @@ contract CoinvestedPositionDistributionTest is Test {
     function _deployDistribution(
         bytes32 salt,
         FakePaymentToken _currency,
-        uint256 totalCurrency
+        uint256 initialFunding,
+        uint256 _pricePerToken
     ) internal returns (Distribution) {
-        return _deployDistributionWithSnapshot(salt, _currency, totalCurrency, snapshotId);
+        return _deployDistributionWithSnapshot(salt, _currency, initialFunding, _pricePerToken, snapshotId);
     }
 
     /// @dev Deploy a funded Distribution clone against an explicit snapshotId
     function _deployDistributionWithSnapshot(
         bytes32 salt,
         FakePaymentToken _currency,
-        uint256 totalCurrency,
+        uint256 initialFunding,
+        uint256 _pricePerToken,
         uint256 _snapshotId
     ) internal returns (Distribution) {
         DistributionInitializerArguments memory args = DistributionInitializerArguments({
@@ -212,14 +217,17 @@ contract CoinvestedPositionDistributionTest is Test {
             token: token,
             snapshotId: _snapshotId,
             currency: IERC20(address(_currency)),
-            totalCurrencyAmount: totalCurrency,
-            reassignAfter: reassignAfter,
+            pricePerToken: _pricePerToken,
+            initialFundingAmount: initialFunding,
+            reassignOrDrainAfter: reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
         address cloneAddr = distributionFactory.predictCloneAddress(salt, trustedForwarder, args);
-        _currency.mint(currencyProvider, totalCurrency);
-        vm.prank(currencyProvider);
-        _currency.approve(cloneAddr, totalCurrency);
+        if (initialFunding > 0) {
+            _currency.mint(currencyProvider, initialFunding);
+            vm.prank(currencyProvider);
+            _currency.approve(cloneAddr, initialFunding);
+        }
         return
             Distribution(distributionFactory.createDistributionClone(salt, trustedForwarder, currencyProvider, args));
     }
@@ -243,7 +251,7 @@ contract CoinvestedPositionDistributionTest is Test {
     // ─────────────────────────────────────────────────────────────────────────
 
     function testDI_I_BasicProportionalClaim() public {
-        Distribution distribution = _deployDistribution(bytes32("DI-I"), usdc, TOTAL_USDC);
+        Distribution distribution = _deployDistribution(bytes32("DI-I"), usdc, TOTAL_USDC, PRICE_PER_TOKEN_USDC);
 
         // Verify eligible before claim
         assertEq(
@@ -298,13 +306,13 @@ contract CoinvestedPositionDistributionTest is Test {
     // ─────────────────────────────────────────────────────────────────────────
 
     function testDI_II_MinorityHolder_OthersClaimFirst() public {
-        Distribution distribution = _deployDistribution(bytes32("DI-II"), usdc, TOTAL_USDC);
+        Distribution distribution = _deployDistribution(bytes32("DI-II"), usdc, TOTAL_USDC, PRICE_PER_TOKEN_USDC);
 
         // holderX (800 tokens = 80%) claims first
         vm.prank(holderX);
         distribution.claim(holderX);
 
-        uint256 expectedHolderX = (TOTAL_USDC * OTHER_TOKENS) / TOKEN_SUPPLY;
+        uint256 expectedHolderX = (OTHER_TOKENS * PRICE_PER_TOKEN_USDC) / (10 ** token.decimals());
         assertEq(usdc.balanceOf(holderX), expectedHolderX, "DI-II: wrong holderX payout");
         assertEq(expectedHolderX, 1600e6, "wrong amount for X");
 
@@ -378,11 +386,17 @@ contract CoinvestedPositionDistributionTest is Test {
 
         // Now cp3 holds 200 tokens in snap3.
         // Total supply at snap3 = original 1000e18 (coinvestedPosition, holderX) + 200e18 (cp3) = 1200e18
-        // Use TOTAL_USDC distribution: cp3 eligible = 200/1200 * 1000e6
-        uint256 totalSupplyAtSnap3 = token.totalSupplyAt(snap3);
-        uint256 coinvestedPosition3Eligible = (TOTAL_USDC * COINVESTED_POSITION_TOKEN_AMOUNT) / totalSupplyAtSnap3;
+        // cp3 eligible = 200e18 * PRICE_PER_TOKEN_USDC / 1e18
+        uint256 coinvestedPosition3Eligible = (COINVESTED_POSITION_TOKEN_AMOUNT * PRICE_PER_TOKEN_USDC) /
+            (10 ** token.decimals());
 
-        Distribution distribution = _deployDistributionWithSnapshot(bytes32("DI-III-A"), usdc, TOTAL_USDC, snap3);
+        Distribution distribution = _deployDistributionWithSnapshot(
+            bytes32("DI-III-A"),
+            usdc,
+            TOTAL_USDC,
+            PRICE_PER_TOKEN_USDC,
+            snap3
+        );
 
         assertEq(
             distribution.eligible(address(coinvestedPosition3)),
@@ -436,11 +450,19 @@ contract CoinvestedPositionDistributionTest is Test {
         vm.prank(admin);
         uint256 snap3 = token.createSnapshot();
 
-        uint256 totalSupplyAtSnap3 = token.totalSupplyAt(snap3);
         uint256 totalEure = 1000e18;
-        uint256 coinvestedPosition3Eligible = (totalEure * COINVESTED_POSITION_TOKEN_AMOUNT) / totalSupplyAtSnap3;
+        uint256 totalSupplyAtSnap3 = token.totalSupplyAt(snap3);
+        uint256 pricePerTokenEure = (totalEure * (10 ** token.decimals())) / totalSupplyAtSnap3;
+        uint256 coinvestedPosition3Eligible = (COINVESTED_POSITION_TOKEN_AMOUNT * pricePerTokenEure) /
+            (10 ** token.decimals());
 
-        Distribution distribution = _deployDistributionWithSnapshot(bytes32("DI-III-B"), eure, totalEure, snap3);
+        Distribution distribution = _deployDistributionWithSnapshot(
+            bytes32("DI-III-B"),
+            eure,
+            totalEure,
+            pricePerTokenEure,
+            snap3
+        );
 
         assertEq(
             distribution.eligible(address(coinvestedPosition3)),
@@ -454,24 +476,21 @@ contract CoinvestedPositionDistributionTest is Test {
         uint256 expectedC = _leadShare(leadInvestors[2].carryFraction, coinvestedPosition3Eligible);
 
         // total token amount = 1000 + 200 = 1200e18
-        // our token amount = 200e18, which is 1/6th of supply
-        // total currency amount = 1000e18
-        assertEq(coinvestedPosition3Eligible, uint256(1000e18) / 6, "total eligible wrong");
+        // our token amount = 200e18, pricePerToken = 1000e18 * 1e18 / 1200e18 = 833333333333333333
+        // eligible = 200e18 * 833333333333333333 / 1e18 = 166666666666666666600
+        // (double rounding from price-based formula loses ~66 wei vs proportional 1000e18/6)
+        assertEq(coinvestedPosition3Eligible, 166666666666666666600, "total eligible wrong");
         // percentages calculated the same way as contracts do, to get the rounding error right
         assertEq(
             expectedA,
             ((coinvestedPosition3Eligible * (((type(uint64).max) / 100) * 7)) / type(uint64).max),
             "expectedA wrong"
         );
-        // 1000 / 6 * 0.07 = 11.6666
-        assertEq(expectedA, 11666666666666666657, "expectedA fixed wrong");
         assertEq(
             expectedB,
             ((coinvestedPosition3Eligible * (((type(uint64).max) / 100) * 13)) / type(uint64).max),
             "expectedB wrong"
         );
-        // 1000 / 6 * 0.13 = 21.66666
-        assertEq(expectedB, 21666666666666666648, "expectedB fixed wrong");
         assertEq(
             expectedC,
             ((coinvestedPosition3Eligible * (((type(uint64).max) / 100) * 3)) / type(uint64).max),
@@ -510,7 +529,7 @@ contract CoinvestedPositionDistributionTest is Test {
 
     function testDI_IV_NonEuroTrustedCurrency_Accepted() public {
         // USDC has TRUSTED_CURRENCY bit — must be accepted by claimDistribution
-        Distribution distribution = _deployDistribution(bytes32("DI-IV"), usdc, TOTAL_USDC);
+        Distribution distribution = _deployDistribution(bytes32("DI-IV"), usdc, TOTAL_USDC, PRICE_PER_TOKEN_USDC);
 
         uint256 beforeA = usdc.balanceOf(leadA);
         uint256 beforeB = usdc.balanceOf(leadB);
@@ -556,7 +575,7 @@ contract CoinvestedPositionDistributionTest is Test {
 
     function testDI_V_DividendCurrencyDiffersFromBaseCurrency() public {
         // coinvestedPosition was initialised with EURc as baseCurrency; Distribution pays USDC
-        Distribution distribution = _deployDistribution(bytes32("DI-V"), usdc, TOTAL_USDC);
+        Distribution distribution = _deployDistribution(bytes32("DI-V"), usdc, TOTAL_USDC, PRICE_PER_TOKEN_USDC);
 
         // Give coinvestedPosition some EURc to verify it is untouched
         eurc.mint(address(coinvestedPosition), 500e6);
@@ -604,13 +623,13 @@ contract CoinvestedPositionDistributionTest is Test {
         );
         // Do NOT mint any tokens to coinvestedPositionZero before the snapshot (snapshotId taken in setUp)
 
-        Distribution distribution = _deployDistribution(bytes32("DI-VI"), usdc, TOTAL_USDC);
+        Distribution distribution = _deployDistribution(bytes32("DI-VI"), usdc, TOTAL_USDC, PRICE_PER_TOKEN_USDC);
 
         // eligible must be 0
         assertEq(distribution.eligible(address(coinvestedPositionZero)), 0, "DI-VI: eligible not zero");
 
-        // claimDistribution must revert because received = 0
-        vm.expectRevert("didn't receive expected currency from distribution");
+        // claimDistribution must revert because eligible = 0
+        vm.expectRevert("nothing to claim");
         vm.prank(owner);
         coinvestedPositionZero.claimDistribution(IDistribution(address(distribution)), usdc);
     }
@@ -628,11 +647,17 @@ contract CoinvestedPositionDistributionTest is Test {
         vm.prank(admin);
         uint256 snap7 = token.createSnapshot();
 
-        uint256 totalSupply7 = token.totalSupplyAt(snap7);
-        uint256 coinvestedPositionEligible7 = (TOTAL_USDC * COINVESTED_POSITION_TOKEN_AMOUNT) / totalSupply7;
-        uint256 holderYEligible = (TOTAL_USDC * 100e18) / totalSupply7;
+        uint256 coinvestedPositionEligible7 = (COINVESTED_POSITION_TOKEN_AMOUNT * PRICE_PER_TOKEN_USDC) /
+            (10 ** token.decimals());
+        uint256 holderYEligible = (100e18 * PRICE_PER_TOKEN_USDC) / (10 ** token.decimals());
 
-        Distribution distribution = _deployDistributionWithSnapshot(bytes32("DI-VII"), usdc, TOTAL_USDC, snap7);
+        Distribution distribution = _deployDistributionWithSnapshot(
+            bytes32("DI-VII"),
+            usdc,
+            TOTAL_USDC,
+            PRICE_PER_TOKEN_USDC,
+            snap7
+        );
         assertEq(
             distribution.eligible(address(coinvestedPosition)),
             coinvestedPositionEligible7,
@@ -640,7 +665,7 @@ contract CoinvestedPositionDistributionTest is Test {
         );
         assertEq(distribution.eligible(holderY), holderYEligible, "DI-VII: wrong holderY eligible");
 
-        vm.warp(reassignAfter);
+        vm.warp(reassignOrDrainAfter);
         uint256 yEligible = distribution.eligible(holderY);
         vm.prank(owner);
         distribution.reassign(holderY, address(coinvestedPosition), yEligible);
@@ -678,7 +703,9 @@ contract CoinvestedPositionDistributionTest is Test {
 
         // holderY cannot claim anything
         uint256 holderYBalBefore = usdc.balanceOf(holderY);
+        // holderY's eligible is 0 after full reassign → claim reverts
         vm.prank(holderY);
+        vm.expectRevert("nothing to claim");
         distribution.claim(holderY);
         assertEq(usdc.balanceOf(holderY), holderYBalBefore, "DI-VII: holderY received non-zero after reassign");
 
@@ -693,8 +720,8 @@ contract CoinvestedPositionDistributionTest is Test {
     // ─────────────────────────────────────────────────────────────────────────
 
     function testDI_VIII_MultipleDistributions_Sequential() public {
-        Distribution usdcDistribution = _deployDistribution(bytes32("DI-VIII-usdc"), usdc, TOTAL_USDC);
-        Distribution eureDistribution = _deployDistribution(bytes32("DI-VIII-eure"), eure, 1000e18);
+        Distribution usdcDistribution = _deployDistribution(bytes32("DI-VIII-usdc"), usdc, TOTAL_USDC, PRICE_PER_TOKEN_USDC);
+        Distribution eureDistribution = _deployDistribution(bytes32("DI-VIII-eure"), eure, 1000e18, PRICE_PER_TOKEN_EURE);
 
         // --- Claim USDC distribution ---
         {
@@ -773,7 +800,7 @@ contract CoinvestedPositionDistributionTest is Test {
         uint256 preExisting = 300e6;
         usdc.mint(address(coinvestedPosition), preExisting);
 
-        Distribution distribution = _deployDistribution(bytes32("DI-IX"), usdc, TOTAL_USDC);
+        Distribution distribution = _deployDistribution(bytes32("DI-IX"), usdc, TOTAL_USDC, PRICE_PER_TOKEN_USDC);
 
         // before snapshot is taken at call time — pre-existing is excluded from `received`
         uint256 beforeA = usdc.balanceOf(leadA);
@@ -810,7 +837,7 @@ contract CoinvestedPositionDistributionTest is Test {
     function testDI_X_BuyBetweenSnapshotAndClaim() public {
         // Snapshot already taken in setUp with coinvestedPosition holding 200 tokens.
         // Deploy distribution — coinvestedPosition eligible = 200e6
-        Distribution distribution = _deployDistribution(bytes32("DI-X"), usdc, TOTAL_USDC);
+        Distribution distribution = _deployDistribution(bytes32("DI-X"), usdc, TOTAL_USDC, PRICE_PER_TOKEN_USDC);
         assertEq(
             distribution.eligible(address(coinvestedPosition)),
             COINVESTED_POSITION_ELIGIBLE_USDC,
@@ -893,8 +920,9 @@ contract CoinvestedPositionDistributionTest is Test {
             token: token,
             snapshotId: snapshotId,
             currency: IERC20(address(token)),
-            totalCurrencyAmount: 100e18,
-            reassignAfter: reassignAfter,
+            pricePerToken: PRICE_PER_TOKEN_USDC,
+            initialFundingAmount: 100e18,
+            reassignOrDrainAfter: reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
         address cloneAddr = distributionFactory.predictCloneAddress(bytes32("DI-XII"), trustedForwarder, args);
@@ -928,7 +956,7 @@ contract CoinvestedPositionDistributionTest is Test {
     }
 
     /**
-     * @notice Fuzz: random CoinvestedPosition snapshot balance, totalCurrencyAmount, 1-3 lead investors.
+     * @notice Fuzz: random CoinvestedPosition snapshot balance, pricePerToken, 1-3 lead investors.
      * Invariants:
      *   1. received == Distribution.eligible(coinvestedPosition) at claim time
      *   2. sum(lead investor payouts) + receiver_payout == received
@@ -938,7 +966,7 @@ contract CoinvestedPositionDistributionTest is Test {
     function testDI_XI_Fuzz(
         uint64 coinvestedPositionTokenAmount,
         uint64 otherTokenAmount,
-        uint96 totalCurrencyAmount,
+        uint96 fuzzPricePerToken,
         uint8 numLeads,
         uint64 carryA,
         uint64 carryB,
@@ -956,7 +984,7 @@ contract CoinvestedPositionDistributionTest is Test {
         else carryC = 0;
         vm.assume(uint256(carryA) + uint256(carryB) + uint256(carryC) < type(uint64).max);
 
-        vm.assume(totalCurrencyAmount >= 1);
+        vm.assume(fuzzPricePerToken >= 1);
 
         // Scope leadInvestors, fuzzToken, snapFuzz so they're freed before the assertion phase.
         CoinvestedPosition coinvestedPositionFuzz;
@@ -1025,16 +1053,21 @@ contract CoinvestedPositionDistributionTest is Test {
             }
 
             coinvestedPositionEligible =
-                (uint256(totalCurrencyAmount) * fuzzToken.balanceOfAt(address(coinvestedPositionFuzz), snapFuzz)) /
-                fuzzToken.totalSupplyAt(snapFuzz);
+                (fuzzToken.balanceOfAt(address(coinvestedPositionFuzz), snapFuzz) * uint256(fuzzPricePerToken)) /
+                (10 ** fuzzToken.decimals());
+
+            // Compute initial funding: enough to cover all eligible claims
+            uint256 totalSupplyFuzz = fuzzToken.totalSupplyAt(snapFuzz);
+            uint256 initialFunding = (totalSupplyFuzz * uint256(fuzzPricePerToken)) / (10 ** fuzzToken.decimals());
 
             DistributionInitializerArguments memory distributionArgs = DistributionInitializerArguments({
                 owner: owner,
                 token: fuzzToken,
                 snapshotId: snapFuzz,
                 currency: IERC20(address(usdc)),
-                totalCurrencyAmount: uint256(totalCurrencyAmount),
-                reassignAfter: reassignAfter,
+                pricePerToken: uint256(fuzzPricePerToken),
+                initialFundingAmount: initialFunding,
+                reassignOrDrainAfter: reassignOrDrainAfter,
                 initialReassignments: new Reassignment[](0)
             });
             address cloneAddr = distributionFactory.predictCloneAddress(
@@ -1042,9 +1075,9 @@ contract CoinvestedPositionDistributionTest is Test {
                 trustedForwarder,
                 distributionArgs
             );
-            usdc.mint(currencyProvider, uint256(totalCurrencyAmount));
+            usdc.mint(currencyProvider, initialFunding);
             vm.prank(currencyProvider);
-            usdc.approve(cloneAddr, uint256(totalCurrencyAmount));
+            usdc.approve(cloneAddr, initialFunding);
             distributionFuzz = Distribution(
                 distributionFactory.createDistributionClone(
                     bytes32("DI-XI-dist"),

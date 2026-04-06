@@ -27,8 +27,10 @@ contract DistributionTest is Test {
     uint256 public constant TOTAL_SUPPLY = SUPPLY_A + SUPPLY_B + SUPPLY_C;
     // 200 USDC total distribution
     uint256 public constant TOTAL_CURRENCY = 200e6;
+    // pricePerToken: 200e6 currency for 1000e18 tokens → 200e6 * 1e18 / 1000e18 = 200_000
+    uint256 public constant PRICE_PER_TOKEN = 200_000;
 
-    uint64 public reassignAfter;
+    uint64 public reassignOrDrainAfter;
 
     AllowList allowList;
     FakePaymentToken currency;
@@ -40,7 +42,7 @@ contract DistributionTest is Test {
     uint256 public snapshotId;
 
     function setUp() public {
-        reassignAfter = uint64(block.timestamp + 31 days);
+        reassignOrDrainAfter = uint64(block.timestamp + 31 days);
 
         allowList = createAllowList(trustedForwarder, admin);
         currency = new FakePaymentToken(0, CURRENCY_DECIMALS);
@@ -70,24 +72,31 @@ contract DistributionTest is Test {
 
         distLogic = new Distribution(trustedForwarder);
         factory = new DistributionCloneFactory(address(distLogic));
-        dist = _deployDist(bytes32(0), TOTAL_CURRENCY, reassignAfter);
+        dist = _deployDist(bytes32(0), TOTAL_CURRENCY, reassignOrDrainAfter);
     }
 
     /// @dev Helper: predict address, fund, and deploy a Distribution clone
-    function _deployDist(bytes32 salt, uint256 totalCurrency, uint64 _reassignAfter) internal returns (Distribution) {
+    function _deployDist(
+        bytes32 salt,
+        uint256 initialFunding,
+        uint64 _reassignOrDrainAfter
+    ) internal returns (Distribution) {
         DistributionInitializerArguments memory args = DistributionInitializerArguments({
             owner: owner,
             token: token,
             snapshotId: snapshotId,
             currency: IERC20(address(currency)),
-            totalCurrencyAmount: totalCurrency,
-            reassignAfter: _reassignAfter,
+            pricePerToken: PRICE_PER_TOKEN,
+            initialFundingAmount: initialFunding,
+            reassignOrDrainAfter: _reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
         address cloneAddr = factory.predictCloneAddress(salt, trustedForwarder, args);
-        currency.mint(currencyProvider, totalCurrency);
-        vm.prank(currencyProvider);
-        currency.approve(cloneAddr, totalCurrency);
+        if (initialFunding > 0) {
+            currency.mint(currencyProvider, initialFunding);
+            vm.prank(currencyProvider);
+            currency.approve(cloneAddr, initialFunding);
+        }
         return Distribution(factory.createDistributionClone(salt, trustedForwarder, currencyProvider, args));
     }
 
@@ -99,8 +108,9 @@ contract DistributionTest is Test {
             token: token,
             snapshotId: snapshotId,
             currency: IERC20(address(currency)),
-            totalCurrencyAmount: 0,
-            reassignAfter: reassignAfter,
+            pricePerToken: PRICE_PER_TOKEN,
+            initialFundingAmount: 0,
+            reassignOrDrainAfter: reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
         vm.expectRevert("Initializable: contract is already initialized");
@@ -113,8 +123,9 @@ contract DistributionTest is Test {
             token: token,
             snapshotId: snapshotId,
             currency: IERC20(address(currency)),
-            totalCurrencyAmount: 0,
-            reassignAfter: reassignAfter,
+            pricePerToken: PRICE_PER_TOKEN,
+            initialFundingAmount: 0,
+            reassignOrDrainAfter: reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
         vm.expectRevert("Initializable: contract is already initialized");
@@ -130,8 +141,9 @@ contract DistributionTest is Test {
             token: token,
             snapshotId: snapshotId,
             currency: IERC20(address(badCurrency)),
-            totalCurrencyAmount: 0,
-            reassignAfter: reassignAfter,
+            pricePerToken: PRICE_PER_TOKEN,
+            initialFundingAmount: 0,
+            reassignOrDrainAfter: reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
         vm.expectRevert("currency needs to be on the allowlist with TRUSTED_CURRENCY attribute");
@@ -144,8 +156,9 @@ contract DistributionTest is Test {
             token: token,
             snapshotId: snapshotId,
             currency: IERC20(address(currency)),
-            totalCurrencyAmount: 500e6,
-            reassignAfter: reassignAfter,
+            pricePerToken: PRICE_PER_TOKEN,
+            initialFundingAmount: 500e6,
+            reassignOrDrainAfter: reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
         address cloneAddr = factory.predictCloneAddress(bytes32("lowA"), trustedForwarder, args);
@@ -156,12 +169,27 @@ contract DistributionTest is Test {
         factory.createDistributionClone(bytes32("lowA"), trustedForwarder, currencyProvider, args);
     }
 
+    function testInitializeZeroPriceReverts() public {
+        DistributionInitializerArguments memory args = DistributionInitializerArguments({
+            owner: owner,
+            token: token,
+            snapshotId: snapshotId,
+            currency: IERC20(address(currency)),
+            pricePerToken: 0,
+            initialFundingAmount: 0,
+            reassignOrDrainAfter: reassignOrDrainAfter,
+            initialReassignments: new Reassignment[](0)
+        });
+        vm.expectRevert("price must be positive");
+        factory.createDistributionClone(bytes32("zeroP"), trustedForwarder, currencyProvider, args);
+    }
+
     function testInitializeStateVariables() public view {
         assertEq(address(dist.token()), address(token), "unexpected token address");
         assertEq(dist.snapshotId(), snapshotId, "unexpected snapshotId");
         assertEq(address(dist.currency()), address(currency), "unexpected currency address");
-        assertEq(dist.totalCurrencyAmount(), TOTAL_CURRENCY, "unexpected totalCurrencyAmount");
-        assertEq(dist.reassignAfter(), reassignAfter, "unexpected reassignAfter");
+        assertEq(dist.pricePerToken(), PRICE_PER_TOKEN, "unexpected pricePerToken");
+        assertEq(dist.reassignOrDrainAfter(), reassignOrDrainAfter, "unexpected reassignOrDrainAfter");
         assertEq(dist.owner(), owner, "unexpected owner");
         assertEq(currency.balanceOf(address(dist)), TOTAL_CURRENCY, "dist not fully funded");
     }
@@ -193,26 +221,31 @@ contract DistributionTest is Test {
             token: emptyToken,
             snapshotId: emptySnap,
             currency: IERC20(address(currency)),
-            totalCurrencyAmount: TOTAL_CURRENCY,
-            reassignAfter: reassignAfter,
+            pricePerToken: PRICE_PER_TOKEN,
+            initialFundingAmount: 0,
+            reassignOrDrainAfter: reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
-        address cloneAddr = factory.predictCloneAddress(bytes32("emptyDist"), trustedForwarder, args);
-        currency.mint(currencyProvider, TOTAL_CURRENCY);
-        vm.prank(currencyProvider);
-        currency.approve(cloneAddr, TOTAL_CURRENCY);
         vm.expectRevert("snapshot has no tokens");
         factory.createDistributionClone(bytes32("emptyDist"), trustedForwarder, currencyProvider, args);
+    }
+
+    function testInitializeWithZeroFunding() public {
+        Distribution unfunded = _deployDist(bytes32("unfunded"), 0, reassignOrDrainAfter);
+        assertEq(currency.balanceOf(address(unfunded)), 0, "unfunded dist should have zero balance");
+        assertEq(unfunded.pricePerToken(), PRICE_PER_TOKEN, "pricePerToken should be set even without funding");
+        // eligible is based on price, not balance
+        assertEq(unfunded.eligible(holderA), 120e6, "holderA eligible should be based on price");
     }
 
     // ========== D3. eligible() — Math ==========
 
     function testEligibleConcreteExample() public view {
-        // A: 600/1000 of 200e6 = 120e6
+        // A: 600e18 * 200_000 / 1e18 = 120e6
         assertEq(dist.eligible(holderA), 120e6, "holderA eligible amount wrong");
-        // B: 300/1000 of 200e6 = 60e6
+        // B: 300e18 * 200_000 / 1e18 = 60e6
         assertEq(dist.eligible(holderB), 60e6, "holderB eligible amount wrong");
-        // C: 100/1000 of 200e6 = 20e6
+        // C: 100e18 * 200_000 / 1e18 = 20e6
         assertEq(dist.eligible(holderC), 20e6, "holderC eligible amount wrong");
     }
 
@@ -222,15 +255,19 @@ contract DistributionTest is Test {
 
     function testEligibleSumEqTotalCurrencyLimitedDust() public view {
         uint256 sumEligible = dist.eligible(holderA) + dist.eligible(holderB) + dist.eligible(holderC);
-        assertLe(sumEligible, TOTAL_CURRENCY, "sum of eligible exceeds totalCurrencyAmount");
+        uint256 maxPayout = (TOTAL_SUPPLY * PRICE_PER_TOKEN) / (10 ** token.decimals());
+        assertLe(sumEligible, maxPayout, "sum of eligible exceeds max payout");
         // max dust = number of holders
-        assertGe(sumEligible + 3, TOTAL_CURRENCY, "sum of eligible less than totalCurrencyAmount");
+        assertGe(sumEligible + 3, maxPayout, "sum of eligible less than max payout minus dust");
     }
 
-    function testFuzzEligibleSumNeverExceedsTotal(uint128 totalCurrency, uint128 balA, uint128 balB) public {
-        vm.assume(totalCurrency > 0);
+    function testFuzzEligibleSumNeverExceedsTotal(uint128 pricePerTokenFuzz, uint128 balA, uint128 balB) public {
+        vm.assume(pricePerTokenFuzz > 0);
         vm.assume(uint256(balA) + balB < type(uint128).max);
         uint256 balC = uint256(balA) + balB > 0 ? uint256(balA) + balB : 1;
+        // Ensure balance * pricePerToken fits in uint256 (each balance ≤ 2*type(uint128).max)
+        uint256 maxBalance = 2 * uint256(type(uint128).max);
+        vm.assume(uint256(pricePerTokenFuzz) <= type(uint256).max / (maxBalance > 0 ? maxBalance : 1));
 
         // Deploy a fresh token with three holders
         IFeeSettingsV2 feeSettings = createFeeSettings(
@@ -259,19 +296,19 @@ contract DistributionTest is Test {
         vm.prank(admin);
         uint256 snap = fuzzToken.createSnapshot();
 
+        uint256 totalSupply = uint256(balA) + uint256(balB) + balC;
+        uint256 maxPayout = (totalSupply * uint256(pricePerTokenFuzz)) / (10 ** fuzzToken.decimals());
+
         DistributionInitializerArguments memory args = DistributionInitializerArguments({
             owner: owner,
             token: fuzzToken,
             snapshotId: snap,
             currency: IERC20(address(currency)),
-            totalCurrencyAmount: totalCurrency,
-            reassignAfter: reassignAfter,
+            pricePerToken: pricePerTokenFuzz,
+            initialFundingAmount: 0,
+            reassignOrDrainAfter: reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
-        address cloneAddr = factory.predictCloneAddress(bytes32("fuzz2"), trustedForwarder, args);
-        currency.mint(currencyProvider, totalCurrency);
-        vm.prank(currencyProvider);
-        currency.approve(cloneAddr, totalCurrency);
         Distribution fuzzDistribution = Distribution(
             factory.createDistributionClone(bytes32("fuzz2"), trustedForwarder, currencyProvider, args)
         );
@@ -279,22 +316,24 @@ contract DistributionTest is Test {
         uint256 sumE = fuzzDistribution.eligible(holderA) +
             fuzzDistribution.eligible(holderB) +
             fuzzDistribution.eligible(holderC);
-        assertLe(sumE, totalCurrency, "sum of eligible exceeds totalCurrencyAmount");
-        assertGe(sumE + 3, totalCurrency, "dust > number of holders");
+        assertLe(sumE, maxPayout, "sum of eligible exceeds max payout");
+        // Each eligible() truncates balance * pricePerToken / 10^decimals, losing up to (10^decimals - 1) per holder
+        uint256 maxDust = 3 * (10 ** fuzzToken.decimals());
+        assertGe(sumE + maxDust, maxPayout, "dust exceeds bound");
     }
 
     // ========== D4. claim(address) — Direct Claim ==========
 
     function testClaimCorrectAmount() public {
-        assertEq(currency.balanceOf(address(this)), 0, "already holding currency");
-        dist.claim(recipient);
-        assertEq(currency.balanceOf(address(this)), 0, "received currency");
-        // msgSender is address(this), which has 0 snapshot balance → 0 currency
-        // Test via holderA:
         assertEq(currency.balanceOf(recipient), 0, "recipient already holds currency");
         vm.prank(holderA);
         dist.claim(recipient);
         assertEq(currency.balanceOf(recipient), 120e6, "recipient did not receive holderA's share");
+    }
+
+    function testClaimZeroEligibleReverts() public {
+        vm.expectRevert("nothing to claim");
+        dist.claim(recipient); // address(this) has 0 snapshot balance
     }
 
     function testClaimUpdatesPayedOut() public {
@@ -304,13 +343,12 @@ contract DistributionTest is Test {
         assertEq(dist.paidOut(holderA), 120e6, "paidOut not updated after claim");
     }
 
-    function testSecondClaimTransfersZero() public {
+    function testSecondClaimReverts() public {
         vm.prank(holderA);
         dist.claim(holderA);
-        uint256 balBefore = currency.balanceOf(holderA);
         vm.prank(holderA);
-        dist.claim(holderA); // eligible = 0 → transfers 0, must not revert
-        assertEq(currency.balanceOf(holderA), balBefore, "second claim should transfer nothing");
+        vm.expectRevert("nothing to claim");
+        dist.claim(holderA);
     }
 
     function testClaimRecipientDiffersFromSender() public {
@@ -348,28 +386,81 @@ contract DistributionTest is Test {
     function _deployDistWithSnapshot(
         bytes32 salt,
         uint256 snap,
-        uint256 totalCurrency
+        uint256 initialFunding
     ) internal returns (Distribution) {
         DistributionInitializerArguments memory args = DistributionInitializerArguments({
             owner: owner,
             token: token,
             snapshotId: snap,
             currency: IERC20(address(currency)),
-            totalCurrencyAmount: totalCurrency,
-            reassignAfter: reassignAfter,
+            pricePerToken: PRICE_PER_TOKEN,
+            initialFundingAmount: initialFunding,
+            reassignOrDrainAfter: reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
         address cloneAddr = factory.predictCloneAddress(salt, trustedForwarder, args);
-        currency.mint(currencyProvider, totalCurrency);
-        vm.prank(currencyProvider);
-        currency.approve(cloneAddr, totalCurrency);
+        if (initialFunding > 0) {
+            currency.mint(currencyProvider, initialFunding);
+            vm.prank(currencyProvider);
+            currency.approve(cloneAddr, initialFunding);
+        }
         return Distribution(factory.createDistributionClone(salt, trustedForwarder, currencyProvider, args));
+    }
+
+    // ========== D5. drain() ==========
+
+    function testDrainNonOwnerReverts() public {
+        vm.warp(reassignOrDrainAfter);
+        vm.expectRevert("Ownable: caller is not the owner");
+        vm.prank(holderA);
+        dist.drain(holderA);
+    }
+
+    function testDrainBeforeDeadlineReverts() public {
+        vm.expectRevert("drain not yet available");
+        vm.prank(owner);
+        dist.drain(owner);
+    }
+
+    function testDrainAtExactDeadlineSucceeds() public {
+        vm.warp(reassignOrDrainAfter);
+        vm.prank(owner);
+        dist.drain(owner);
+        assertEq(currency.balanceOf(owner), TOTAL_CURRENCY, "owner should receive full balance after drain");
+        assertEq(currency.balanceOf(address(dist)), 0, "dist should be empty after drain");
+    }
+
+    function testDrainAfterPartialClaims() public {
+        vm.prank(holderA);
+        dist.claim(holderA);
+        uint256 remaining = currency.balanceOf(address(dist));
+        assertEq(remaining, TOTAL_CURRENCY - 120e6, "remaining balance wrong after holderA claim");
+
+        vm.warp(reassignOrDrainAfter);
+        vm.prank(owner);
+        dist.drain(owner);
+        assertEq(currency.balanceOf(owner), remaining, "owner should receive remaining balance after drain");
+        assertEq(currency.balanceOf(address(dist)), 0, "dist should be empty after drain");
+    }
+
+    function testFuzzDrainTiming(uint64 warpTo) public {
+        vm.assume(warpTo >= block.timestamp);
+        vm.warp(warpTo);
+        if (warpTo < reassignOrDrainAfter) {
+            vm.expectRevert("drain not yet available");
+            vm.prank(owner);
+            dist.drain(owner);
+        } else {
+            vm.prank(owner);
+            dist.drain(owner);
+            assertEq(currency.balanceOf(address(dist)), 0, "dist should be empty after drain");
+        }
     }
 
     // ========== D7. reassign() ==========
 
     function testReassignNonOwnerReverts() public {
-        vm.warp(reassignAfter);
+        vm.warp(reassignOrDrainAfter);
         uint256 amount = dist.eligible(holderA);
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(holderA);
@@ -384,7 +475,7 @@ contract DistributionTest is Test {
     }
 
     function testReassignAtExactDeadlineSucceeds() public {
-        vm.warp(reassignAfter);
+        vm.warp(reassignOrDrainAfter);
         uint256 amount = dist.eligible(holderA);
         vm.prank(owner);
         dist.reassign(holderA, holderB, amount);
@@ -396,7 +487,7 @@ contract DistributionTest is Test {
         vm.warp(warpTo);
         assertEq(dist.eligible(holderA), amount, "holderA eligible should be non-zero before reassign");
         assertEq(dist.eligible(holderB), 60e6, "holderB eligible should be own share before reassign");
-        if (warpTo < reassignAfter) {
+        if (warpTo < reassignOrDrainAfter) {
             vm.expectRevert("reassignment not yet available");
             vm.prank(owner);
             dist.reassign(holderA, holderB, amount);
@@ -411,21 +502,21 @@ contract DistributionTest is Test {
     }
 
     function testReassignZeroAmountReverts() public {
-        vm.warp(reassignAfter);
+        vm.warp(reassignOrDrainAfter);
         vm.expectRevert("amount must be positive");
         vm.prank(owner);
         dist.reassign(holderA, holderB, 0);
     }
 
     function testReassignExceedsEligibleReverts() public {
-        vm.warp(reassignAfter);
+        vm.warp(reassignOrDrainAfter);
         vm.expectRevert("amount exceeds eligible");
         vm.prank(owner);
         dist.reassign(address(42), holderB, 1); // address(42) has no balance
     }
 
     function testReassignEffect() public {
-        vm.warp(reassignAfter);
+        vm.warp(reassignOrDrainAfter);
         assertEq(dist.eligible(holderA), 120e6, "holderA eligible should be 120e6 before reassign");
         assertEq(dist.eligible(holderB), 60e6, "holderB eligible should be 60e6 before reassign");
         uint256 amountA = dist.eligible(holderA);
@@ -439,7 +530,7 @@ contract DistributionTest is Test {
     }
 
     function testReassignEmitsEvent() public {
-        vm.warp(reassignAfter);
+        vm.warp(reassignOrDrainAfter);
         vm.expectEmit(true, true, false, true, address(dist));
         emit Distribution.Reassigned(holderA, holderB, 120e6);
         vm.prank(owner);
@@ -447,7 +538,7 @@ contract DistributionTest is Test {
     }
 
     function testReassignStackingMultipleToSameRecipient() public {
-        vm.warp(reassignAfter);
+        vm.warp(reassignOrDrainAfter);
         uint256 amountB = dist.eligible(holderB);
         vm.prank(owner);
         dist.reassign(holderB, holderA, amountB); // A gets B's 60e6
@@ -469,7 +560,7 @@ contract DistributionTest is Test {
     }
 
     function testReassignSelfIsNoOp() public {
-        vm.warp(reassignAfter);
+        vm.warp(reassignOrDrainAfter);
         uint256 eligibleBefore = dist.eligible(holderA);
         vm.prank(owner);
         dist.reassign(holderA, holderA, eligibleBefore); // self-reassign
@@ -479,14 +570,14 @@ contract DistributionTest is Test {
     function testReassignAfterClaimReverts() public {
         vm.prank(holderA);
         dist.claim(holderA); // eligible drops to 0
-        vm.warp(reassignAfter);
+        vm.warp(reassignOrDrainAfter);
         vm.expectRevert("amount exceeds eligible");
         vm.prank(owner);
         dist.reassign(holderA, holderB, 1);
     }
 
     function testSecondReassignFromSameAddressReverts() public {
-        vm.warp(reassignAfter);
+        vm.warp(reassignOrDrainAfter);
         uint256 amountA = dist.eligible(holderA);
         vm.prank(owner);
         dist.reassign(holderA, holderB, amountA);
@@ -496,17 +587,17 @@ contract DistributionTest is Test {
     }
 
     function testPartialReassign() public {
-        vm.warp(reassignAfter);
-        uint256 aliceEligible = dist.eligible(holderA); // 600e6
+        vm.warp(reassignOrDrainAfter);
+        uint256 aliceEligible = dist.eligible(holderA); // 120e6
 
         vm.prank(owner);
-        dist.reassign(holderA, holderB, aliceEligible / 2); // 300e6 to B
+        dist.reassign(holderA, holderB, aliceEligible / 2); // 60e6 to B
         assertEq(dist.eligible(holderA), aliceEligible / 2, "holderA eligible should be halved after partial reassign");
         assertEq(dist.eligible(holderB), 60e6 + aliceEligible / 2, "holderB eligible should include reassigned half");
 
         uint256 aliceRemaining = dist.eligible(holderA);
         vm.prank(owner);
-        dist.reassign(holderA, holderC, aliceRemaining); // remaining 300e6 to C
+        dist.reassign(holderA, holderC, aliceRemaining); // remaining 60e6 to C
         assertEq(dist.eligible(holderA), 0, "holderA eligible should be zero after second partial reassign");
         assertEq(
             dist.eligible(holderC),
@@ -517,14 +608,14 @@ contract DistributionTest is Test {
 
     function testChainedReassignAToB() public {
         // A → B → C (B has no snapshot balance)
-        Distribution chainDist = _deployDist(bytes32("chain"), TOTAL_CURRENCY, reassignAfter);
+        Distribution chainDist = _deployDist(bytes32("chain"), TOTAL_CURRENCY, reassignOrDrainAfter);
 
         // initial state
         assertEq(chainDist.eligible(holderA), 120e6, "holderA initial eligible");
         assertEq(chainDist.eligible(holderB), 60e6, "holderB initial eligible");
         assertEq(chainDist.eligible(holderC), 20e6, "holderC initial eligible");
 
-        vm.warp(reassignAfter);
+        vm.warp(reassignOrDrainAfter);
         uint256 amountA = chainDist.eligible(holderA);
         vm.prank(owner);
         chainDist.reassign(holderA, holderB, amountA); // B now has 120+60=180e6
@@ -560,7 +651,7 @@ contract DistributionTest is Test {
         // After each reassign, sum of all eligible must remain constant
         uint256 sumBefore = dist.eligible(holderA) + dist.eligible(holderB) + dist.eligible(holderC);
 
-        vm.warp(reassignAfter);
+        vm.warp(reassignOrDrainAfter);
         uint256 amountA = dist.eligible(holderA);
         vm.prank(owner);
         dist.reassign(holderA, holderB, amountA);
@@ -574,7 +665,7 @@ contract DistributionTest is Test {
     function testClaimThenReassignReverts() public {
         vm.prank(holderA);
         dist.claim(holderA); // eligible(A) = 0
-        vm.warp(reassignAfter);
+        vm.warp(reassignOrDrainAfter);
         vm.expectRevert("amount exceeds eligible");
         vm.prank(owner);
         dist.reassign(holderA, holderB, 1);
@@ -583,7 +674,7 @@ contract DistributionTest is Test {
     // ========== D9. Interaction: reassign then claim by recipient ==========
 
     function testReassignThenClaimByRecipient() public {
-        vm.warp(reassignAfter);
+        vm.warp(reassignOrDrainAfter);
         uint256 amountA = dist.eligible(holderA);
         vm.prank(owner);
         dist.reassign(holderA, holderB, amountA); // B gets 60 + 120 = 180e6
@@ -594,21 +685,22 @@ contract DistributionTest is Test {
 
         // A's paidOut covers their share: A claims 0
         vm.prank(holderA);
+        vm.expectRevert("nothing to claim");
         dist.claim(holderA);
         assertEq(currency.balanceOf(holderA), 0, "holderA should receive nothing after full reassign");
 
-        // total paid out ≤ totalCurrencyAmount
+        // total paid out ≤ funded amount
         assertLe(
             currency.balanceOf(holderB) + currency.balanceOf(holderA),
             TOTAL_CURRENCY,
-            "total paid out exceeds totalCurrencyAmount"
+            "total paid out exceeds funded amount"
         );
     }
 
     // ========== D10. Fuzz / Property-Based Tests ==========
 
     function testFuzzClaimNoDoublePay(uint8 claimOrder) public {
-        // Any order of A, B, C claiming → sum of payouts ≤ totalCurrencyAmount
+        // Any order of A, B, C claiming → sum of payouts ≤ funded amount
         address[3] memory holders = [holderA, holderB, holderC];
         // claimOrder low bits determine which subset claims
         for (uint256 i = 0; i < 3; i++) {
@@ -618,7 +710,7 @@ contract DistributionTest is Test {
             }
         }
         uint256 totalPaid = currency.balanceOf(holderA) + currency.balanceOf(holderB) + currency.balanceOf(holderC);
-        assertLe(totalPaid, TOTAL_CURRENCY, "total paid out exceeds totalCurrencyAmount");
+        assertLe(totalPaid, TOTAL_CURRENCY, "total paid out exceeds funded amount");
     }
 
     function testFuzzReassignSumInvariant(address reassignTo) public {
@@ -631,7 +723,7 @@ contract DistributionTest is Test {
             dist.eligible(holderC) +
             dist.eligible(reassignTo);
 
-        vm.warp(reassignAfter);
+        vm.warp(reassignOrDrainAfter);
         uint256 amountA = dist.eligible(holderA);
         vm.prank(owner);
         dist.reassign(holderA, reassignTo, amountA);
@@ -643,11 +735,42 @@ contract DistributionTest is Test {
         assertEq(sumBefore, sumAfter, "sum of eligible should be unchanged after reassign");
     }
 
-    // ========== D_Fee. Fee Collection at Initialization ==========
+    // ========== D11. Underfunding ==========
+
+    function testClaimRevertsWhenUnderfunded() public {
+        Distribution unfunded = _deployDist(bytes32("underfund"), 0, reassignOrDrainAfter);
+        // holderA is eligible for 120e6 but contract has 0 balance
+        vm.prank(holderA);
+        vm.expectRevert("ERC20: transfer amount exceeds balance");
+        unfunded.claim(holderA);
+    }
+
+    function testClaimSucceedsAfterLaterFunding() public {
+        Distribution unfunded = _deployDist(bytes32("lateFund"), 0, reassignOrDrainAfter);
+        // Fund later
+        currency.mint(address(unfunded), TOTAL_CURRENCY);
+        vm.prank(holderA);
+        unfunded.claim(holderA);
+        assertEq(currency.balanceOf(holderA), 120e6, "holderA should receive share after late funding");
+    }
+
+    function testPartialFundingAllowsSomeClaims() public {
+        // Fund only enough for holderC (20e6)
+        Distribution partialDist = _deployDist(bytes32("partial"), 20e6, reassignOrDrainAfter);
+        vm.prank(holderC);
+        partialDist.claim(holderC);
+        assertEq(currency.balanceOf(holderC), 20e6, "holderC should claim from partial funding");
+
+        // holderA cannot claim (not enough balance)
+        vm.prank(holderA);
+        vm.expectRevert("ERC20: transfer amount exceeds balance");
+        partialDist.claim(holderA);
+    }
+
+    // ========== D_Fee. Fee Collection at Claim Time ==========
 
     /// @dev Deploy a Distribution backed by a token with 1% private offer fee.
-    ///      Returns the deployed clone and the fee amount deducted from TOTAL_CURRENCY.
-    function _deployDistWithNonZeroFee() internal returns (Distribution d, uint256 fee) {
+    function _deployDistWithNonZeroFee() internal returns (Distribution d) {
         IFeeSettingsV2 feeSettingsWithFee = createFeeSettings(
             trustedForwarder,
             admin,
@@ -679,108 +802,95 @@ contract DistributionTest is Test {
             token: feeToken,
             snapshotId: snap,
             currency: IERC20(address(currency)),
-            totalCurrencyAmount: TOTAL_CURRENCY,
-            reassignAfter: reassignAfter,
+            pricePerToken: PRICE_PER_TOKEN,
+            initialFundingAmount: TOTAL_CURRENCY,
+            reassignOrDrainAfter: reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
         address cloneAddr = factory.predictCloneAddress(bytes32("feeDist"), trustedForwarder, args);
-        fee = feeSettingsWithFee.privateOfferFee(TOTAL_CURRENCY, address(feeToken));
         currency.mint(currencyProvider, TOTAL_CURRENCY);
         vm.prank(currencyProvider);
         currency.approve(cloneAddr, TOTAL_CURRENCY);
         d = Distribution(factory.createDistributionClone(bytes32("feeDist"), trustedForwarder, currencyProvider, args));
     }
 
-    function testFeeDeductedFromTotalCurrencyAmount() public {
+    function testNoFeeAtInitialization() public {
         assertEq(currency.balanceOf(feeCollector), 0, "feeCollector should have no currency before deployment");
-        (Distribution localDistribution, uint256 fee) = _deployDistWithNonZeroFee();
-        assertEq(
-            currency.balanceOf(feeCollector),
-            2e6,
-            "feeCollector should have exactly 2e6 (1% of 200e6) after deployment"
-        );
-        assertGt(fee, 0, "fee should be positive");
-        assertEq(
-            localDistribution.totalCurrencyAmount(),
-            TOTAL_CURRENCY - fee,
-            "totalCurrencyAmount should be net of fee"
-        );
-        assertEq(
-            currency.balanceOf(address(localDistribution)),
-            TOTAL_CURRENCY - fee,
-            "dist balance should be reduced by fee"
-        );
+        _deployDistWithNonZeroFee();
+        assertEq(currency.balanceOf(feeCollector), 0, "feeCollector should have no currency after deployment");
     }
 
-    function testFeeSentToFeeCollector() public {
-        (, uint256 fee) = _deployDistWithNonZeroFee();
-        assertEq(currency.balanceOf(feeCollector), fee, "feeCollector did not receive the fee");
+    function testFeeDeductedAtClaimTime() public {
+        Distribution d = _deployDistWithNonZeroFee();
+        uint256 eligibleA = d.eligible(holderA); // 120e6
+        // 1% fee on 120e6 = 1.2e6
+        uint256 expectedFee = eligibleA / 100;
+        uint256 expectedNet = eligibleA - expectedFee;
+
+        vm.prank(holderA);
+        d.claim(holderA);
+
+        assertEq(currency.balanceOf(feeCollector), expectedFee, "feeCollector did not receive correct fee");
+        assertEq(currency.balanceOf(holderA), expectedNet, "holderA did not receive net amount after fee");
     }
 
-    function testEligibleBasedOnNetAmountAfterFee() public {
-        (Distribution d, uint256 fee) = _deployDistWithNonZeroFee();
-        uint256 net = TOTAL_CURRENCY - fee;
-        assertEq(
-            d.eligible(holderA),
-            (net * SUPPLY_A) / TOTAL_SUPPLY,
-            "holderA eligible should be based on net amount"
-        );
-        assertEq(
-            d.eligible(holderB),
-            (net * SUPPLY_B) / TOTAL_SUPPLY,
-            "holderB eligible should be based on net amount"
-        );
-        assertEq(
-            d.eligible(holderC),
-            (net * SUPPLY_C) / TOTAL_SUPPLY,
-            "holderC eligible should be based on net amount"
-        );
+    function testFeeSentToFeeCollectorPerClaim() public {
+        Distribution d = _deployDistWithNonZeroFee();
+
+        vm.prank(holderA);
+        d.claim(holderA);
+        uint256 feeAfterA = currency.balanceOf(feeCollector);
+        assertGt(feeAfterA, 0, "feeCollector should have received fee from holderA claim");
+
+        vm.prank(holderB);
+        d.claim(holderB);
+        uint256 feeAfterB = currency.balanceOf(feeCollector);
+        assertGt(feeAfterB, feeAfterA, "feeCollector should have received additional fee from holderB claim");
+    }
+
+    function testEligibleUnaffectedByFee() public {
+        Distribution d = _deployDistWithNonZeroFee();
+        // eligible is gross (before fee), same as without fee
+        assertEq(d.eligible(holderA), 120e6, "holderA eligible should be based on price, not net of fee");
+        assertEq(d.eligible(holderB), 60e6, "holderB eligible should be based on price, not net of fee");
+        assertEq(d.eligible(holderC), 20e6, "holderC eligible should be based on price, not net of fee");
     }
 
     function testFuzzReassignAndClaimWithFee(uint256 amount) public {
-        (Distribution d, uint256 fee) = _deployDistWithNonZeroFee();
-        uint256 net = TOTAL_CURRENCY - fee;
+        Distribution d = _deployDistWithNonZeroFee();
 
         uint256 eligibleA = d.eligible(holderA);
         uint256 eligibleB = d.eligible(holderB);
         uint256 eligibleC = d.eligible(holderC);
 
-        assertEq(eligibleA, (net * SUPPLY_A) / TOTAL_SUPPLY, "holderA eligible wrong before reassign");
-        assertEq(eligibleB, (net * SUPPLY_B) / TOTAL_SUPPLY, "holderB eligible wrong before reassign");
-        assertEq(eligibleC, (net * SUPPLY_C) / TOTAL_SUPPLY, "holderC eligible wrong before reassign");
-        uint256 sumBefore = eligibleA + eligibleB + eligibleC;
-        assertLe(sumBefore, net, "sum of eligible exceeds net before reassign");
-        assertGe(sumBefore + 3, net, "sum of eligible too far below net before reassign");
-
         amount = bound(amount, 1, eligibleA);
 
-        vm.warp(reassignAfter);
+        vm.warp(reassignOrDrainAfter);
         vm.prank(owner);
         d.reassign(holderA, holderB, amount);
 
         assertEq(d.eligible(holderA), eligibleA - amount, "holderA eligible wrong after reassign");
         assertEq(d.eligible(holderB), eligibleB + amount, "holderB eligible wrong after reassign");
         assertEq(d.eligible(holderC), eligibleC, "holderC eligible unchanged after reassign");
-        assertEq(
-            d.eligible(holderA) + d.eligible(holderB) + d.eligible(holderC),
-            sumBefore,
-            "sum of eligible changed after reassign"
-        );
 
-        vm.prank(holderA);
-        d.claim(holderA);
+        // Claims with fee: each holder gets (eligible - 1% fee)
+        uint256 newEligibleA = d.eligible(holderA);
+        uint256 newEligibleB = d.eligible(holderB);
+
+        if (newEligibleA > 0) {
+            vm.prank(holderA);
+            d.claim(holderA);
+        }
         vm.prank(holderB);
         d.claim(holderB);
         vm.prank(holderC);
         d.claim(holderC);
 
-        assertEq(currency.balanceOf(holderA), eligibleA - amount, "holderA balance wrong after claim");
-        assertEq(currency.balanceOf(holderB), eligibleB + amount, "holderB balance wrong after claim");
-        assertEq(currency.balanceOf(holderC), eligibleC, "holderC balance wrong after claim");
-        assertEq(
-            currency.balanceOf(holderA) + currency.balanceOf(holderB) + currency.balanceOf(holderC),
-            sumBefore,
-            "total paid out does not match sum of eligible before reassign"
-        );
+        // Each gets 99% of eligible (1% fee)
+        if (newEligibleA > 0) {
+            assertEq(currency.balanceOf(holderA), newEligibleA - newEligibleA / 100, "holderA balance wrong");
+        }
+        assertEq(currency.balanceOf(holderB), newEligibleB - newEligibleB / 100, "holderB balance wrong");
+        assertEq(currency.balanceOf(holderC), eligibleC - eligibleC / 100, "holderC balance wrong");
     }
 }

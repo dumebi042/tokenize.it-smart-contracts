@@ -19,12 +19,13 @@ contract DistributionCloneFactory is CloneFactory {
     constructor(address _implementation) CloneFactory(_implementation) {}
 
     /**
-     * @notice Create a new Distribution clone, fund it with currency from `_currencyProvider`, and initialize it.
-     *  `_currencyProvider` must have approved the clone address (use predictCloneAddress()) for `_arguments.totalCurrencyAmount`.
+     * @notice Create a new Distribution clone and initialize it. Optionally fund it with currency from `_currencyProvider`.
+     *  If `_arguments.initialFundingAmount > 0`, `_currencyProvider` must have approved the clone address
+     *  (use predictCloneAddress()) for that amount.
      *  `_currencyProvider` does not affect the clone's address.
      * @param _rawSalt influences the address of the clone, but not the initialization
      * @param _trustedForwarder can not be changed, but is checked for security
-     * @param _currencyProvider address from which the currency is pulled; must have approved the clone address for totalCurrencyAmount; does not affect clone address
+     * @param _currencyProvider address from which the currency is pulled (if initialFundingAmount > 0); does not affect clone address
      * @param _arguments struct with all initialization parameters
      */
     function createDistributionClone(

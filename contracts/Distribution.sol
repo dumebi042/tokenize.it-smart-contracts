@@ -25,11 +25,13 @@ struct DistributionInitializerArguments {
     uint256 snapshotId;
     /// @notice ERC20 token used for distribution payouts; must have TRUSTED_CURRENCY bit set on the token's allowList
     IERC20 currency;
-    /// @notice Total amount of currency to distribute
-    uint256 totalCurrencyAmount;
-    /// @notice Earliest timestamp at which the owner can reassign unclaimed funds
-    uint64 reassignAfter;
-    /// @notice Reassignments to apply immediately at initialization, bypassing the reassignAfter time restriction
+    /// @notice Currency amount (in smallest currency units) per 10**token.decimals() token units
+    uint256 pricePerToken;
+    /// @notice Amount of currency to transfer from the currency provider at initialization (can be 0)
+    uint256 initialFundingAmount;
+    /// @notice Earliest timestamp at which the owner can reassign unclaimed funds or drain the contract
+    uint64 reassignOrDrainAfter;
+    /// @notice Reassignments to apply immediately at initialization, bypassing the time restriction
     Reassignment[] initialReassignments;
 }
 
@@ -45,11 +47,12 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     Token public token;
     uint256 public snapshotId;
     IERC20 public currency;
-    uint256 public totalCurrencyAmount;
+    /// @notice Currency amount (in smallest currency units) per 10**token.decimals() token units
+    uint256 public pricePerToken;
     mapping(address => uint256) public paidOut;
     /// @notice Extra currency credit assigned to an address via reassign(), analogous to token reissuance after key loss
     mapping(address => uint256) public extraCredit;
-    uint64 public reassignAfter;
+    uint64 public reassignOrDrainAfter;
 
     event Reassigned(address indexed from, address indexed to, uint256 amount);
 
@@ -66,6 +69,7 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         DistributionInitializerArguments memory _arguments,
         address _currencyProvider
     ) external initializer {
+        require(_arguments.pricePerToken > 0, "price must be positive");
         __Ownable2Step_init();
         _transferOwnership(_arguments.owner);
         token = _arguments.token;
@@ -78,23 +82,11 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
             token.allowList().map(address(_arguments.currency)) & TRUSTED_CURRENCY == TRUSTED_CURRENCY,
             "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
         );
-        IFeeSettingsV2 feeSettingsV2 = _arguments.token.feeSettings();
-        uint256 fee;
-        address feeCollector;
-        if (feeSettingsV2.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
-            IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(feeSettingsV2));
-            fee = feeSettings.fee(FeeTypes.DISTRIBUTION, _arguments.totalCurrencyAmount, address(_arguments.token));
-            feeCollector = feeSettings.feeCollector(FeeTypes.DISTRIBUTION, address(_arguments.token));
-        } else {
-            fee = feeSettingsV2.privateOfferFee(_arguments.totalCurrencyAmount, address(_arguments.token));
-            feeCollector = feeSettingsV2.privateOfferFeeCollector(address(_arguments.token));
+        pricePerToken = _arguments.pricePerToken;
+        reassignOrDrainAfter = _arguments.reassignOrDrainAfter;
+        if (_arguments.initialFundingAmount > 0) {
+            _arguments.currency.safeTransferFrom(_currencyProvider, address(this), _arguments.initialFundingAmount);
         }
-        if (fee != 0) {
-            _arguments.currency.safeTransferFrom(_currencyProvider, feeCollector, fee);
-        }
-        totalCurrencyAmount = _arguments.totalCurrencyAmount - fee;
-        reassignAfter = _arguments.reassignAfter;
-        _arguments.currency.safeTransferFrom(_currencyProvider, address(this), totalCurrencyAmount);
         for (uint256 i = 0; i < _arguments.initialReassignments.length; i++) {
             Reassignment memory reassignment = _arguments.initialReassignments[i];
             _reassign(reassignment.from, reassignment.to, reassignment.amount);
@@ -103,8 +95,8 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
 
     function eligible(address _holder) public view returns (uint256) {
         return
-            (totalCurrencyAmount * token.balanceOfAt(_holder, snapshotId)) /
-            token.totalSupplyAt(snapshotId) +
+            (token.balanceOfAt(_holder, snapshotId) * pricePerToken) /
+            (10 ** token.decimals()) +
             extraCredit[_holder] -
             paidOut[_holder];
     }
@@ -122,7 +114,7 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
      * @param _amount amount of currency to reassign; must not exceed eligible(_from)
      */
     function reassign(address _from, address _to, uint256 _amount) external onlyOwner {
-        require(block.timestamp >= reassignAfter, "reassignment not yet available");
+        require(block.timestamp >= reassignOrDrainAfter, "reassignment not yet available");
         _reassign(_from, _to, _amount);
     }
 
@@ -140,8 +132,28 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
 
     function _claim(address _holder, address _recipient) internal {
         uint256 amount = eligible(_holder);
+        require(amount > 0, "nothing to claim");
         paidOut[_holder] += amount;
-        currency.safeTransfer(_recipient, amount);
+        IFeeSettingsV2 feeSettingsV2 = token.feeSettings();
+        uint256 fee;
+        address feeCollector;
+        if (feeSettingsV2.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
+            IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(feeSettingsV2));
+            fee = feeSettings.fee(FeeTypes.DISTRIBUTION, amount, address(token));
+            feeCollector = feeSettings.feeCollector(FeeTypes.DISTRIBUTION, address(token));
+        } else {
+            fee = feeSettingsV2.privateOfferFee(amount, address(token));
+            feeCollector = feeSettingsV2.privateOfferFeeCollector(address(token));
+        }
+        if (fee != 0) {
+            currency.safeTransfer(feeCollector, fee);
+        }
+        currency.safeTransfer(_recipient, amount - fee);
+    }
+
+    function drain(address _recipient) external onlyOwner {
+        require(block.timestamp >= reassignOrDrainAfter, "drain not yet available");
+        currency.safeTransfer(_recipient, currency.balanceOf(address(this)));
     }
 
     function _msgSender() internal view override(ContextUpgradeable, ERC2771ContextUpgradeable) returns (address) {
