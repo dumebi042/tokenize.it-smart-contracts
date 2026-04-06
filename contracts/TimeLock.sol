@@ -4,6 +4,7 @@ pragma solidity 0.8.23;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -17,10 +18,10 @@ import "./TokenExitRegistry.sol";
  *      token to any recipient after lockedUntil has passed.
  * @dev Uses clone/proxy pattern. Constructor disables initializers, separate initialize().
  */
-contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeable {
+contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
 
-    /// unix timestamp before which drain() is blocked; 0 means no lock
+    /// unix timestamp before which drain() is blocked
     uint64 public lockedUntil;
     /// registry contract; if its exit() is set, the lockedUntil constraint is bypassed
     TokenExitRegistry public tokenExitRegistry;
@@ -49,6 +50,7 @@ contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeabl
         require(_lockedUntil > block.timestamp, "lockedUntil must be in the future");
         require(address(_tokenExitRegistry) != address(0), "tokenExitRegistry can not be zero address");
         __Ownable_init();
+        __ReentrancyGuard_init();
         _transferOwnership(_owner);
         lockedUntil = _lockedUntil;
         tokenExitRegistry = _tokenExitRegistry;
@@ -64,7 +66,7 @@ contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeabl
         IERC20 _dividendCurrency,
         address _recipient,
         uint256 _minPayout
-    ) external onlyOwner {
+    ) external onlyOwner nonReentrant {
         require(_recipient != address(0), "recipient can not be zero address");
         uint256 before = _dividendCurrency.balanceOf(_recipient);
         _dist.claim(_recipient, _minPayout);
@@ -79,7 +81,7 @@ contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeabl
      *      and forwards all received currency to _recipient.
      * @param _recipient address to receive the exit proceeds
      */
-    function claimExit(IERC20 _exitCurrency, address _recipient, uint256 _minPayout) external onlyOwner {
+    function claimExit(IERC20 _exitCurrency, address _recipient, uint256 _minPayout) external onlyOwner nonReentrant {
         IExit exit = tokenExitRegistry.exit();
         require(address(exit) != address(0), "no exit set in tokenExitRegistry");
         require(_recipient != address(0), "recipient can not be zero address");
