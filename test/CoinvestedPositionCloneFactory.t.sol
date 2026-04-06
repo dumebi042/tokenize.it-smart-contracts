@@ -4,7 +4,9 @@ pragma solidity 0.8.23;
 import "../lib/forge-std/src/Test.sol";
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/factories/CoinvestedPositionCloneFactory.sol";
+import "../contracts/factories/TokenExitRegistryCloneFactory.sol";
 import "../contracts/CoinvestedPosition.sol";
+import "../contracts/TokenExitRegistry.sol";
 import "./resources/FakePaymentToken.sol";
 import "./resources/CloneCreators.sol";
 
@@ -22,6 +24,7 @@ contract CoinvestedPositionCloneFactoryTest is Test {
     AllowList allowList;
     FakePaymentToken currency;
     Token token;
+    TokenExitRegistry tokenExitRegistry;
     CoinvestedPositionCloneFactory factory;
     TokenProxyFactory tokenFactory;
 
@@ -43,6 +46,14 @@ contract CoinvestedPositionCloneFactoryTest is Test {
         );
 
         factory = new CoinvestedPositionCloneFactory(address(new CoinvestedPosition(trustedForwarder)));
+
+        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry(trustedForwarder);
+        TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(
+            address(tokenExitRegistryLogic)
+        );
+        tokenExitRegistry = TokenExitRegistry(
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token)
+        );
     }
 
     /// @dev Returns baseline arguments with two lead investors.
@@ -59,7 +70,8 @@ contract CoinvestedPositionCloneFactoryTest is Test {
                 basePrice: EXAMPLE_BASE_PRICE,
                 baseCurrency: IERC20(address(currency)),
                 token: token,
-                lockedUntil: 0
+                lockedUntil: 0,
+                tokenExitRegistry: tokenExitRegistry
             });
     }
 

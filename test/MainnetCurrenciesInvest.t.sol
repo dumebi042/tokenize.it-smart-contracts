@@ -78,7 +78,7 @@ contract MainnetCurrencies is Test {
 
         fundraisingFactory = new CrowdinvestingCloneFactory(address(new Crowdinvesting(trustedForwarder)));
 
-        TimeLock timeLockImplementation = new TimeLock();
+        TimeLock timeLockImplementation = new TimeLock(trustedForwarder);
         TimeLockCloneFactory timeLockCloneFactory = new TimeLockCloneFactory(address(timeLockImplementation));
         inviteFactory = new PrivateOfferFactory(timeLockCloneFactory);
         currencyCost = (amountOfTokenToBuy * price) / 10 ** token.decimals();

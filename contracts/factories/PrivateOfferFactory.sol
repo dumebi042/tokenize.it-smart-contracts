@@ -3,6 +3,7 @@ pragma solidity 0.8.23;
 
 import "@openzeppelin/contracts/utils/Create2.sol";
 import "../PrivateOffer.sol";
+import "../TokenExitRegistry.sol";
 import "./TimeLockCloneFactory.sol";
 
 /**
@@ -42,15 +43,26 @@ contract PrivateOfferFactory {
      * @param _arguments Arguments for the PrivateOffer contract.
      * @param _lockedUntil Unix timestamp before which the TimeLock's drain() is blocked.
      * @param _timeLockOwner Owner of the TimeLock contract.
+     * @param _tokenExitRegistry Registry contract; setting exit on it bypasses lockedUntil.
      */
     function deployPrivateOfferWithTimeLock(
         bytes32 _rawSalt,
         PrivateOfferArguments calldata _arguments,
         uint64 _lockedUntil,
-        address _timeLockOwner
+        address _timeLockOwner,
+        TokenExitRegistry _tokenExitRegistry,
+        address _trustedForwarder
     ) external returns (address) {
         // deploy the time lock contract
-        TimeLock timeLock = TimeLock(timeLockCloneFactory.createTimeLockClone(_rawSalt, _timeLockOwner, _lockedUntil));
+        TimeLock timeLock = TimeLock(
+            timeLockCloneFactory.createTimeLockClone(
+                _rawSalt,
+                _trustedForwarder,
+                _timeLockOwner,
+                _lockedUntil,
+                _tokenExitRegistry
+            )
+        );
 
         // route token delivery through the time lock
         PrivateOfferArguments memory arguments = _arguments;
@@ -71,6 +83,7 @@ contract PrivateOfferFactory {
      * @param _arguments Arguments for the PrivateOffer contract.
      * @param _lockedUntil Unix timestamp before which the TimeLock's drain() is blocked.
      * @param _timeLockOwner Owner of the TimeLock contract.
+     * @param _tokenExitRegistry Registry contract; setting exit on it bypasses lockedUntil.
      * @return privateOfferAddress The address of the PrivateOffer contract that would be deployed.
      * @return timeLockAddress The address of the TimeLock contract that would be deployed.
      */
@@ -78,9 +91,17 @@ contract PrivateOfferFactory {
         bytes32 _rawSalt,
         PrivateOfferArguments calldata _arguments,
         uint64 _lockedUntil,
-        address _timeLockOwner
+        address _timeLockOwner,
+        TokenExitRegistry _tokenExitRegistry,
+        address _trustedForwarder
     ) public view returns (address privateOfferAddress, address timeLockAddress) {
-        timeLockAddress = timeLockCloneFactory.predictCloneAddress(_rawSalt, _timeLockOwner, _lockedUntil);
+        timeLockAddress = timeLockCloneFactory.predictCloneAddress(
+            _rawSalt,
+            _trustedForwarder,
+            _timeLockOwner,
+            _lockedUntil,
+            _tokenExitRegistry
+        );
 
         PrivateOfferArguments memory arguments = _arguments;
         arguments.tokenReceiver = timeLockAddress;

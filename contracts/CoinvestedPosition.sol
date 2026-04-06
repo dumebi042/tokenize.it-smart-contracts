@@ -4,6 +4,7 @@ pragma solidity 0.8.23;
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
+import "./TokenExitRegistry.sol";
 import "./TokenSwapBase.sol";
 import "./IDistribution.sol";
 import "./IExit.sol";
@@ -30,6 +31,8 @@ struct CoinvestedPositionInitializerArguments {
     Token token;
     /// unix timestamp before which unpause() is blocked; 0 means no lock
     uint64 lockedUntil;
+    /// registry contract; if its exit() is set, the lockedUntil constraint is bypassed
+    TokenExitRegistry tokenExitRegistry;
 }
 
 /**
@@ -56,6 +59,8 @@ contract CoinvestedPosition is TokenSwapBase {
     uint8 public basePriceDecimals;
     /// unix timestamp before which unpause() is blocked; 0 means no lock
     uint64 public lockedUntil;
+    /// registry contract; if its exit() is set, the lockedUntil constraint is bypassed
+    TokenExitRegistry public tokenExitRegistry;
 
     /**
      * This constructor creates a logic contract that is used to clone new contracts.
@@ -85,9 +90,11 @@ contract CoinvestedPosition is TokenSwapBase {
             carryFractionsSum += _arguments.leadInvestors[i].carryFraction; // reverts on overflow
             leadInvestors.push(_arguments.leadInvestors[i]);
         }
+        require(address(_arguments.tokenExitRegistry) != address(0), "tokenExitRegistry can not be zero address");
         basePrice = _arguments.basePrice;
         basePriceDecimals = IERC20Metadata(address(_arguments.baseCurrency)).decimals();
         lockedUntil = _arguments.lockedUntil;
+        tokenExitRegistry = _arguments.tokenExitRegistry;
 
         // Pausing the contract prevents an immediate sell of the tokens. Once they should be sold, update price and unpause.
         _pause();
@@ -212,29 +219,26 @@ contract CoinvestedPosition is TokenSwapBase {
 
     /**
      * @notice Claim exit proceeds for this contract's full token balance and split them among the receiver and lead investors.
-     * @dev Transfers all held tokens to the Exit contract in exchange for currency.
+     * @dev Requires tokenExitRegistry.exit() to be set; that also acts as the unlock signal.
      *      If proceeds < base, receiver gets everything.
      *      Carry is split among lead investors by carryFraction; remainder goes to receiver.
-     *      Any trusted token (TRUSTED_CURRENCY) may be used, independent of the currency used for buy().
-     * @param _exit the Exit contract to claim from
+     *      Any trusted token (TRUSTED_CURRENCY) may be used, independent of the currency stored for buy().
      * @param _exitCurrency the EURO token paid out by the exit
      * @param _minCurrencyAmount minimum currency the call must receive; reverts if proceeds fall short.
      *      This guards against faulty or malicious exit contracts.
      */
-    function distributeExit(
-        IExit _exit,
-        IERC20 _exitCurrency,
-        uint256 _minCurrencyAmount
-    ) external onlyOwner nonReentrant {
+    function distributeExit(IERC20 _exitCurrency, uint256 _minCurrencyAmount) external onlyOwner nonReentrant {
+        IExit exit = tokenExitRegistry.exit();
+        require(address(exit) != address(0), "no exit set in tokenExitRegistry");
         require(
             token.allowList().map(address(_exitCurrency)) == TRUSTED_CURRENCY,
             "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
         );
         uint256 tokenBalance = token.balanceOf(address(this));
         require(tokenBalance > 0, "no tokens to claim");
-        IERC20(address(token)).approve(address(_exit), tokenBalance);
+        IERC20(address(token)).approve(address(exit), tokenBalance);
         uint256 before = _exitCurrency.balanceOf(address(this));
-        _exit.claim(tokenBalance, address(this));
+        exit.claim(tokenBalance, address(this));
         uint256 received = _exitCurrency.balanceOf(address(this)) - before;
         require(received >= _minCurrencyAmount, "received less than _minCurrencyAmount");
         uint256 basePayout = _scaleToDecimals(
