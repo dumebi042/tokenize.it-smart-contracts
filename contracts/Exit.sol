@@ -73,8 +73,8 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         _arguments.currency.safeTransferFrom(_currencyProvider, address(this), _arguments.totalCurrencyAmount);
     }
 
-    function claim(uint256 _tokenAmount, address _recipient) external {
-        _claim(_msgSender(), _tokenAmount, _recipient);
+    function claim(uint256 _tokenAmount, address _recipient, uint256 _minPayout) external {
+        _claim(_msgSender(), _tokenAmount, _recipient, _minPayout);
     }
 
     function drain(address _recipient) external onlyOwner {
@@ -82,7 +82,7 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         currency.safeTransfer(_recipient, currency.balanceOf(address(this)));
     }
 
-    function _claim(address _holder, uint256 _tokenAmount, address _recipient) internal {
+    function _claim(address _holder, uint256 _tokenAmount, address _recipient, uint256 _minPayout) internal {
         require(block.timestamp >= claimStart, "exit not yet started");
         IERC20(address(token)).safeTransferFrom(_holder, address(this), _tokenAmount);
         uint256 currencyAmount = (_tokenAmount * pricePerToken) / 10 ** token.decimals();
@@ -97,6 +97,7 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
             fee = feeSettingsV2.privateOfferFee(currencyAmount, address(token));
             feeCollector = feeSettingsV2.privateOfferFeeCollector(address(token));
         }
+        require(currencyAmount - fee >= _minPayout, "payout below minimum");
         if (fee != 0) {
             currency.safeTransfer(feeCollector, fee);
         }

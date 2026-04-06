@@ -102,7 +102,7 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     }
 
     /**
-     * @notice Reassigns unclaimed distribution funds from one address to another. This is used to fix
+     * @notice Reassigns (unclaimed) distribution funds from one address to another. This is used to fix
      *  holders in the snapshot not being able to claim their funds. It can be audited because the
      *  reassignment is emitted on-chain. Some cases that could lead to this being needed:
      *      - holder losing their key and only noticing after the snapshot
@@ -126,11 +126,11 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         emit Reassigned(_from, _to, _amount);
     }
 
-    function claim(address _recipient) external {
-        _claim(_msgSender(), _recipient); // works for direct calls and meta-transactions via ERC2771
+    function claim(address _recipient, uint256 _minPayout) external {
+        _claim(_msgSender(), _recipient, _minPayout); // works for direct calls and meta-transactions via ERC2771
     }
 
-    function _claim(address _holder, address _recipient) internal {
+    function _claim(address _holder, address _recipient, uint256 _minPayout) internal {
         uint256 amount = eligible(_holder);
         require(amount > 0, "nothing to claim");
         paidOut[_holder] += amount;
@@ -145,6 +145,7 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
             fee = feeSettingsV2.privateOfferFee(amount, address(token));
             feeCollector = feeSettingsV2.privateOfferFeeCollector(address(token));
         }
+        require(amount - fee >= _minPayout, "payout below minimum");
         if (fee != 0) {
             currency.safeTransfer(feeCollector, fee);
         }

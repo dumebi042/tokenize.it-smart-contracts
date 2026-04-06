@@ -327,44 +327,44 @@ contract DistributionTest is Test {
     function testClaimCorrectAmount() public {
         assertEq(currency.balanceOf(recipient), 0, "recipient already holds currency");
         vm.prank(holderA);
-        dist.claim(recipient);
+        dist.claim(recipient, 0);
         assertEq(currency.balanceOf(recipient), 120e6, "recipient did not receive holderA's share");
     }
 
     function testClaimZeroEligibleReverts() public {
         vm.expectRevert("nothing to claim");
-        dist.claim(recipient); // address(this) has 0 snapshot balance
+        dist.claim(recipient, 0); // address(this) has 0 snapshot balance
     }
 
     function testClaimUpdatesPayedOut() public {
         vm.prank(holderA);
-        dist.claim(holderA);
+        dist.claim(holderA, 0);
         assertEq(dist.eligible(holderA), 0, "eligible should be zero after claim");
         assertEq(dist.paidOut(holderA), 120e6, "paidOut not updated after claim");
     }
 
     function testSecondClaimReverts() public {
         vm.prank(holderA);
-        dist.claim(holderA);
+        dist.claim(holderA, 0);
         vm.prank(holderA);
         vm.expectRevert("nothing to claim");
-        dist.claim(holderA);
+        dist.claim(holderA, 0);
     }
 
     function testClaimRecipientDiffersFromSender() public {
         vm.prank(holderA);
-        dist.claim(recipient);
+        dist.claim(recipient, 0);
         assertEq(currency.balanceOf(holderA), 0, "sender should not receive currency when recipient differs");
         assertEq(currency.balanceOf(recipient), 120e6, "recipient did not receive holderA's share");
     }
 
     function testMultipleHoldersClaimIndependently() public {
         vm.prank(holderA);
-        dist.claim(holderA);
+        dist.claim(holderA, 0);
         vm.prank(holderB);
-        dist.claim(holderB);
+        dist.claim(holderB, 0);
         vm.prank(holderC);
-        dist.claim(holderC);
+        dist.claim(holderC, 0);
         assertEq(currency.balanceOf(holderA), 120e6, "holderA received wrong amount");
         assertEq(currency.balanceOf(holderB), 60e6, "holderB received wrong amount");
         assertEq(currency.balanceOf(holderC), 20e6, "holderC received wrong amount");
@@ -373,7 +373,7 @@ contract DistributionTest is Test {
     function testERC2771ClaimIdentifiesHolder() public {
         uint256 expected = 120e6;
         bytes memory callData = abi.encodePacked(
-            abi.encodeWithSelector(bytes4(keccak256("claim(address)")), recipient),
+            abi.encodeWithSelector(bytes4(keccak256("claim(address,uint256)")), recipient, uint256(0)),
             holderA
         );
         vm.prank(trustedForwarder);
@@ -432,7 +432,7 @@ contract DistributionTest is Test {
 
     function testDrainAfterPartialClaims() public {
         vm.prank(holderA);
-        dist.claim(holderA);
+        dist.claim(holderA, 0);
         uint256 remaining = currency.balanceOf(address(dist));
         assertEq(remaining, TOTAL_CURRENCY - 120e6, "remaining balance wrong after holderA claim");
 
@@ -551,7 +551,7 @@ contract DistributionTest is Test {
         assertEq(dist.eligible(holderC), 0, "holderC eligible should be zero after full reassign");
 
         vm.prank(holderA);
-        dist.claim(holderA);
+        dist.claim(holderA, 0);
         assertEq(
             currency.balanceOf(holderA),
             200e6,
@@ -569,7 +569,7 @@ contract DistributionTest is Test {
 
     function testReassignAfterClaimReverts() public {
         vm.prank(holderA);
-        dist.claim(holderA); // eligible drops to 0
+        dist.claim(holderA, 0); // eligible drops to 0
         vm.warp(reassignOrDrainAfter);
         vm.expectRevert("amount exceeds eligible");
         vm.prank(owner);
@@ -639,7 +639,7 @@ contract DistributionTest is Test {
         );
 
         vm.prank(holderC);
-        chainDist.claim(holderC);
+        chainDist.claim(holderC, 0);
         assertEq(
             currency.balanceOf(holderC),
             TOTAL_CURRENCY,
@@ -664,7 +664,7 @@ contract DistributionTest is Test {
 
     function testClaimThenReassignReverts() public {
         vm.prank(holderA);
-        dist.claim(holderA); // eligible(A) = 0
+        dist.claim(holderA, 0); // eligible(A) = 0
         vm.warp(reassignOrDrainAfter);
         vm.expectRevert("amount exceeds eligible");
         vm.prank(owner);
@@ -680,13 +680,13 @@ contract DistributionTest is Test {
         dist.reassign(holderA, holderB, amountA); // B gets 60 + 120 = 180e6
 
         vm.prank(holderB);
-        dist.claim(holderB);
+        dist.claim(holderB, 0);
         assertEq(currency.balanceOf(holderB), 180e6, "holderB should receive own share plus reassigned amount");
 
         // A's paidOut covers their share: A claims 0
         vm.prank(holderA);
         vm.expectRevert("nothing to claim");
-        dist.claim(holderA);
+        dist.claim(holderA, 0);
         assertEq(currency.balanceOf(holderA), 0, "holderA should receive nothing after full reassign");
 
         // total paid out ≤ funded amount
@@ -706,7 +706,7 @@ contract DistributionTest is Test {
         for (uint256 i = 0; i < 3; i++) {
             if ((claimOrder >> i) & 1 == 1) {
                 vm.prank(holders[i]);
-                dist.claim(holders[i]);
+                dist.claim(holders[i], 0);
             }
         }
         uint256 totalPaid = currency.balanceOf(holderA) + currency.balanceOf(holderB) + currency.balanceOf(holderC);
@@ -742,7 +742,7 @@ contract DistributionTest is Test {
         // holderA is eligible for 120e6 but contract has 0 balance
         vm.prank(holderA);
         vm.expectRevert("ERC20: transfer amount exceeds balance");
-        unfunded.claim(holderA);
+        unfunded.claim(holderA, 0);
     }
 
     function testClaimSucceedsAfterLaterFunding() public {
@@ -750,7 +750,7 @@ contract DistributionTest is Test {
         // Fund later
         currency.mint(address(unfunded), TOTAL_CURRENCY);
         vm.prank(holderA);
-        unfunded.claim(holderA);
+        unfunded.claim(holderA, 0);
         assertEq(currency.balanceOf(holderA), 120e6, "holderA should receive share after late funding");
     }
 
@@ -758,13 +758,13 @@ contract DistributionTest is Test {
         // Fund only enough for holderC (20e6)
         Distribution partialDist = _deployDist(bytes32("partial"), 20e6, reassignOrDrainAfter);
         vm.prank(holderC);
-        partialDist.claim(holderC);
+        partialDist.claim(holderC, 0);
         assertEq(currency.balanceOf(holderC), 20e6, "holderC should claim from partial funding");
 
         // holderA cannot claim (not enough balance)
         vm.prank(holderA);
         vm.expectRevert("ERC20: transfer amount exceeds balance");
-        partialDist.claim(holderA);
+        partialDist.claim(holderA, 0);
     }
 
     // ========== D_Fee. Fee Collection at Claim Time ==========
@@ -828,7 +828,7 @@ contract DistributionTest is Test {
         uint256 expectedNet = eligibleA - expectedFee;
 
         vm.prank(holderA);
-        d.claim(holderA);
+        d.claim(holderA, 0);
 
         assertEq(currency.balanceOf(feeCollector), expectedFee, "feeCollector did not receive correct fee");
         assertEq(currency.balanceOf(holderA), expectedNet, "holderA did not receive net amount after fee");
@@ -838,12 +838,12 @@ contract DistributionTest is Test {
         Distribution d = _deployDistWithNonZeroFee();
 
         vm.prank(holderA);
-        d.claim(holderA);
+        d.claim(holderA, 0);
         uint256 feeAfterA = currency.balanceOf(feeCollector);
         assertGt(feeAfterA, 0, "feeCollector should have received fee from holderA claim");
 
         vm.prank(holderB);
-        d.claim(holderB);
+        d.claim(holderB, 0);
         uint256 feeAfterB = currency.balanceOf(feeCollector);
         assertGt(feeAfterB, feeAfterA, "feeCollector should have received additional fee from holderB claim");
     }
@@ -854,6 +854,64 @@ contract DistributionTest is Test {
         assertEq(d.eligible(holderA), 120e6, "holderA eligible should be based on price, not net of fee");
         assertEq(d.eligible(holderB), 60e6, "holderB eligible should be based on price, not net of fee");
         assertEq(d.eligible(holderC), 20e6, "holderC eligible should be based on price, not net of fee");
+    }
+
+    // ========== D_MinPayout. minPayout guard ==========
+
+    /// minPayout == 0 always passes (no minimum)
+    function testClaimMinPayoutZeroAlwaysPasses() public {
+        vm.prank(holderA);
+        dist.claim(holderA, 0);
+        assertGt(currency.balanceOf(holderA), 0, "holderA should receive currency");
+    }
+
+    /// minPayout exactly equal to eligible (no fees) succeeds
+    function testClaimMinPayoutExactEligibleSucceeds() public {
+        uint256 expectedNet = dist.eligible(holderA); // 120e6
+        vm.prank(holderA);
+        dist.claim(holderA, expectedNet);
+        assertEq(currency.balanceOf(holderA), expectedNet, "holderA should receive exactly eligible");
+    }
+
+    /// minPayout one above eligible reverts
+    function testClaimMinPayoutAboveEligibleReverts() public {
+        uint256 expectedNet = dist.eligible(holderA);
+        vm.prank(holderA);
+        vm.expectRevert("payout below minimum");
+        dist.claim(holderA, expectedNet + 1);
+    }
+
+    /// With a fee, minPayout exactly equal to net-after-fee succeeds
+    function testClaimMinPayoutExactNetAfterFeeSucceeds() public {
+        Distribution d = _deployDistWithNonZeroFee();
+        uint256 eligible = d.eligible(holderA); // 120e6
+        uint256 fee = eligible / 100; // 1%
+        uint256 expectedNet = eligible - fee;
+        vm.prank(holderA);
+        d.claim(holderA, expectedNet);
+        assertEq(currency.balanceOf(holderA), expectedNet, "holderA should receive net after fee");
+    }
+
+    /// With a fee, minPayout equal to gross eligible reverts because actual payout is eligible - fee
+    function testClaimMinPayoutAboveNetAfterFeeReverts() public {
+        Distribution d = _deployDistWithNonZeroFee();
+        uint256 eligible = d.eligible(holderA); // 120e6
+        vm.prank(holderA);
+        vm.expectRevert("payout below minimum");
+        d.claim(holderA, eligible); // eligible > net after fee
+    }
+
+    /// Fuzz: claim always succeeds when minPayout <= net, reverts when minPayout > net (no fees)
+    function testFuzzClaimMinPayoutBoundary(uint256 minPayout) public {
+        uint256 net = dist.eligible(holderA); // 120e6, no fee
+        vm.prank(holderA);
+        if (minPayout <= net) {
+            dist.claim(holderA, minPayout);
+            assertEq(currency.balanceOf(holderA), net, "holderA should receive eligible");
+        } else {
+            vm.expectRevert("payout below minimum");
+            dist.claim(holderA, minPayout);
+        }
     }
 
     function testFuzzReassignAndClaimWithFee(uint256 amount) public {
@@ -879,12 +937,12 @@ contract DistributionTest is Test {
 
         if (newEligibleA > 0) {
             vm.prank(holderA);
-            d.claim(holderA);
+            d.claim(holderA, 0);
         }
         vm.prank(holderB);
-        d.claim(holderB);
+        d.claim(holderB, 0);
         vm.prank(holderC);
-        d.claim(holderC);
+        d.claim(holderC, 0);
 
         // Each gets 99% of eligible (1% fee)
         if (newEligibleA > 0) {

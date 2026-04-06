@@ -188,13 +188,13 @@ contract CoinvestedPosition is TokenSwapBase {
      * @param _dist the Distribution (dividend) contract to claim from
      * @param _dividendCurrency the currency paid out by the distribution; must be trusted
      */
-    function claimDistribution(IDistribution _dist, IERC20 _dividendCurrency) external onlyOwner nonReentrant {
+    function claimDistribution(IDistribution _dist, IERC20 _dividendCurrency, uint256 _minPayout) external onlyOwner nonReentrant {
         require(
             token.allowList().map(address(_dividendCurrency)) == TRUSTED_CURRENCY,
             "dividend currency must be a trusted currency"
         );
         uint256 before = _dividendCurrency.balanceOf(address(this));
-        _dist.claim(address(this));
+        _dist.claim(address(this), _minPayout);
         uint256 received = _dividendCurrency.balanceOf(address(this)) - before;
         require(received > 0, "didn't receive expected currency from distribution");
         _settle(received, _dividendCurrency);
@@ -234,7 +234,7 @@ contract CoinvestedPosition is TokenSwapBase {
 
         IERC20(address(token)).approve(address(_exit), tokenBalance);
         uint256 before = _exitCurrency.balanceOf(address(this));
-        _exit.claim(tokenBalance, address(this));
+        _exit.claim(tokenBalance, address(this), _minCurrencyAmount);
         uint256 received = _exitCurrency.balanceOf(address(this)) - before;
         require(received >= _minCurrencyAmount, "received less than _minCurrencyAmount");
         uint256 carry = basePayout < received ? received - basePayout : 0;

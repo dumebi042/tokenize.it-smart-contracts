@@ -159,7 +159,7 @@ contract ExitSafeTest is Test {
         // Safe calls claim -- Safe is msg.sender / holder
         bool claimOk = _execSafeTx(
             address(exitContract),
-            abi.encodeWithSelector(bytes4(keccak256("claim(uint256,address)")), claimAmt, recipient)
+            abi.encodeWithSelector(bytes4(keccak256("claim(uint256,address,uint256)")), claimAmt, recipient, 0)
         );
         assertTrue(claimOk, "Safe claim tx should succeed");
 
@@ -175,7 +175,7 @@ contract ExitSafeTest is Test {
         _execSafeTx(address(token), abi.encodeWithSelector(IERC20.approve.selector, address(exitContract), claimAmt));
         _execSafeTx(
             address(exitContract),
-            abi.encodeWithSelector(bytes4(keccak256("claim(uint256,address)")), claimAmt, recipient)
+            abi.encodeWithSelector(bytes4(keccak256("claim(uint256,address,uint256)")), claimAmt, recipient, 0)
         );
 
         assertEq(token.balanceOf(address(exitContract)), claimAmt, "Exit should hold Safe's claimed tokens");
@@ -191,7 +191,7 @@ contract ExitSafeTest is Test {
         _execSafeTx(address(token), abi.encodeWithSelector(IERC20.approve.selector, address(exitContract), claimAmt));
         _execSafeTx(
             address(exitContract),
-            abi.encodeWithSelector(bytes4(keccak256("claim(uint256,address)")), claimAmt, recipient)
+            abi.encodeWithSelector(bytes4(keccak256("claim(uint256,address,uint256)")), claimAmt, recipient, 0)
         );
 
         assertEq(currency.balanceOf(recipient), expectedCurrency, "recipient should receive correct currency");
@@ -205,9 +205,10 @@ contract ExitSafeTest is Test {
         // Pre-compute the signature so that vm.expectRevert fires on execTransaction,
         // not on the preceding nonce/hash view calls.
         bytes memory claimCalldata = abi.encodeWithSelector(
-            bytes4(keccak256("claim(uint256,address)")),
+            bytes4(keccak256("claim(uint256,address,uint256)")),
             1e18,
-            recipient
+            recipient,
+            0
         );
         bytes32 txHash = safe.getTransactionHash(
             address(exitContract),
@@ -256,11 +257,11 @@ contract ExitSafeTest is Test {
 
         bool ok1 = _execSafeTx(
             address(exitContract),
-            abi.encodeWithSelector(bytes4(keccak256("claim(uint256,address)")), firstClaim, recipient)
+            abi.encodeWithSelector(bytes4(keccak256("claim(uint256,address,uint256)")), firstClaim, recipient, 0)
         );
         bool ok2 = _execSafeTx(
             address(exitContract),
-            abi.encodeWithSelector(bytes4(keccak256("claim(uint256,address)")), secondClaim, recipient)
+            abi.encodeWithSelector(bytes4(keccak256("claim(uint256,address,uint256)")), secondClaim, recipient, 0)
         );
         assertTrue(ok1 && ok2, "both partial claims should succeed");
 

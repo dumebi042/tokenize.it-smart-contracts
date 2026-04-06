@@ -16,7 +16,7 @@ import "./resources/FakePaymentToken.sol";
 
 /**
  * @title TimeLockDistributeExitTest
- * @notice Tests for TimeLock.claimExit(), which claims exit proceeds bypassing lockedUntil.
+ * @notice Tests for TimeLock.claimExit(, 0), which claims exit proceeds bypassing lockedUntil.
  */
 contract TimeLockDistributeExitTest is Test {
     address public constant admin = 0x0109709eCFa91a80626FF3989D68f67f5b1dD120;
@@ -122,7 +122,7 @@ contract TimeLockDistributeExitTest is Test {
 
         vm.warp(claimStart);
         vm.prank(owner);
-        timeLock.claimExit(recipient);
+        timeLock.claimExit(recipient, 0);
 
         assertEq(token.balanceOf(address(timeLock)), 0, "timeLock should have no tokens after exit");
         assertEq(
@@ -159,7 +159,7 @@ contract TimeLockDistributeExitTest is Test {
         vm.warp(claimStart);
         vm.prank(owner);
         vm.expectRevert("no exit set in tokenExitRegistry");
-        timeLock.claimExit(recipient);
+        timeLock.claimExit(recipient, 0);
     }
 
     /// Reverts when recipient is zero address
@@ -171,7 +171,7 @@ contract TimeLockDistributeExitTest is Test {
         vm.warp(claimStart);
         vm.prank(owner);
         vm.expectRevert("recipient can not be zero address");
-        timeLock.claimExit(address(0));
+        timeLock.claimExit(address(0), 0);
     }
 
     /// Only owner can call claimExit
@@ -182,7 +182,7 @@ contract TimeLockDistributeExitTest is Test {
 
         vm.warp(claimStart);
         vm.expectRevert("Ownable: caller is not the owner");
-        timeLock.claimExit(recipient);
+        timeLock.claimExit(recipient, 0);
     }
 
     /// Reverts when timeLock holds no tokens (drain after lock expires, then try claimExit)
@@ -203,6 +203,6 @@ contract TimeLockDistributeExitTest is Test {
         vm.warp(lockedUntil + 1 days);
         vm.prank(owner);
         vm.expectRevert("no tokens to exit");
-        timeLock.claimExit(recipient);
+        timeLock.claimExit(recipient, 0);
     }
 }

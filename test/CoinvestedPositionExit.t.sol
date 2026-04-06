@@ -16,7 +16,7 @@ import "./resources/CloneCreators.sol";
 
 /// @dev Minimal IExit stub: claim() does nothing, so claimExit measures received == 0.
 contract NoOpExit {
-    function claim(uint256, address) external {}
+    function claim(uint256, address, uint256) external {}
 }
 
 /**
@@ -1037,7 +1037,7 @@ contract CoinvestedPositionExitTest is Test {
         tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.warp(claimStart);
         vm.prank(owner);
-        vm.expectRevert("received less than _minCurrencyAmount");
+        vm.expectRevert("payout below minimum");
         coinvestedPosition.claimExit(IERC20(address(eurc)), totalCurrency + 1, 0);
     }
 
@@ -1107,7 +1107,7 @@ contract CoinvestedPositionExitTest is Test {
         vm.warp(claimStart);
         vm.prank(owner);
         if (uint256(minCurrencyAmount) > received) {
-            vm.expectRevert("received less than _minCurrencyAmount");
+            vm.expectRevert("payout below minimum");
         }
         coinvestedPositionFuzz.claimExit(IERC20(address(eurc)), uint256(minCurrencyAmount), 0);
     }
