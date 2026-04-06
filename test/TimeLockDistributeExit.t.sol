@@ -11,12 +11,29 @@ import "../contracts/TimeLock.sol";
 import "../contracts/TokenExitRegistry.sol";
 import "../contracts/Exit.sol";
 import "../contracts/Token.sol";
+import "../contracts/common/IDistribution.sol";
 import "./resources/CloneCreators.sol";
 import "./resources/FakePaymentToken.sol";
+import "./resources/FixedPayoutExit.sol";
+
+/// @dev Stub IDistribution: claim() pays a fixed amount to _recipient, ignoring _minPayout.
+contract FixedPayoutDistribution {
+    IERC20 public currency;
+    uint256 public payout;
+
+    constructor(IERC20 _currency, uint256 _payout) {
+        currency = _currency;
+        payout = _payout;
+    }
+
+    function claim(address _recipient, uint256) external {
+        if (payout > 0) currency.transfer(_recipient, payout);
+    }
+}
 
 /**
  * @title TimeLockDistributeExitTest
- * @notice Tests for TimeLock.distributeExit(), which claims exit proceeds bypassing lockedUntil.
+ * @notice Tests for TimeLock.claimExit(, 0), which claims exit proceeds bypassing lockedUntil.
  */
 contract TimeLockDistributeExitTest is Test {
     address public constant admin = 0x0109709eCFa91a80626FF3989D68f67f5b1dD120;
@@ -98,19 +115,19 @@ contract TimeLockDistributeExitTest is Test {
             currency: IERC20(address(eurc)),
             pricePerToken: pricePerToken,
             claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: totalCurrency
+            drainStart: drainStart
         });
         address cloneAddr = exitFactory.predictCloneAddress(bytes32("exit"), trustedForwarder, args);
         eurc.mint(currencyProvider, totalCurrency);
         vm.prank(currencyProvider);
         eurc.approve(cloneAddr, totalCurrency);
-        return Exit(exitFactory.createExitClone(bytes32("exit"), trustedForwarder, currencyProvider, args));
+        return
+            Exit(exitFactory.createExitClone(bytes32("exit"), trustedForwarder, currencyProvider, args, totalCurrency));
     }
 
-    // ── distributeExit bypasses lockedUntil ──────────────────────────────────
+    // ── claimExit bypasses lockedUntil ──────────────────────────────────
 
-    /// distributeExit works before lockedUntil has passed
+    /// claimExit works before lockedUntil has passed
     function testDistributeExitBeforeLockedUntil() public {
         Exit exitContract = _deployExit(200e6);
 
@@ -122,7 +139,7 @@ contract TimeLockDistributeExitTest is Test {
 
         vm.warp(claimStart);
         vm.prank(owner);
-        timeLock.distributeExit(recipient);
+        timeLock.claimExit(eurc, recipient, 0);
 
         assertEq(token.balanceOf(address(timeLock)), 0, "timeLock should have no tokens after exit");
         assertEq(
@@ -159,7 +176,7 @@ contract TimeLockDistributeExitTest is Test {
         vm.warp(claimStart);
         vm.prank(owner);
         vm.expectRevert("no exit set in tokenExitRegistry");
-        timeLock.distributeExit(recipient);
+        timeLock.claimExit(eurc, recipient, 0);
     }
 
     /// Reverts when recipient is zero address
@@ -171,10 +188,10 @@ contract TimeLockDistributeExitTest is Test {
         vm.warp(claimStart);
         vm.prank(owner);
         vm.expectRevert("recipient can not be zero address");
-        timeLock.distributeExit(address(0));
+        timeLock.claimExit(eurc, address(0), 0);
     }
 
-    /// Only owner can call distributeExit
+    /// Only owner can call claimExit
     function testDistributeExitRevertsIfNotOwner() public {
         Exit exitContract = _deployExit(200e6);
         vm.prank(admin);
@@ -182,10 +199,10 @@ contract TimeLockDistributeExitTest is Test {
 
         vm.warp(claimStart);
         vm.expectRevert("Ownable: caller is not the owner");
-        timeLock.distributeExit(recipient);
+        timeLock.claimExit(eurc, recipient, 0);
     }
 
-    /// Reverts when timeLock holds no tokens (drain after lock expires, then try distributeExit)
+    /// Reverts when timeLock holds no tokens (drain after lock expires, then try claimExit)
     function testDistributeExitRevertsIfNoTokens() public {
         Exit exitContract = _deployExit(200e6);
 
@@ -196,13 +213,65 @@ contract TimeLockDistributeExitTest is Test {
 
         assertEq(token.balanceOf(address(timeLock)), 0, "timeLock should have no tokens after drain");
 
-        // Now set exit and try distributeExit — should revert because no tokens remain
+        // Now set exit and try claimExit — should revert because no tokens remain
         vm.prank(admin);
         tokenExitRegistry.setExit(IExit(address(exitContract)));
 
         vm.warp(lockedUntil + 1 days);
         vm.prank(owner);
         vm.expectRevert("no tokens to exit");
-        timeLock.distributeExit(recipient);
+        timeLock.claimExit(eurc, recipient, 0);
+    }
+
+    // ── Balance-diff minPayout checks (stub-based) ────────────────────────────
+
+    /// FixedPayoutExit pays 1 but _minPayout=2: TimeLock's balance-diff check reverts
+    function testClaimExitRevertsWhenReceivedBelowMinPayout() public {
+        eurc.mint(address(this), 1);
+        FixedPayoutExit stub = new FixedPayoutExit(IERC20(address(eurc)), 1);
+        IERC20(address(eurc)).transfer(address(stub), 1);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(stub)));
+
+        vm.prank(owner);
+        vm.expectRevert("received less than _minPayout");
+        timeLock.claimExit(IERC20(address(eurc)), recipient, 2);
+    }
+
+    /// FixedPayoutExit pays exactly _minPayout: balance-diff check passes
+    function testClaimExitSucceedsWhenReceivedEqualsMinPayout() public {
+        uint256 minPayout = 1e6;
+        eurc.mint(address(this), minPayout);
+        FixedPayoutExit stub = new FixedPayoutExit(IERC20(address(eurc)), minPayout);
+        IERC20(address(eurc)).transfer(address(stub), minPayout);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(stub)));
+
+        vm.prank(owner);
+        timeLock.claimExit(IERC20(address(eurc)), recipient, minPayout);
+        assertEq(eurc.balanceOf(recipient), minPayout, "recipient should receive exactly minPayout");
+    }
+
+    /// FixedPayoutDistribution pays 1 but _minPayout=2: TimeLock's balance-diff check reverts
+    function testClaimDistributionRevertsWhenReceivedBelowMinPayout() public {
+        eurc.mint(address(this), 1);
+        FixedPayoutDistribution stub = new FixedPayoutDistribution(IERC20(address(eurc)), 1);
+        IERC20(address(eurc)).transfer(address(stub), 1);
+
+        vm.prank(owner);
+        vm.expectRevert("received less than _minPayout");
+        timeLock.claimDistribution(IDistribution(address(stub)), IERC20(address(eurc)), recipient, 2);
+    }
+
+    /// FixedPayoutDistribution pays exactly _minPayout: balance-diff check passes
+    function testClaimDistributionSucceedsWhenReceivedEqualsMinPayout() public {
+        uint256 minPayout = 1e6;
+        eurc.mint(address(this), minPayout);
+        FixedPayoutDistribution stub = new FixedPayoutDistribution(IERC20(address(eurc)), minPayout);
+        IERC20(address(eurc)).transfer(address(stub), minPayout);
+
+        vm.prank(owner);
+        timeLock.claimDistribution(IDistribution(address(stub)), IERC20(address(eurc)), recipient, minPayout);
+        assertEq(eurc.balanceOf(recipient), minPayout, "recipient should receive exactly minPayout");
     }
 }

@@ -4,7 +4,7 @@ pragma solidity 0.8.23;
 import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "./interfaces/IPriceDynamic.sol";
+import "./common/IPriceDynamic.sol";
 
 struct Linear {
     /// numerator of slope of linear function, e.g. a where slope == a/b

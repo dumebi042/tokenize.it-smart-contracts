@@ -6,7 +6,7 @@ import "../lib/forge-std/src/console.sol";
 
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/FeeSettings.sol";
-import "../contracts/interfaces/IFeeSettings.sol";
+import "../contracts/common/IFeeSettings.sol";
 import "../contracts/factories/TokenSwapCloneFactory.sol";
 import "./resources/FakePaymentToken.sol";
 import "./resources/MaliciousPaymentToken.sol";
@@ -759,6 +759,7 @@ contract TokenSwapTest is Test {
 
     function testOnlyOwnerCanPause(address rando) public {
         vm.assume(rando != owner);
+        vm.assume(rando != trustedForwarder);
         vm.prank(rando);
         vm.expectRevert("Ownable: caller is not the owner");
         tokenSwap.pause();
@@ -766,6 +767,7 @@ contract TokenSwapTest is Test {
 
     function testOnlyOwnerCanUnpause(address rando) public {
         vm.assume(rando != owner);
+        vm.assume(rando != trustedForwarder);
         vm.prank(owner);
         tokenSwap.pause();
         vm.prank(rando);

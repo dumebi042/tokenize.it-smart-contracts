@@ -4,9 +4,9 @@ pragma solidity 0.8.23;
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
 import "./TokenExitRegistry.sol";
-import "./TokenSwapBase.sol";
-import "./IDistribution.sol";
-import "./IExit.sol";
+import "./common/TokenSwapBase.sol";
+import "./common/IDistribution.sol";
+import "./common/IExit.sol";
 
 struct LeadInvestor {
     /// lead investor address that receives carry
@@ -188,15 +188,20 @@ contract CoinvestedPosition is TokenSwapBase {
      * @param _dist the Distribution (dividend) contract to claim from
      * @param _dividendCurrency the currency paid out by the distribution; must be trusted
      */
-    function distributeDividends(IDistribution _dist, IERC20 _dividendCurrency) external onlyOwner nonReentrant {
+    function claimDistribution(
+        IDistribution _dist,
+        IERC20 _dividendCurrency,
+        uint256 _minPayout
+    ) external onlyOwner nonReentrant {
         require(
             token.allowList().map(address(_dividendCurrency)) == TRUSTED_CURRENCY,
             "dividend currency must be a trusted currency"
         );
         uint256 before = _dividendCurrency.balanceOf(address(this));
-        _dist.claim(address(this));
+        _dist.claim(address(this), _minPayout);
         uint256 received = _dividendCurrency.balanceOf(address(this)) - before;
         require(received > 0, "didn't receive expected currency from distribution");
+        require(received >= _minPayout, "received less than _minPayout");
         _settle(received, _dividendCurrency);
     }
 
@@ -212,7 +217,7 @@ contract CoinvestedPosition is TokenSwapBase {
      *      This guards against faulty or malicious exit contracts.
      * @param _basePrice base price in _exitCurrency's units; ignored when _exitCurrency == currency
      */
-    function distributeExit(
+    function claimExit(
         IERC20 _exitCurrency,
         uint256 _minCurrencyAmount,
         uint256 _basePrice
@@ -234,7 +239,7 @@ contract CoinvestedPosition is TokenSwapBase {
 
         IERC20(address(token)).approve(address(_exit), tokenBalance);
         uint256 before = _exitCurrency.balanceOf(address(this));
-        _exit.claim(tokenBalance, address(this));
+        _exit.claim(tokenBalance, address(this), _minCurrencyAmount);
         uint256 received = _exitCurrency.balanceOf(address(this)) - before;
         require(received >= _minCurrencyAmount, "received less than _minCurrencyAmount");
         uint256 carry = basePayout < received ? received - basePayout : 0;

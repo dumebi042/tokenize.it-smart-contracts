@@ -9,7 +9,7 @@ import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import "./AllowList.sol";
-import "./interfaces/IFeeSettings.sol";
+import "./common/IFeeSettings.sol";
 
 /**
  * @title tokenize.it Token

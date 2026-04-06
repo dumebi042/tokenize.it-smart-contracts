@@ -75,6 +75,7 @@ contract VestingTest is Test {
         Vesting vest = Vesting(factory.createVestingClone(0, trustedForwarder, address(this), address(token)));
         vm.assume(rando != address(0));
         vm.assume(rando != address(this));
+        vm.assume(rando != trustedForwarder);
         vm.assume(hash != bytes32(0));
 
         // rando cannot commit
@@ -89,6 +90,7 @@ contract VestingTest is Test {
     function testOnlyOwnerCanCreate(address _owner, address _rando, address _token) public {
         vm.assume(_rando != address(0));
         vm.assume(_rando != address(this));
+        vm.assume(_rando != trustedForwarder);
         vm.assume(_owner != address(0));
         vm.assume(_owner != address(this));
         vm.assume(_owner != _rando);

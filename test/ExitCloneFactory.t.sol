@@ -57,8 +57,7 @@ contract ExitCloneFactoryTest is Test {
                 currency: IERC20(address(currency)),
                 pricePerToken: EXAMPLE_PRICE,
                 claimStart: EXAMPLE_CLAIM_START,
-                drainStart: EXAMPLE_DRAIN_START,
-                totalCurrencyAmount: EXAMPLE_TOTAL_CURRENCY
+                drainStart: EXAMPLE_DRAIN_START
             });
     }
 
@@ -66,13 +65,14 @@ contract ExitCloneFactoryTest is Test {
     function _deploy(
         bytes32 salt,
         address _trustedForwarder,
-        ExitInitializerArguments memory args
+        ExitInitializerArguments memory args,
+        uint256 _totalCurrencyAmount
     ) internal returns (address) {
         address cloneAddr = factory.predictCloneAddress(salt, _trustedForwarder, args);
-        currency.mint(currencyProvider, args.totalCurrencyAmount);
+        currency.mint(currencyProvider, _totalCurrencyAmount);
         vm.prank(currencyProvider);
-        currency.approve(cloneAddr, args.totalCurrencyAmount);
-        return factory.createExitClone(salt, _trustedForwarder, currencyProvider, args);
+        currency.approve(cloneAddr, _totalCurrencyAmount);
+        return factory.createExitClone(salt, _trustedForwarder, currencyProvider, args, _totalCurrencyAmount);
     }
 
     // ========== F1-E. Address Prediction ==========
@@ -89,19 +89,19 @@ contract ExitCloneFactoryTest is Test {
     function testActualAddressMatchesPrediction() public {
         ExitInitializerArguments memory args = _baseArgs();
         address predicted = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
-        address actual = _deploy(EXAMPLE_SALT, trustedForwarder, args);
+        address actual = _deploy(EXAMPLE_SALT, trustedForwarder, args, EXAMPLE_TOTAL_CURRENCY);
         assertEq(predicted, actual, "deployed address does not match prediction");
     }
 
     function testNewCloneEventEmitted() public {
         ExitInitializerArguments memory args = _baseArgs();
         address predicted = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
-        currency.mint(currencyProvider, args.totalCurrencyAmount);
+        currency.mint(currencyProvider, EXAMPLE_TOTAL_CURRENCY);
         vm.prank(currencyProvider);
-        currency.approve(predicted, args.totalCurrencyAmount);
+        currency.approve(predicted, EXAMPLE_TOTAL_CURRENCY);
         vm.expectEmit(true, false, false, false, address(factory));
         emit CloneFactory.NewClone(predicted);
-        factory.createExitClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args);
+        factory.createExitClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args, EXAMPLE_TOTAL_CURRENCY);
     }
 
     // ========== F2-E. Each Salt Parameter Changes the Address ==========
@@ -172,12 +172,12 @@ contract ExitCloneFactoryTest is Test {
         assertFalse(addr1 == addr2);
     }
 
-    function testTotalCurrencyAmountChangesAddress() public {
+    function testTotalCurrencyAmountDoesNotAffectAddress() public {
         ExitInitializerArguments memory args = _baseArgs();
         address addr1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
-        args.totalCurrencyAmount = EXAMPLE_TOTAL_CURRENCY + 1;
+        // totalCurrencyAmount is no longer part of the salt — same address regardless of funding amount
         address addr2 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
-        assertFalse(addr1 == addr2);
+        assertEq(addr1, addr2);
     }
 
     // ========== F3-E. _currencyProvider Is Not in the Salt ==========
@@ -188,10 +188,16 @@ contract ExitCloneFactoryTest is Test {
         address predicted = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
 
         // Provider 1 deploys
-        currency.mint(_currencyProvider, args.totalCurrencyAmount);
+        currency.mint(_currencyProvider, EXAMPLE_TOTAL_CURRENCY);
         vm.prank(_currencyProvider);
-        currency.approve(predicted, args.totalCurrencyAmount);
-        address actual = factory.createExitClone(EXAMPLE_SALT, trustedForwarder, _currencyProvider, args);
+        currency.approve(predicted, EXAMPLE_TOTAL_CURRENCY);
+        address actual = factory.createExitClone(
+            EXAMPLE_SALT,
+            trustedForwarder,
+            _currencyProvider,
+            args,
+            EXAMPLE_TOTAL_CURRENCY
+        );
         assertEq(predicted, actual);
     }
 
@@ -202,32 +208,32 @@ contract ExitCloneFactoryTest is Test {
         ExitInitializerArguments memory args = _baseArgs();
         address wrongForwarder = address(0xBAD);
         address predicted = factory.predictCloneAddress(EXAMPLE_SALT, wrongForwarder, args);
-        currency.mint(currencyProvider, args.totalCurrencyAmount);
+        currency.mint(currencyProvider, EXAMPLE_TOTAL_CURRENCY);
         vm.prank(currencyProvider);
-        currency.approve(predicted, args.totalCurrencyAmount);
+        currency.approve(predicted, EXAMPLE_TOTAL_CURRENCY);
         vm.expectRevert("ExitCloneFactory: Unexpected trustedForwarder");
-        factory.createExitClone(EXAMPLE_SALT, wrongForwarder, currencyProvider, args);
+        factory.createExitClone(EXAMPLE_SALT, wrongForwarder, currencyProvider, args, EXAMPLE_TOTAL_CURRENCY);
     }
 
     // ========== F5-E. Second Deployment Fails ==========
 
     function testSecondDeploymentWithSameSaltReverts() public {
         ExitInitializerArguments memory args = _baseArgs();
-        _deploy(EXAMPLE_SALT, trustedForwarder, args);
+        _deploy(EXAMPLE_SALT, trustedForwarder, args, EXAMPLE_TOTAL_CURRENCY);
         // Second deploy: predict same address, approve, then expect revert
         address cloneAddr = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
-        currency.mint(currencyProvider, args.totalCurrencyAmount);
+        currency.mint(currencyProvider, EXAMPLE_TOTAL_CURRENCY);
         vm.prank(currencyProvider);
-        currency.approve(cloneAddr, args.totalCurrencyAmount);
+        currency.approve(cloneAddr, EXAMPLE_TOTAL_CURRENCY);
         vm.expectRevert("ERC1167: create2 failed");
-        factory.createExitClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args);
+        factory.createExitClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args, EXAMPLE_TOTAL_CURRENCY);
     }
 
     // ========== F6-E. Initialization ==========
 
     function testStateVariablesSetCorrectly() public {
         ExitInitializerArguments memory args = _baseArgs();
-        Exit clone = Exit(_deploy(EXAMPLE_SALT, trustedForwarder, args));
+        Exit clone = Exit(_deploy(EXAMPLE_SALT, trustedForwarder, args, EXAMPLE_TOTAL_CURRENCY));
 
         assertEq(clone.owner(), args.owner);
         assertEq(address(clone.token()), address(args.token));
@@ -235,46 +241,52 @@ contract ExitCloneFactoryTest is Test {
         assertEq(clone.pricePerToken(), args.pricePerToken);
         assertEq(clone.claimStart(), args.claimStart);
         assertEq(clone.drainStart(), args.drainStart);
-        assertEq(currency.balanceOf(address(clone)), args.totalCurrencyAmount);
+        assertEq(currency.balanceOf(address(clone)), EXAMPLE_TOTAL_CURRENCY);
         assertTrue(clone.isTrustedForwarder(trustedForwarder));
     }
 
     function testReInitializingCloneReverts() public {
         ExitInitializerArguments memory args = _baseArgs();
-        Exit clone = Exit(_deploy(EXAMPLE_SALT, trustedForwarder, args));
+        Exit clone = Exit(_deploy(EXAMPLE_SALT, trustedForwarder, args, EXAMPLE_TOTAL_CURRENCY));
         vm.expectRevert("Initializable: contract is already initialized");
-        clone.initialize(args, currencyProvider);
+        clone.initialize(args, currencyProvider, 0);
     }
 
     // ========== F7-E. Funding via Clone Address Approval ==========
 
     function testApprovalToFactoryInsteadOfCloneReverts() public {
         ExitInitializerArguments memory args = _baseArgs();
-        currency.mint(currencyProvider, args.totalCurrencyAmount);
+        currency.mint(currencyProvider, EXAMPLE_TOTAL_CURRENCY);
         vm.prank(currencyProvider);
-        currency.approve(address(factory), args.totalCurrencyAmount); // wrong address
+        currency.approve(address(factory), EXAMPLE_TOTAL_CURRENCY); // wrong address
         vm.expectRevert("ERC20: insufficient allowance");
-        factory.createExitClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args);
+        factory.createExitClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args, EXAMPLE_TOTAL_CURRENCY);
     }
 
     function testApprovalBelowRequiredReverts() public {
         ExitInitializerArguments memory args = _baseArgs();
         address cloneAddr = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
-        currency.mint(currencyProvider, args.totalCurrencyAmount);
+        currency.mint(currencyProvider, EXAMPLE_TOTAL_CURRENCY);
         vm.prank(currencyProvider);
-        currency.approve(cloneAddr, args.totalCurrencyAmount - 1);
+        currency.approve(cloneAddr, EXAMPLE_TOTAL_CURRENCY - 1);
         vm.expectRevert("ERC20: insufficient allowance");
-        factory.createExitClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args);
+        factory.createExitClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args, EXAMPLE_TOTAL_CURRENCY);
     }
 
     function testExactApprovalSucceeds() public {
         ExitInitializerArguments memory args = _baseArgs();
         address cloneAddr = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
-        currency.mint(currencyProvider, args.totalCurrencyAmount);
+        currency.mint(currencyProvider, EXAMPLE_TOTAL_CURRENCY);
         vm.prank(currencyProvider);
-        currency.approve(cloneAddr, args.totalCurrencyAmount);
-        address actual = factory.createExitClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args);
-        assertEq(currency.balanceOf(actual), args.totalCurrencyAmount);
+        currency.approve(cloneAddr, EXAMPLE_TOTAL_CURRENCY);
+        address actual = factory.createExitClone(
+            EXAMPLE_SALT,
+            trustedForwarder,
+            currencyProvider,
+            args,
+            EXAMPLE_TOTAL_CURRENCY
+        );
+        assertEq(currency.balanceOf(actual), EXAMPLE_TOTAL_CURRENCY);
     }
 
     // ========== F8-E. Invalid Currency Reverts ==========
@@ -285,12 +297,12 @@ contract ExitCloneFactoryTest is Test {
         ExitInitializerArguments memory args = _baseArgs();
         args.currency = IERC20(address(badCurrency));
         vm.expectRevert("currency needs to be on the allowlist with TRUSTED_CURRENCY attribute");
-        factory.createExitClone(bytes32("bad1"), trustedForwarder, currencyProvider, args);
+        factory.createExitClone(bytes32("bad1"), trustedForwarder, currencyProvider, args, 0);
     }
 
     function testTrustedCurrencyBitSucceeds() public {
         ExitInitializerArguments memory args = _baseArgs();
-        address actual = _deploy(EXAMPLE_SALT, trustedForwarder, args);
+        address actual = _deploy(EXAMPLE_SALT, trustedForwarder, args, EXAMPLE_TOTAL_CURRENCY);
         assertFalse(actual == address(0));
     }
 }

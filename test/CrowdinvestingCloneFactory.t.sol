@@ -6,7 +6,7 @@ import "../lib/forge-std/src/console.sol";
 import "../contracts/factories/CrowdinvestingCloneFactory.sol";
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/factories/FeeSettingsCloneFactory.sol";
-import "../contracts/interfaces/IFeeSettings.sol";
+import "../contracts/common/IFeeSettings.sol";
 import "./resources/ERC2771Helper.sol";
 import "./resources/CloneCreators.sol";
 

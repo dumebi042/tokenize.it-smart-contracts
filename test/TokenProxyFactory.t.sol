@@ -232,8 +232,10 @@ contract tokenProxyFactoryTest is Test {
     */
     function testPausing(address _admin, address rando) public {
         vm.assume(_admin != address(0));
+        vm.assume(_admin != trustedForwarder);
         vm.assume(rando != address(0));
         vm.assume(rando != _admin);
+        vm.assume(rando != trustedForwarder);
 
         FeeSettings _feeSettings = createFeeSettings(
             trustedForwarder,
@@ -290,6 +292,7 @@ contract tokenProxyFactoryTest is Test {
     function testGrantRole(address newPauser) public {
         vm.assume(newPauser != address(0));
         vm.assume(newPauser != admin);
+        vm.assume(newPauser != trustedForwarder);
 
         FeeSettings _feeSettings = createFeeSettings(
             trustedForwarder,

@@ -9,7 +9,7 @@ import "../contracts/factories/PrivateOfferFactory.sol";
 import "../contracts/factories/TimeLockCloneFactory.sol";
 import "../contracts/TimeLock.sol";
 import "./resources/CloneCreators.sol";
-import "../contracts/interfaces/IFeeSettings.sol";
+import "../contracts/common/IFeeSettings.sol";
 import "./resources/FakePaymentToken.sol";
 
 contract PrivateOfferTest is Test {

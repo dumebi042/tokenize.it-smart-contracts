@@ -8,7 +8,7 @@ import "../contracts/factories/FeeSettingsCloneFactory.sol";
 import "../contracts/factories/AllowListCloneFactory.sol";
 import "../contracts/factories/PrivateOfferFactory.sol";
 import "../contracts/factories/TokenProxyFactory.sol";
-import "../contracts/interfaces/IFeeSettings.sol";
+import "../contracts/common/IFeeSettings.sol";
 
 contract DeployPlatform is Script {
     function setUp() public {}

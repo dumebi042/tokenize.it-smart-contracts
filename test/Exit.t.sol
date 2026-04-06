@@ -82,14 +82,13 @@ contract ExitTest is Test {
             currency: IERC20(address(currency)),
             pricePerToken: price,
             claimStart: start,
-            drainStart: end,
-            totalCurrencyAmount: totalCurrency
+            drainStart: end
         });
         address cloneAddr = factory.predictCloneAddress(salt, trustedForwarder, args);
         currency.mint(currencyProvider, totalCurrency);
         vm.prank(currencyProvider);
         currency.approve(cloneAddr, totalCurrency);
-        return Exit(factory.createExitClone(salt, trustedForwarder, currencyProvider, args));
+        return Exit(factory.createExitClone(salt, trustedForwarder, currencyProvider, args, totalCurrency));
     }
 
     // ========== E1. Constructor / Logic Contract ==========
@@ -101,11 +100,10 @@ contract ExitTest is Test {
             currency: IERC20(address(currency)),
             pricePerToken: PRICE_PER_TOKEN,
             claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: 0
+            drainStart: drainStart
         });
         vm.expectRevert("Initializable: contract is already initialized");
-        exitLogic.initialize(args, currencyProvider);
+        exitLogic.initialize(args, currencyProvider, 0);
     }
 
     function testLogicContractStateIsZero() public view {
@@ -121,7 +119,7 @@ contract ExitTest is Test {
         // claimStart is 0, so timestamp >= claimStart passes; claim then tries
         // safeTransferFrom on token=address(0) which reverts (no code at address)
         vm.expectRevert("Address: call to non-contract");
-        exitLogic.claim(1e18, recipient);
+        exitLogic.claim(1e18, recipient, 0);
     }
 
     function testLogicContractDrainReverts() public {
@@ -138,11 +136,10 @@ contract ExitTest is Test {
             currency: IERC20(address(currency)),
             pricePerToken: PRICE_PER_TOKEN,
             claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: 100
+            drainStart: drainStart
         });
         vm.expectRevert("Initializable: contract is already initialized");
-        exitContract.initialize(args, currencyProvider);
+        exitContract.initialize(args, currencyProvider, 100);
     }
 
     // ========== E2. initialize() — Validation & State ==========
@@ -154,11 +151,10 @@ contract ExitTest is Test {
             currency: IERC20(address(currency)),
             pricePerToken: 0,
             claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: 0
+            drainStart: drainStart
         });
         vm.expectRevert("price must be positive");
-        factory.createExitClone(bytes32("p0"), trustedForwarder, currencyProvider, args);
+        factory.createExitClone(bytes32("p0"), trustedForwarder, currencyProvider, args, 0);
     }
 
     function testInitializeZeroClaimStartReverts() public {
@@ -168,11 +164,10 @@ contract ExitTest is Test {
             currency: IERC20(address(currency)),
             pricePerToken: PRICE_PER_TOKEN,
             claimStart: 0,
-            drainStart: drainStart,
-            totalCurrencyAmount: 0
+            drainStart: drainStart
         });
         vm.expectRevert("claimStart must be set");
-        factory.createExitClone(bytes32("cs0"), trustedForwarder, currencyProvider, args);
+        factory.createExitClone(bytes32("cs0"), trustedForwarder, currencyProvider, args, 0);
     }
 
     function testInitializeDrainStartEqualToStartReverts() public {
@@ -182,11 +177,10 @@ contract ExitTest is Test {
             currency: IERC20(address(currency)),
             pricePerToken: PRICE_PER_TOKEN,
             claimStart: claimStart,
-            drainStart: claimStart,
-            totalCurrencyAmount: 0
+            drainStart: claimStart
         });
         vm.expectRevert("drainStart must be after claimStart");
-        factory.createExitClone(bytes32("ce0"), trustedForwarder, currencyProvider, args);
+        factory.createExitClone(bytes32("ce0"), trustedForwarder, currencyProvider, args, 0);
     }
 
     function testInitializeCurrencyEqualsTokenReverts() public {
@@ -196,11 +190,10 @@ contract ExitTest is Test {
             currency: IERC20(address(token)),
             pricePerToken: PRICE_PER_TOKEN,
             claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: 0
+            drainStart: drainStart
         });
         vm.expectRevert("currency and token must be different");
-        factory.createExitClone(bytes32("cet"), trustedForwarder, currencyProvider, args);
+        factory.createExitClone(bytes32("cet"), trustedForwarder, currencyProvider, args, 0);
     }
 
     function testInitializeNonTrustedCurrencyReverts() public {
@@ -212,11 +205,10 @@ contract ExitTest is Test {
             currency: IERC20(address(badCurrency)),
             pricePerToken: PRICE_PER_TOKEN,
             claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: 0
+            drainStart: drainStart
         });
         vm.expectRevert("currency needs to be on the allowlist with TRUSTED_CURRENCY attribute");
-        factory.createExitClone(bytes32("ntc"), trustedForwarder, currencyProvider, args);
+        factory.createExitClone(bytes32("ntc"), trustedForwarder, currencyProvider, args, 0);
     }
 
     function testInitializeInsufficientAllowanceReverts() public {
@@ -226,15 +218,14 @@ contract ExitTest is Test {
             currency: IERC20(address(currency)),
             pricePerToken: PRICE_PER_TOKEN,
             claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: 1000e6
+            drainStart: drainStart
         });
         address cloneAddr = factory.predictCloneAddress(bytes32("lowApproval"), trustedForwarder, args);
         currency.mint(currencyProvider, 1000e6);
         vm.prank(currencyProvider);
         currency.approve(cloneAddr, 999e6); // one unit short
         vm.expectRevert("ERC20: insufficient allowance");
-        factory.createExitClone(bytes32("lowApproval"), trustedForwarder, currencyProvider, args);
+        factory.createExitClone(bytes32("lowApproval"), trustedForwarder, currencyProvider, args, 1000e6);
     }
 
     function testInitializeStateVariables() public view {
@@ -252,20 +243,20 @@ contract ExitTest is Test {
     function testClaimBeforeStartReverts() public {
         vm.expectRevert("exit not yet started");
         vm.prank(holder);
-        exitContract.claim(1e18, recipient);
+        exitContract.claim(1e18, recipient, 0);
     }
 
     function testClaimAtStartBoundarySucceeds() public {
         vm.warp(claimStart);
         vm.prank(holder);
-        exitContract.claim(1e18, recipient);
+        exitContract.claim(1e18, recipient, 0);
     }
 
     function testClaimAfterEndSucceeds() public {
         vm.warp(drainStart + 1);
         assertEq(currency.balanceOf(recipient), 0, "recipient currency balance should be zero before claim");
         vm.prank(holder);
-        exitContract.claim(1e18, recipient);
+        exitContract.claim(1e18, recipient, 0);
         assertGt(currency.balanceOf(recipient), 0, "recipient should have received currency after claim");
     }
 
@@ -275,7 +266,7 @@ contract ExitTest is Test {
         assertEq(token.balanceOf(address(exitContract)), 0, "exitContract token balance should be zero before claim");
         assertEq(token.balanceOf(holder), TOKEN_SUPPLY, "holder token balance should be full before claim");
         vm.prank(holder);
-        exitContract.claim(claimAmt, recipient);
+        exitContract.claim(claimAmt, recipient, 0);
         // tokens go to Exit, not burned
         assertEq(token.balanceOf(address(exitContract)), claimAmt, "exitContract should hold claimed tokens");
         assertEq(
@@ -292,7 +283,7 @@ contract ExitTest is Test {
         assertEq(currency.balanceOf(recipient), 0, "recipient currency balance should be zero before claim");
         assertEq(currency.balanceOf(holder), 0, "holder currency balance should be zero before claim");
         vm.prank(holder);
-        exitContract.claim(claimAmt, recipient);
+        exitContract.claim(claimAmt, recipient, 0);
         assertEq(currency.balanceOf(recipient), expectedCurrency, "recipient should receive exact currency amount");
         assertEq(currency.balanceOf(holder), 0, "holder should not receive any currency");
     }
@@ -302,7 +293,7 @@ contract ExitTest is Test {
         assertEq(currency.balanceOf(holder), 0, "holder currency balance should be zero before claim");
         assertEq(currency.balanceOf(recipient), 0, "recipient currency balance should be zero before claim");
         vm.prank(holder);
-        exitContract.claim(1e18, recipient);
+        exitContract.claim(1e18, recipient, 0);
         assertEq(currency.balanceOf(holder), 0, "holder should not receive any currency");
         assertGt(currency.balanceOf(recipient), 0, "recipient should have received currency");
     }
@@ -315,7 +306,7 @@ contract ExitTest is Test {
         // no approval → safeTransferFrom fails
         vm.expectRevert("ERC20: insufficient allowance");
         vm.prank(stranger);
-        exitContract.claim(10e18, stranger);
+        exitContract.claim(10e18, stranger, 0);
     }
 
     function testMultipleSequentialClaims() public {
@@ -337,9 +328,9 @@ contract ExitTest is Test {
             "exitContract should hold full currency before claims"
         );
         vm.prank(holder);
-        exitContract.claim(10e18, recipient);
+        exitContract.claim(10e18, recipient, 0);
         vm.prank(holder2);
-        exitContract.claim(50e18, address(44));
+        exitContract.claim(50e18, address(44), 0);
 
         assertEq(currency.balanceOf(recipient), expected1, "recipient should receive correct currency amount");
         assertEq(currency.balanceOf(address(44)), expected2, "address(44) should receive correct currency amount");
@@ -359,7 +350,7 @@ contract ExitTest is Test {
         );
         // Drain exit fully first
         vm.prank(holder);
-        exitContract.claim(TOKEN_SUPPLY, recipient);
+        exitContract.claim(TOKEN_SUPPLY, recipient, 0);
         assertEq(currency.balanceOf(address(exitContract)), 0, "exitContract should be empty after full claim");
 
         // One more token has nowhere to pull from
@@ -370,7 +361,7 @@ contract ExitTest is Test {
         token.approve(address(exitContract), 1e18);
         vm.expectRevert("ERC20: transfer amount exceeds balance");
         vm.prank(extra);
-        exitContract.claim(1e18, extra);
+        exitContract.claim(1e18, extra, 0);
     }
 
     // ========== E6. drain() ==========
@@ -385,6 +376,7 @@ contract ExitTest is Test {
     function testFuzzDrainNonOwnerReverts(address caller) public {
         vm.assume(caller != owner);
         vm.assume(caller != address(0));
+        vm.assume(caller != trustedForwarder);
         vm.warp(drainStart + 1);
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(caller);
@@ -449,7 +441,7 @@ contract ExitTest is Test {
         token.approve(address(exitContract), claimAmt);
 
         uint256 balBefore = currency.balanceOf(address(this));
-        exitContract.claim(claimAmt, address(this));
+        exitContract.claim(claimAmt, address(this), 0);
         assertEq(
             currency.balanceOf(address(this)) - balBefore,
             PRICE_PER_TOKEN, // exactly 1 token's worth; the +1 wei is rounded away
@@ -477,10 +469,10 @@ contract ExitTest is Test {
 
         vm.warp(claimStart);
 
-        fuzzExit.claim(claim1, address(0x1001));
-        fuzzExit.claim(claim2, address(0x1002));
-        fuzzExit.claim(claim3, address(0x1003));
-        fuzzExit.claim(uint256(fuzzAmt), address(0x1004));
+        fuzzExit.claim(claim1, address(0x1001), 0);
+        fuzzExit.claim(claim2, address(0x1002), 0);
+        fuzzExit.claim(claim3, address(0x1003), 0);
+        fuzzExit.claim(uint256(fuzzAmt), address(0x1004), 0);
 
         assertEq(currency.balanceOf(address(0x1001)), expected1, "claim1 payout wrong");
         assertEq(currency.balanceOf(address(0x1002)), expected2, "claim2 payout wrong");
@@ -502,7 +494,7 @@ contract ExitTest is Test {
         token.approve(address(exitContract), tokenAmt);
 
         uint256 balBefore = currency.balanceOf(address(this));
-        exitContract.claim(tokenAmt, address(this));
+        exitContract.claim(tokenAmt, address(this), 0);
         uint256 received = currency.balanceOf(address(this)) - balBefore;
         assertEq(received, expectedCurrency, "received currency should match floor division");
         // floor division: received ≤ what a full-precision calculation would give
@@ -524,7 +516,12 @@ contract ExitTest is Test {
         assertEq(token.balanceOf(holder), TOKEN_SUPPLY, "holder token balance should be full before meta-tx");
         // Build meta-tx calldata: claim(tokenAmount, recipient) + appended holder address
         bytes memory callData = abi.encodePacked(
-            abi.encodeWithSelector(bytes4(keccak256("claim(uint256,address)")), claimAmt, recipient),
+            abi.encodeWithSelector(
+                bytes4(keccak256("claim(uint256,address,uint256)")),
+                claimAmt,
+                recipient,
+                uint256(0)
+            ),
             holder
         );
         vm.prank(trustedForwarder);
@@ -579,14 +576,15 @@ contract ExitTest is Test {
             currency: IERC20(address(currency)),
             pricePerToken: PRICE_PER_TOKEN,
             claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: TOTAL_CURRENCY
+            drainStart: drainStart
         });
         address cloneAddr = factory.predictCloneAddress(bytes32("feeExit"), trustedForwarder, args);
         currency.mint(currencyProvider, TOTAL_CURRENCY);
         vm.prank(currencyProvider);
         currency.approve(cloneAddr, TOTAL_CURRENCY);
-        feeExit = Exit(factory.createExitClone(bytes32("feeExit"), trustedForwarder, currencyProvider, args));
+        feeExit = Exit(
+            factory.createExitClone(bytes32("feeExit"), trustedForwarder, currencyProvider, args, TOTAL_CURRENCY)
+        );
 
         vm.prank(holder);
         feeToken.approve(address(feeExit), TOKEN_SUPPLY);
@@ -601,7 +599,7 @@ contract ExitTest is Test {
         vm.warp(claimStart);
         assertEq(currency.balanceOf(recipient), 0, "recipient currency balance should be zero before claim");
         vm.prank(holder);
-        feeExit.claim(claimAmt, recipient);
+        feeExit.claim(claimAmt, recipient, 0);
 
         assertGt(fee, 0, "fee should be positive");
         assertEq(currency.balanceOf(recipient), currencyAmount - fee, "recipient should receive currency minus fee");
@@ -616,9 +614,152 @@ contract ExitTest is Test {
         vm.warp(claimStart);
         assertEq(currency.balanceOf(feeCollector), 0, "feeCollector currency balance should be zero before claim");
         vm.prank(holder);
-        feeExit.claim(claimAmt, recipient);
+        feeExit.claim(claimAmt, recipient, 0);
 
         assertEq(currency.balanceOf(feeCollector), fee, "feeCollector should receive exact fee amount");
+    }
+
+    // ========== E_MinPayout. minPayout guard ==========
+
+    /// minPayout == 0 always passes (no minimum)
+    function testClaimMinPayoutZeroAlwaysPasses() public {
+        vm.warp(claimStart);
+        vm.prank(holder);
+        exitContract.claim(1e18, recipient, 0);
+        assertGt(currency.balanceOf(recipient), 0, "recipient should receive currency");
+    }
+
+    /// minPayout exactly equal to net payout succeeds
+    function testClaimMinPayoutExactNetSucceeds() public {
+        uint256 claimAmt = 1e18;
+        uint256 expectedNet = (claimAmt * PRICE_PER_TOKEN) / 10 ** token.decimals();
+        vm.warp(claimStart);
+        vm.prank(holder);
+        exitContract.claim(claimAmt, recipient, expectedNet);
+        assertEq(currency.balanceOf(recipient), expectedNet, "recipient should receive exactly expectedNet");
+    }
+
+    /// minPayout one above net payout reverts
+    function testClaimMinPayoutAboveNetReverts() public {
+        uint256 claimAmt = 1e18;
+        uint256 expectedNet = (claimAmt * PRICE_PER_TOKEN) / 10 ** token.decimals();
+        vm.warp(claimStart);
+        vm.prank(holder);
+        vm.expectRevert("payout below minimum");
+        exitContract.claim(claimAmt, recipient, expectedNet + 1);
+    }
+
+    /// With a fee, minPayout exactly equal to net-after-fee succeeds
+    function testClaimMinPayoutExactNetAfterFeeSucceeds() public {
+        (Exit feeExit, IFeeSettingsV2 feeSettingsWithFee, Token feeToken) = _deployExitWithNonZeroFee();
+        uint256 claimAmt = 1e18;
+        uint256 gross = (claimAmt * PRICE_PER_TOKEN) / 10 ** feeToken.decimals();
+        uint256 fee = feeSettingsWithFee.privateOfferFee(gross, address(feeToken));
+        uint256 expectedNet = gross - fee;
+        vm.warp(claimStart);
+        vm.prank(holder);
+        feeExit.claim(claimAmt, recipient, expectedNet);
+        assertEq(currency.balanceOf(recipient), expectedNet, "recipient should receive net after fee");
+    }
+
+    /// With a fee, minPayout equal to gross (before fee) reverts because actual payout is gross - fee
+    function testClaimMinPayoutAboveNetAfterFeeReverts() public {
+        (Exit feeExit, , Token feeToken) = _deployExitWithNonZeroFee();
+        uint256 claimAmt = 1e18;
+        uint256 gross = (claimAmt * PRICE_PER_TOKEN) / 10 ** feeToken.decimals();
+        vm.warp(claimStart);
+        vm.prank(holder);
+        vm.expectRevert("payout below minimum");
+        feeExit.claim(claimAmt, recipient, gross); // gross > net
+    }
+
+    /// With a fee, using eligible() as minPayout succeeds because eligible() already deducts the fee
+    function testClaimMinPayoutEligibleWithFeeSucceeds() public {
+        (Exit feeExit, , Token feeToken) = _deployExitWithNonZeroFee();
+        uint256 minPayout = feeExit.eligible(holder); // eligible() returns net after fee
+        vm.warp(claimStart);
+        vm.prank(holder);
+        feeExit.claim(TOKEN_SUPPLY, recipient, minPayout);
+        assertEq(currency.balanceOf(recipient), minPayout, "recipient should receive exactly eligible");
+    }
+
+    /// With a fee, minPayout above eligible() (i.e. the gross amount) reverts
+    function testClaimMinPayoutAboveEligibleWithFeeReverts() public {
+        (Exit feeExit, , Token feeToken) = _deployExitWithNonZeroFee();
+        uint256 gross = (TOKEN_SUPPLY * PRICE_PER_TOKEN) / 10 ** feeToken.decimals();
+        vm.warp(claimStart);
+        vm.prank(holder);
+        vm.expectRevert("payout below minimum");
+        feeExit.claim(TOKEN_SUPPLY, recipient, gross); // gross > eligible() (net)
+    }
+
+    /// Fuzz: claim always succeeds when minPayout <= net, reverts when minPayout > net
+    function testFuzzClaimMinPayoutBoundary(uint256 claimAmt, uint256 minPayout) public {
+        claimAmt = bound(claimAmt, 1e15, TOKEN_SUPPLY); // at least 0.001 tokens
+        uint256 net = (claimAmt * PRICE_PER_TOKEN) / 10 ** token.decimals();
+        vm.assume(net > 0);
+        vm.warp(claimStart);
+        vm.prank(holder);
+        if (minPayout <= net) {
+            exitContract.claim(claimAmt, recipient, minPayout);
+            assertEq(currency.balanceOf(recipient), net, "recipient should receive net");
+        } else {
+            vm.expectRevert("payout below minimum");
+            exitContract.claim(claimAmt, recipient, minPayout);
+        }
+    }
+
+    // ========== E_Eligible. eligible() ==========
+
+    function testEligibleReturnsCorrectAmountForHolder() public view {
+        uint256 expectedCurrency = (TOKEN_SUPPLY * PRICE_PER_TOKEN) / 1e18;
+        assertEq(
+            exitContract.eligible(holder),
+            expectedCurrency,
+            "eligible should return full currency for full token balance"
+        );
+    }
+
+    function testEligibleZeroForAddressWithNoTokens() public view {
+        assertEq(exitContract.eligible(address(0xdead)), 0, "eligible should be zero for address with no tokens");
+    }
+
+    function testEligibleDecreasesAfterClaim() public {
+        vm.warp(claimStart);
+        uint256 claimAmt = 10e18;
+        uint256 eligibleBefore = exitContract.eligible(holder);
+        vm.prank(holder);
+        exitContract.claim(claimAmt, recipient, 0);
+        uint256 eligibleAfter = exitContract.eligible(holder);
+        uint256 claimedCurrency = (claimAmt * PRICE_PER_TOKEN) / 1e18;
+        assertEq(
+            eligibleAfter,
+            eligibleBefore - claimedCurrency,
+            "eligible should decrease by claimed currency amount"
+        );
+    }
+
+    function testEligibleZeroAfterFullClaim() public {
+        vm.warp(claimStart);
+        vm.prank(holder);
+        exitContract.claim(TOKEN_SUPPLY, recipient, 0);
+        assertEq(exitContract.eligible(holder), 0, "eligible should be zero after full claim");
+    }
+
+    function testFuzzEligible(uint128 tokenBalance) public {
+        vm.assume(tokenBalance > 0);
+        address testHolder = address(0xABCD);
+        vm.prank(admin);
+        token.mint(testHolder, tokenBalance);
+        uint256 expectedCurrency = (uint256(tokenBalance) * PRICE_PER_TOKEN) / 1e18;
+        assertEq(exitContract.eligible(testHolder), expectedCurrency, "eligible fuzz mismatch");
+    }
+
+    /// eligible() deducts the fee, returning net payout amount
+    function testEligibleDeductsFee() public {
+        (Exit feeExit, , Token feeToken) = _deployExitWithNonZeroFee();
+        uint256 gross = (TOKEN_SUPPLY * PRICE_PER_TOKEN) / 10 ** feeToken.decimals();
+        assertEq(feeExit.eligible(holder), gross - gross / 100, "eligible should be net after fee deduction");
     }
 
     function testDrainWithFeeReflectsCorrectRemainder() public {
@@ -636,7 +777,7 @@ contract ExitTest is Test {
 
         uint256 fee = feeSettingsWithFee.privateOfferFee(currencyAmount, address(feeToken));
         vm.prank(holder);
-        feeExit.claim(claimAmt, recipient);
+        feeExit.claim(claimAmt, recipient, 0);
 
         assertEq(currency.balanceOf(feeCollector), fee, "feeCollector should receive fee on claim");
 

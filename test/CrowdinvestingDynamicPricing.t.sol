@@ -7,7 +7,7 @@ import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/factories/FeeSettingsCloneFactory.sol";
 import "../contracts/factories/CrowdinvestingCloneFactory.sol";
 import "../contracts/factories/PriceLinearCloneFactory.sol";
-import "../contracts/interfaces/IFeeSettings.sol";
+import "../contracts/common/IFeeSettings.sol";
 import "./resources/FakePaymentToken.sol";
 import "./resources/MaliciousPaymentToken.sol";
 import "./resources/CloneCreators.sol";

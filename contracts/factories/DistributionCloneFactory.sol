@@ -19,24 +19,27 @@ contract DistributionCloneFactory is CloneFactory {
     constructor(address _implementation) CloneFactory(_implementation) {}
 
     /**
-     * @notice Create a new Distribution clone, fund it with currency from `_currencyProvider`, and initialize it.
-     *  `_currencyProvider` must have approved the clone address (use predictCloneAddress()) for `_arguments.totalCurrencyAmount`.
-     *  `_currencyProvider` does not affect the clone's address.
+     * @notice Create a new Distribution clone and initialize it. Optionally fund it with currency from `_currencyProvider`.
+     *  If `_initialFundingAmount > 0`, `_currencyProvider` must have approved the clone address
+     *  (use predictCloneAddress()) for that amount.
+     *  Neither `_currencyProvider` nor `_initialFundingAmount` affects the clone's address.
      * @param _rawSalt influences the address of the clone, but not the initialization
      * @param _trustedForwarder can not be changed, but is checked for security
-     * @param _currencyProvider address from which the currency is pulled; must have approved the clone address for totalCurrencyAmount; does not affect clone address
+     * @param _currencyProvider address from which the currency is pulled (if _initialFundingAmount > 0); does not affect clone address
      * @param _arguments struct with all initialization parameters
+     * @param _initialFundingAmount amount of currency to transfer from _currencyProvider at initialization (can be 0); does not affect clone address
      */
     function createDistributionClone(
         bytes32 _rawSalt,
         address _trustedForwarder,
         address _currencyProvider,
-        DistributionInitializerArguments memory _arguments
+        DistributionInitializerArguments memory _arguments,
+        uint256 _initialFundingAmount
     ) external returns (address) {
         bytes32 salt = _getSalt(_rawSalt, _trustedForwarder, _arguments);
         Distribution clone = Distribution(Clones.cloneDeterministic(implementation, salt));
         require(clone.isTrustedForwarder(_trustedForwarder), "DistributionCloneFactory: Unexpected trustedForwarder");
-        clone.initialize(_arguments, _currencyProvider);
+        clone.initialize(_arguments, _currencyProvider, _initialFundingAmount);
         emit NewClone(address(clone));
         return address(clone);
     }

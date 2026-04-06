@@ -4,10 +4,11 @@ pragma solidity 0.8.23;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import "./IDistribution.sol";
+import "./common/IDistribution.sol";
 import "./TokenExitRegistry.sol";
 
 /**
@@ -17,10 +18,10 @@ import "./TokenExitRegistry.sol";
  *      token to any recipient after lockedUntil has passed.
  * @dev Uses clone/proxy pattern. Constructor disables initializers, separate initialize().
  */
-contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeable {
+contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
 
-    /// unix timestamp before which drain() is blocked; 0 means no lock
+    /// unix timestamp before which drain() is blocked
     uint64 public lockedUntil;
     /// registry contract; if its exit() is set, the lockedUntil constraint is bypassed
     TokenExitRegistry public tokenExitRegistry;
@@ -49,6 +50,7 @@ contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeabl
         require(_lockedUntil > block.timestamp, "lockedUntil must be in the future");
         require(address(_tokenExitRegistry) != address(0), "tokenExitRegistry can not be zero address");
         __Ownable_init();
+        __ReentrancyGuard_init();
         _transferOwnership(_owner);
         lockedUntil = _lockedUntil;
         tokenExitRegistry = _tokenExitRegistry;
@@ -59,11 +61,18 @@ contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeabl
      * @param _dist the Distribution contract to claim from
      * @param _recipient address to forward the received currency to
      */
-    function distributeDividends(IDistribution _dist, address _recipient) external onlyOwner {
+    function claimDistribution(
+        IDistribution _dist,
+        IERC20 _dividendCurrency,
+        address _recipient,
+        uint256 _minPayout
+    ) external onlyOwner nonReentrant {
         require(_recipient != address(0), "recipient can not be zero address");
-        IERC20 dividendCurrency = _dist.currency();
-        _dist.claim(_recipient);
-        emit DividendsDistributed(_dist, dividendCurrency, _recipient);
+        uint256 before = _dividendCurrency.balanceOf(_recipient);
+        _dist.claim(_recipient, _minPayout);
+        uint256 received = _dividendCurrency.balanceOf(_recipient) - before;
+        require(received >= _minPayout, "received less than _minPayout");
+        emit DividendsDistributed(_dist, _dividendCurrency, _recipient);
     }
 
     /**
@@ -72,7 +81,7 @@ contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeabl
      *      and forwards all received currency to _recipient.
      * @param _recipient address to receive the exit proceeds
      */
-    function distributeExit(address _recipient) external onlyOwner {
+    function claimExit(IERC20 _exitCurrency, address _recipient, uint256 _minPayout) external onlyOwner nonReentrant {
         IExit exit = tokenExitRegistry.exit();
         require(address(exit) != address(0), "no exit set in tokenExitRegistry");
         require(_recipient != address(0), "recipient can not be zero address");
@@ -80,7 +89,10 @@ contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeabl
         uint256 tokenBalance = token.balanceOf(address(this));
         require(tokenBalance > 0, "no tokens to exit");
         IERC20(address(token)).approve(address(exit), tokenBalance);
-        exit.claim(tokenBalance, _recipient);
+        uint256 before = _exitCurrency.balanceOf(_recipient);
+        exit.claim(tokenBalance, _recipient, _minPayout);
+        uint256 received = _exitCurrency.balanceOf(_recipient) - before;
+        require(received >= _minPayout, "received less than _minPayout");
         emit ExitDistributed(exit, _recipient, tokenBalance);
     }
 

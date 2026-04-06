@@ -6,7 +6,7 @@ import "../lib/forge-std/src/console.sol";
 import "../contracts/factories/TokenSwapCloneFactory.sol";
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/factories/FeeSettingsCloneFactory.sol";
-import "../contracts/interfaces/IFeeSettings.sol";
+import "../contracts/common/IFeeSettings.sol";
 import "./resources/ERC2771Helper.sol";
 import "./resources/CloneCreators.sol";
 
@@ -355,8 +355,10 @@ contract TokenSwapCloneFactoryTest is Test {
     */
     function testPausing(address _admin, address rando) public {
         vm.assume(_admin != address(0));
+        vm.assume(_admin != trustedForwarder);
         vm.assume(rando != address(0));
         vm.assume(rando != _admin);
+        vm.assume(rando != trustedForwarder);
 
         TokenSwapInitializerArguments memory arguments = TokenSwapInitializerArguments(
             _admin,

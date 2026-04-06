@@ -181,6 +181,7 @@ contract tokenTest is Test {
     function testXCanNotSetRequirements(address X) public {
         // x is missing the Requirements role
         vm.assume(X != requirer);
+        vm.assume(X != trustedForwarder);
         vm.prank(X);
         vm.expectRevert();
         token.setRequirements(3);
@@ -525,6 +526,7 @@ contract tokenTest is Test {
     function testTransferTo0(address _address) public {
         vm.assume(token.balanceOf(_address) == 0);
         vm.assume(_address != address(0));
+        vm.assume(_address != trustedForwarder);
         vm.assume(_address != FeeSettings(address(token.feeSettings())).feeCollector());
 
         uint _amount = 100;

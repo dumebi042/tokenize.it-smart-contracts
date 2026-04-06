@@ -150,12 +150,13 @@ The following statements about the smart contracts should always be true
 
 ## Distribution.sol
 
-- Each holder in the token snapshot underlying the distribution is entitled to claim a fraction a of the currency amount underlying the distribution, minus a fee. The fraction a is the ratio of the holder's balance at the snapshot to the total supply at the snapshot.
-- The platform fee is deducted once at initialization.
+- Payout per claim depends on token amount, price per token and fee.
+- The platform fee is deducted at claim time.
 - The currency must have the `TRUSTED_CURRENCY` attribute on the token's AllowList at initialization.
 - The snapshot must have a non-zero total token supply; initialization reverts otherwise to prevent funds being locked forever.
-- Only the owner can reassign eligible funds to another address
-- Reassigning eligible funds can only be done after the `reassignAfter` timestamp.
+- Only the owner can reassign eligible funds to another address or drain the contract.
+- Reassigning eligible funds can only be done after the `reassignOrDrainAfter` timestamp.
+- Draining the contract can only be done after the `reassignOrDrainAfter` timestamp.
 - Reassigning funds does not affect the total amount of eligible funds, the amount of currency that one token in the snapshot is entitled to claim (e.g. price).
 - After `reassign(from, to, amount)`, `eligible(from)` decreases by `amount` and `eligible(to)` increases by `amount`.
 - Every reassignment is emitted as a `Reassigned` event for auditability.
@@ -165,9 +166,10 @@ The following statements about the smart contracts should always be true
 
 - Tokens are transferred from the holder to the Exit contract during a claim.
 - Claims are only possible after `claimStart`.
-- Payout per claim equals depends on token amount, price per token and fee.
-- Fee is calculated per claim using `privateOfferFee` and sent to `privateOfferFeeCollector`.
-- Currency must have both `TRUSTED_CURRENCY` and `EURO_CURRENCY` attributes on the token's AllowList.
+- Payout per claim depends on token amount, price per token and fee.
+- If the FeeSettings contract does not support `IFeeSettingsV3`, Fee is calculated per claim using `privateOfferFee` and sent to `privateOfferFeeCollector`.
+- If the FeeSettings contract supports `IFeeSettingsV3`, the fee is calculated using `fee(FeeTypes.EXIT, amount, address(token))` and sent to `feeCollector(FeeTypes.EXIT, address(token))`.
+- Currency must have `TRUSTED_CURRENCY` attribute on the token's AllowList.
 - `pricePerToken` can never be 0.
 - `drainStart` is always after `claimStart`.
 - The unclaimed currency can be drained by owner only after `drainStart`.

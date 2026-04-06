@@ -3,7 +3,7 @@ pragma solidity 0.8.23;
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
-import "./TokenSwapBase.sol";
+import "./common/TokenSwapBase.sol";
 
 /// this struct is used to circumvent the stack too deep error that occurs when passing too many arguments to a function
 struct TokenSwapInitializerArguments {

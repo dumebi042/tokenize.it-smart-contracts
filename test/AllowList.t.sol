@@ -41,6 +41,7 @@ contract AllowListTest is Test {
 
     function testNotOwner(address x) public {
         vm.assume(x != owner);
+        vm.assume(x != trustedForwarder);
         vm.prank(address(x));
         vm.expectRevert("Ownable: caller is not the owner");
         list.set(address(0), 1);
@@ -48,6 +49,7 @@ contract AllowListTest is Test {
 
     function testNotOwnerRemove(address x) public {
         vm.assume(x != owner);
+        vm.assume(x != trustedForwarder);
         vm.prank(address(x));
         vm.expectRevert("Ownable: caller is not the owner");
         list.remove(address(0));
@@ -142,6 +144,7 @@ contract AllowListTest is Test {
     function testRandoCanNotSetMultiple(address x, uint256 attributesX, address y, uint256 attributesY) public {
         vm.assume(x != address(0));
         vm.assume(x != owner);
+        vm.assume(x != trustedForwarder);
         vm.assume(y != address(0));
         vm.assume(x != y);
         address[] memory addresses = new address[](2);
@@ -184,6 +187,7 @@ contract AllowListTest is Test {
     function testRandoCannotRemoveMultiple(address rando) public {
         vm.assume(rando != address(0));
         vm.assume(rando != owner);
+        vm.assume(rando != trustedForwarder);
 
         address[] memory addresses = new address[](2);
         addresses[0] = address(3);
