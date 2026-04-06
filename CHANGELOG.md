@@ -74,3 +74,13 @@ What should be true:
 
 1. payout = tokenAmount \* price - fee
 2. payout = tokenAmount \* price, and fee is charged extra but doesn't affect the price?
+
+Note that with option 1, a fee change during an exit or distribution would mean different investors effectively get different prices.
+
+# Todo
+
+Stuff that still needs to be done, after this PR is merged:
+
+- docstrings for new contracts
+- update specifications in docs
+- update docs
