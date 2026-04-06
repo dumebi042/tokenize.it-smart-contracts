@@ -188,16 +188,20 @@ contract CoinvestedPosition is TokenSwapBase {
     /**
      * @notice Claim this contract's eligible dividend share from `_dist` and split it among lead investors.
      * @dev The full received amount is treated as carry and split among lead investors by carryFraction;
-     *      remainder goes to receiver. Any currency may be used.
+     *      remainder goes to receiver. Any trusted currency may be used.
      * @param _dist the Distribution (dividend) contract to claim from
+     * @param _dividendCurrency the currency paid out by the distribution; must be trusted
      */
     function distributeDividends(IDistribution _dist, IERC20 _dividendCurrency) external onlyOwner nonReentrant {
-        IERC20 dividendCurrency = _dist.currency();
+        require(
+            token.allowList().map(address(_dividendCurrency)) == TRUSTED_CURRENCY,
+            "dividend currency must be a trusted currency"
+        );
         uint256 before = _dividendCurrency.balanceOf(address(this));
         _dist.claim(address(this));
-        uint256 received = dividendCurrency.balanceOf(address(this)) - before;
+        uint256 received = _dividendCurrency.balanceOf(address(this)) - before;
         require(received > 0, "didn't receive expected currency from distribution");
-        _settle(received, dividendCurrency);
+        _settle(received, _dividendCurrency);
     }
 
     /**
@@ -207,18 +211,18 @@ contract CoinvestedPosition is TokenSwapBase {
      *      Carry is split among lead investors by carryFraction; remainder goes to receiver.
      *      Any currency may be used. When _exitCurrency differs from the stored currency, provide
      *      _altBasePrice expressing the base price in the exit currency's units.
-     * @param _exit the Exit contract to claim from
      * @param _exitCurrency the token paid out by the exit
      * @param _minCurrencyAmount minimum currency the call must receive; reverts if proceeds fall short.
      *      This guards against faulty or malicious exit contracts.
      * @param _altBasePrice base price in _exitCurrency's units; ignored when _exitCurrency == currency
      */
     function distributeExit(
-        IExit _exit,
         IERC20 _exitCurrency,
         uint256 _minCurrencyAmount,
         uint256 _altBasePrice
     ) external onlyOwner nonReentrant {
+        IExit _exit = tokenExitRegistry.exit();
+        require(address(_exit) != address(0), "no exit set in tokenExitRegistry");
         uint256 tokenBalance = token.balanceOf(address(this));
         require(tokenBalance > 0, "no tokens to claim");
 
@@ -234,7 +238,7 @@ contract CoinvestedPosition is TokenSwapBase {
 
         IERC20(address(token)).approve(address(_exit), tokenBalance);
         uint256 before = _exitCurrency.balanceOf(address(this));
-        exit.claim(tokenBalance, address(this));
+        _exit.claim(tokenBalance, address(this));
         uint256 received = _exitCurrency.balanceOf(address(this)) - before;
         require(received >= _minCurrencyAmount, "received less than _minCurrencyAmount");
         uint256 carry = basePayout < received ? received - basePayout : 0;

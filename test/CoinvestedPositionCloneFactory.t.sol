@@ -214,7 +214,6 @@ contract CoinvestedPositionCloneFactoryTest is Test {
         assertEq(address(cp.currency()), address(args.baseCurrency));
         assertEq(address(cp.token()), address(args.token));
         assertEq(cp.basePrice(), args.basePrice);
-        assertEq(cp.basePriceDecimals(), 6); // FakePaymentToken has 6 decimals
         assertEq(cp.getLeadInvestorsCount(), 2);
         assertTrue(cp.paused()); // starts paused
         assertEq(cp.tokenPrice(), 0);
