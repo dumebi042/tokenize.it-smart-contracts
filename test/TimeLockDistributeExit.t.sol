@@ -115,14 +115,13 @@ contract TimeLockDistributeExitTest is Test {
             currency: IERC20(address(eurc)),
             pricePerToken: pricePerToken,
             claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: totalCurrency
+            drainStart: drainStart
         });
         address cloneAddr = exitFactory.predictCloneAddress(bytes32("exit"), trustedForwarder, args);
         eurc.mint(currencyProvider, totalCurrency);
         vm.prank(currencyProvider);
         eurc.approve(cloneAddr, totalCurrency);
-        return Exit(exitFactory.createExitClone(bytes32("exit"), trustedForwarder, currencyProvider, args));
+        return Exit(exitFactory.createExitClone(bytes32("exit"), trustedForwarder, currencyProvider, args, totalCurrency));
     }
 
     // ── claimExit bypasses lockedUntil ──────────────────────────────────

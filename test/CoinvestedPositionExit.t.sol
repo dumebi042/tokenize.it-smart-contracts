@@ -182,14 +182,13 @@ contract CoinvestedPositionExitTest is Test {
             currency: IERC20(address(exitCurrency)),
             pricePerToken: pricePerToken,
             claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: totalCurrency
+            drainStart: drainStart
         });
         address cloneAddr = exitFactory.predictCloneAddress(salt, trustedForwarder, args);
         exitCurrency.mint(currencyProvider, totalCurrency);
         vm.prank(currencyProvider);
         exitCurrency.approve(cloneAddr, totalCurrency);
-        return Exit(exitFactory.createExitClone(salt, trustedForwarder, currencyProvider, args));
+        return Exit(exitFactory.createExitClone(salt, trustedForwarder, currencyProvider, args, totalCurrency));
     }
 
     /// @dev Deploy Exit with explicit totalCurrency (may differ from price * amount)
@@ -205,14 +204,13 @@ contract CoinvestedPositionExitTest is Test {
             currency: IERC20(address(exitCurrency)),
             pricePerToken: pricePerToken,
             claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: totalCurrencyAmount
+            drainStart: drainStart
         });
         address cloneAddr = exitFactory.predictCloneAddress(salt, trustedForwarder, args);
         exitCurrency.mint(currencyProvider, totalCurrencyAmount);
         vm.prank(currencyProvider);
         exitCurrency.approve(cloneAddr, totalCurrencyAmount);
-        return Exit(exitFactory.createExitClone(salt, trustedForwarder, currencyProvider, args));
+        return Exit(exitFactory.createExitClone(salt, trustedForwarder, currencyProvider, args, totalCurrencyAmount));
     }
 
     /// @dev Invariant helper: assert sum of payouts equals received and token balance is 0
@@ -661,14 +659,13 @@ contract CoinvestedPositionExitTest is Test {
             currency: IERC20(address(eurc)),
             pricePerToken: 200e6,
             claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: totalCurrency
+            drainStart: drainStart
         });
         address cloneAddr = exitFactory.predictCloneAddress(bytes32("v_exit"), trustedForwarder, exitArgs);
         eurc.mint(currencyProvider, totalCurrency);
         vm.prank(currencyProvider);
         eurc.approve(cloneAddr, totalCurrency);
-        return Exit(exitFactory.createExitClone(bytes32("v_exit"), trustedForwarder, currencyProvider, exitArgs));
+        return Exit(exitFactory.createExitClone(bytes32("v_exit"), trustedForwarder, currencyProvider, exitArgs, totalCurrency));
     }
 
     /// V: claimExit does NOT apply fees — full received amount is distributed
@@ -862,15 +859,14 @@ contract CoinvestedPositionExitTest is Test {
             currency: IERC20(address(eurc)),
             pricePerToken: uint256(pricePerToken),
             claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: totalCurrency
+            drainStart: drainStart
         });
         address cloneAddr = exitFactory.predictCloneAddress(bytes32("fuzz_a_exit"), trustedForwarder, exitArgs);
         eurc.mint(currencyProvider, totalCurrency);
         vm.prank(currencyProvider);
         eurc.approve(cloneAddr, totalCurrency);
         Exit exitContract = Exit(
-            exitFactory.createExitClone(bytes32("fuzz_a_exit"), trustedForwarder, currencyProvider, exitArgs)
+            exitFactory.createExitClone(bytes32("fuzz_a_exit"), trustedForwarder, currencyProvider, exitArgs, totalCurrency)
         );
 
         uint256 beforeA = eurc.balanceOf(leadA);
@@ -968,15 +964,14 @@ contract CoinvestedPositionExitTest is Test {
             currency: IERC20(address(eurc)),
             pricePerToken: pricePerToken,
             claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: totalCurrency
+            drainStart: drainStart
         });
         address cloneAddr = exitFactory.predictCloneAddress(bytes32("x_exit"), trustedForwarder, exitArgs);
         eurc.mint(currencyProvider, totalCurrency);
         vm.prank(currencyProvider);
         eurc.approve(cloneAddr, totalCurrency);
         Exit exitContract = Exit(
-            exitFactory.createExitClone(bytes32("x_exit"), trustedForwarder, currencyProvider, exitArgs)
+            exitFactory.createExitClone(bytes32("x_exit"), trustedForwarder, currencyProvider, exitArgs, totalCurrency)
         );
 
         // Snapshot balances before exit (cp may have EURc from buy() proceeds — receiver already got them via settle)

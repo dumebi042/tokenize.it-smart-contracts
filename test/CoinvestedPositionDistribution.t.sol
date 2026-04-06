@@ -218,7 +218,6 @@ contract CoinvestedPositionDistributionTest is Test {
             snapshotId: _snapshotId,
             currency: IERC20(address(_currency)),
             pricePerToken: _pricePerToken,
-            initialFundingAmount: initialFunding,
             reassignOrDrainAfter: reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
@@ -229,7 +228,7 @@ contract CoinvestedPositionDistributionTest is Test {
             _currency.approve(cloneAddr, initialFunding);
         }
         return
-            Distribution(distributionFactory.createDistributionClone(salt, trustedForwarder, currencyProvider, args));
+            Distribution(distributionFactory.createDistributionClone(salt, trustedForwarder, currencyProvider, args, initialFunding));
     }
 
     /// @dev Compute expected lead-investor payout: floor(carryFraction * received / uint64.max)
@@ -931,7 +930,6 @@ contract CoinvestedPositionDistributionTest is Test {
             snapshotId: snapshotId,
             currency: IERC20(address(token)),
             pricePerToken: PRICE_PER_TOKEN_USDC,
-            initialFundingAmount: 100e18,
             reassignOrDrainAfter: reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
@@ -942,7 +940,7 @@ contract CoinvestedPositionDistributionTest is Test {
         token.approve(cloneAddr, 100e18);
 
         vm.expectRevert("currency and token must be different");
-        distributionFactory.createDistributionClone(bytes32("DI-XII"), trustedForwarder, currencyProvider, args);
+        distributionFactory.createDistributionClone(bytes32("DI-XII"), trustedForwarder, currencyProvider, args, 100e18);
     }
 
     /// DI-XIII: _settle reverts when currency == held token, tested via a stub Distribution
@@ -1076,7 +1074,6 @@ contract CoinvestedPositionDistributionTest is Test {
                 snapshotId: snapFuzz,
                 currency: IERC20(address(usdc)),
                 pricePerToken: uint256(fuzzPricePerToken),
-                initialFundingAmount: initialFunding,
                 reassignOrDrainAfter: reassignOrDrainAfter,
                 initialReassignments: new Reassignment[](0)
             });
@@ -1093,7 +1090,8 @@ contract CoinvestedPositionDistributionTest is Test {
                     bytes32("DI-XI-dist"),
                     trustedForwarder,
                     currencyProvider,
-                    distributionArgs
+                    distributionArgs,
+                    initialFunding
                 )
             );
         }

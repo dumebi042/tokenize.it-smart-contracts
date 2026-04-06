@@ -87,7 +87,6 @@ contract DistributionTest is Test {
             snapshotId: snapshotId,
             currency: IERC20(address(currency)),
             pricePerToken: PRICE_PER_TOKEN,
-            initialFundingAmount: initialFunding,
             reassignOrDrainAfter: _reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
@@ -97,7 +96,7 @@ contract DistributionTest is Test {
             vm.prank(currencyProvider);
             currency.approve(cloneAddr, initialFunding);
         }
-        return Distribution(factory.createDistributionClone(salt, trustedForwarder, currencyProvider, args));
+        return Distribution(factory.createDistributionClone(salt, trustedForwarder, currencyProvider, args, initialFunding));
     }
 
     // ========== D1. Constructor / Logic Contract ==========
@@ -109,12 +108,11 @@ contract DistributionTest is Test {
             snapshotId: snapshotId,
             currency: IERC20(address(currency)),
             pricePerToken: PRICE_PER_TOKEN,
-            initialFundingAmount: 0,
             reassignOrDrainAfter: reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
         vm.expectRevert("Initializable: contract is already initialized");
-        distLogic.initialize(args, currencyProvider);
+        distLogic.initialize(args, currencyProvider, 0);
     }
 
     function testSecondInitializeReverts() public {
@@ -124,12 +122,11 @@ contract DistributionTest is Test {
             snapshotId: snapshotId,
             currency: IERC20(address(currency)),
             pricePerToken: PRICE_PER_TOKEN,
-            initialFundingAmount: 0,
             reassignOrDrainAfter: reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
         vm.expectRevert("Initializable: contract is already initialized");
-        dist.initialize(args, currencyProvider);
+        dist.initialize(args, currencyProvider, 0);
     }
 
     // ========== D2. initialize() — Validation & State ==========
@@ -142,12 +139,11 @@ contract DistributionTest is Test {
             snapshotId: snapshotId,
             currency: IERC20(address(badCurrency)),
             pricePerToken: PRICE_PER_TOKEN,
-            initialFundingAmount: 0,
             reassignOrDrainAfter: reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
         vm.expectRevert("currency needs to be on the allowlist with TRUSTED_CURRENCY attribute");
-        factory.createDistributionClone(bytes32("ntc"), trustedForwarder, currencyProvider, args);
+        factory.createDistributionClone(bytes32("ntc"), trustedForwarder, currencyProvider, args, 0);
     }
 
     function testInitializeInsufficientAllowanceReverts() public {
@@ -157,7 +153,6 @@ contract DistributionTest is Test {
             snapshotId: snapshotId,
             currency: IERC20(address(currency)),
             pricePerToken: PRICE_PER_TOKEN,
-            initialFundingAmount: 500e6,
             reassignOrDrainAfter: reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
@@ -166,7 +161,7 @@ contract DistributionTest is Test {
         vm.prank(currencyProvider);
         currency.approve(cloneAddr, 499e6); // one short
         vm.expectRevert("ERC20: insufficient allowance");
-        factory.createDistributionClone(bytes32("lowA"), trustedForwarder, currencyProvider, args);
+        factory.createDistributionClone(bytes32("lowA"), trustedForwarder, currencyProvider, args, 500e6);
     }
 
     function testInitializeZeroPriceReverts() public {
@@ -176,12 +171,11 @@ contract DistributionTest is Test {
             snapshotId: snapshotId,
             currency: IERC20(address(currency)),
             pricePerToken: 0,
-            initialFundingAmount: 0,
             reassignOrDrainAfter: reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
         vm.expectRevert("price must be positive");
-        factory.createDistributionClone(bytes32("zeroP"), trustedForwarder, currencyProvider, args);
+        factory.createDistributionClone(bytes32("zeroP"), trustedForwarder, currencyProvider, args, 0);
     }
 
     function testInitializeStateVariables() public view {
@@ -222,12 +216,11 @@ contract DistributionTest is Test {
             snapshotId: emptySnap,
             currency: IERC20(address(currency)),
             pricePerToken: PRICE_PER_TOKEN,
-            initialFundingAmount: 0,
             reassignOrDrainAfter: reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
         vm.expectRevert("snapshot has no tokens");
-        factory.createDistributionClone(bytes32("emptyDist"), trustedForwarder, currencyProvider, args);
+        factory.createDistributionClone(bytes32("emptyDist"), trustedForwarder, currencyProvider, args, 0);
     }
 
     function testInitializeWithZeroFunding() public {
@@ -305,12 +298,11 @@ contract DistributionTest is Test {
             snapshotId: snap,
             currency: IERC20(address(currency)),
             pricePerToken: pricePerTokenFuzz,
-            initialFundingAmount: 0,
             reassignOrDrainAfter: reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
         Distribution fuzzDistribution = Distribution(
-            factory.createDistributionClone(bytes32("fuzz2"), trustedForwarder, currencyProvider, args)
+            factory.createDistributionClone(bytes32("fuzz2"), trustedForwarder, currencyProvider, args, 0)
         );
 
         uint256 sumE = fuzzDistribution.eligible(holderA) +
@@ -394,7 +386,6 @@ contract DistributionTest is Test {
             snapshotId: snap,
             currency: IERC20(address(currency)),
             pricePerToken: PRICE_PER_TOKEN,
-            initialFundingAmount: initialFunding,
             reassignOrDrainAfter: reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
@@ -404,7 +395,7 @@ contract DistributionTest is Test {
             vm.prank(currencyProvider);
             currency.approve(cloneAddr, initialFunding);
         }
-        return Distribution(factory.createDistributionClone(salt, trustedForwarder, currencyProvider, args));
+        return Distribution(factory.createDistributionClone(salt, trustedForwarder, currencyProvider, args, initialFunding));
     }
 
     // ========== D5. drain() ==========
@@ -811,7 +802,6 @@ contract DistributionTest is Test {
             snapshotId: snap,
             currency: IERC20(address(currency)),
             pricePerToken: PRICE_PER_TOKEN,
-            initialFundingAmount: TOTAL_CURRENCY,
             reassignOrDrainAfter: reassignOrDrainAfter,
             initialReassignments: new Reassignment[](0)
         });
@@ -819,7 +809,7 @@ contract DistributionTest is Test {
         currency.mint(currencyProvider, TOTAL_CURRENCY);
         vm.prank(currencyProvider);
         currency.approve(cloneAddr, TOTAL_CURRENCY);
-        d = Distribution(factory.createDistributionClone(bytes32("feeDist"), trustedForwarder, currencyProvider, args));
+        d = Distribution(factory.createDistributionClone(bytes32("feeDist"), trustedForwarder, currencyProvider, args, TOTAL_CURRENCY));
     }
 
     function testNoFeeAtInitialization() public {

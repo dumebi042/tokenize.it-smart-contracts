@@ -82,14 +82,13 @@ contract ExitTest is Test {
             currency: IERC20(address(currency)),
             pricePerToken: price,
             claimStart: start,
-            drainStart: end,
-            totalCurrencyAmount: totalCurrency
+            drainStart: end
         });
         address cloneAddr = factory.predictCloneAddress(salt, trustedForwarder, args);
         currency.mint(currencyProvider, totalCurrency);
         vm.prank(currencyProvider);
         currency.approve(cloneAddr, totalCurrency);
-        return Exit(factory.createExitClone(salt, trustedForwarder, currencyProvider, args));
+        return Exit(factory.createExitClone(salt, trustedForwarder, currencyProvider, args, totalCurrency));
     }
 
     // ========== E1. Constructor / Logic Contract ==========
@@ -101,11 +100,10 @@ contract ExitTest is Test {
             currency: IERC20(address(currency)),
             pricePerToken: PRICE_PER_TOKEN,
             claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: 0
+            drainStart: drainStart
         });
         vm.expectRevert("Initializable: contract is already initialized");
-        exitLogic.initialize(args, currencyProvider);
+        exitLogic.initialize(args, currencyProvider, 0);
     }
 
     function testLogicContractStateIsZero() public view {
@@ -138,11 +136,10 @@ contract ExitTest is Test {
             currency: IERC20(address(currency)),
             pricePerToken: PRICE_PER_TOKEN,
             claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: 100
+            drainStart: drainStart
         });
         vm.expectRevert("Initializable: contract is already initialized");
-        exitContract.initialize(args, currencyProvider);
+        exitContract.initialize(args, currencyProvider, 100);
     }
 
     // ========== E2. initialize() — Validation & State ==========
@@ -154,11 +151,10 @@ contract ExitTest is Test {
             currency: IERC20(address(currency)),
             pricePerToken: 0,
             claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: 0
+            drainStart: drainStart
         });
         vm.expectRevert("price must be positive");
-        factory.createExitClone(bytes32("p0"), trustedForwarder, currencyProvider, args);
+        factory.createExitClone(bytes32("p0"), trustedForwarder, currencyProvider, args, 0);
     }
 
     function testInitializeZeroClaimStartReverts() public {
@@ -168,11 +164,10 @@ contract ExitTest is Test {
             currency: IERC20(address(currency)),
             pricePerToken: PRICE_PER_TOKEN,
             claimStart: 0,
-            drainStart: drainStart,
-            totalCurrencyAmount: 0
+            drainStart: drainStart
         });
         vm.expectRevert("claimStart must be set");
-        factory.createExitClone(bytes32("cs0"), trustedForwarder, currencyProvider, args);
+        factory.createExitClone(bytes32("cs0"), trustedForwarder, currencyProvider, args, 0);
     }
 
     function testInitializeDrainStartEqualToStartReverts() public {
@@ -182,11 +177,10 @@ contract ExitTest is Test {
             currency: IERC20(address(currency)),
             pricePerToken: PRICE_PER_TOKEN,
             claimStart: claimStart,
-            drainStart: claimStart,
-            totalCurrencyAmount: 0
+            drainStart: claimStart
         });
         vm.expectRevert("drainStart must be after claimStart");
-        factory.createExitClone(bytes32("ce0"), trustedForwarder, currencyProvider, args);
+        factory.createExitClone(bytes32("ce0"), trustedForwarder, currencyProvider, args, 0);
     }
 
     function testInitializeCurrencyEqualsTokenReverts() public {
@@ -196,11 +190,10 @@ contract ExitTest is Test {
             currency: IERC20(address(token)),
             pricePerToken: PRICE_PER_TOKEN,
             claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: 0
+            drainStart: drainStart
         });
         vm.expectRevert("currency and token must be different");
-        factory.createExitClone(bytes32("cet"), trustedForwarder, currencyProvider, args);
+        factory.createExitClone(bytes32("cet"), trustedForwarder, currencyProvider, args, 0);
     }
 
     function testInitializeNonTrustedCurrencyReverts() public {
@@ -212,11 +205,10 @@ contract ExitTest is Test {
             currency: IERC20(address(badCurrency)),
             pricePerToken: PRICE_PER_TOKEN,
             claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: 0
+            drainStart: drainStart
         });
         vm.expectRevert("currency needs to be on the allowlist with TRUSTED_CURRENCY attribute");
-        factory.createExitClone(bytes32("ntc"), trustedForwarder, currencyProvider, args);
+        factory.createExitClone(bytes32("ntc"), trustedForwarder, currencyProvider, args, 0);
     }
 
     function testInitializeInsufficientAllowanceReverts() public {
@@ -226,15 +218,14 @@ contract ExitTest is Test {
             currency: IERC20(address(currency)),
             pricePerToken: PRICE_PER_TOKEN,
             claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: 1000e6
+            drainStart: drainStart
         });
         address cloneAddr = factory.predictCloneAddress(bytes32("lowApproval"), trustedForwarder, args);
         currency.mint(currencyProvider, 1000e6);
         vm.prank(currencyProvider);
         currency.approve(cloneAddr, 999e6); // one unit short
         vm.expectRevert("ERC20: insufficient allowance");
-        factory.createExitClone(bytes32("lowApproval"), trustedForwarder, currencyProvider, args);
+        factory.createExitClone(bytes32("lowApproval"), trustedForwarder, currencyProvider, args, 1000e6);
     }
 
     function testInitializeStateVariables() public view {
@@ -585,14 +576,13 @@ contract ExitTest is Test {
             currency: IERC20(address(currency)),
             pricePerToken: PRICE_PER_TOKEN,
             claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: TOTAL_CURRENCY
+            drainStart: drainStart
         });
         address cloneAddr = factory.predictCloneAddress(bytes32("feeExit"), trustedForwarder, args);
         currency.mint(currencyProvider, TOTAL_CURRENCY);
         vm.prank(currencyProvider);
         currency.approve(cloneAddr, TOTAL_CURRENCY);
-        feeExit = Exit(factory.createExitClone(bytes32("feeExit"), trustedForwarder, currencyProvider, args));
+        feeExit = Exit(factory.createExitClone(bytes32("feeExit"), trustedForwarder, currencyProvider, args, TOTAL_CURRENCY));
 
         vm.prank(holder);
         feeToken.approve(address(feeExit), TOKEN_SUPPLY);

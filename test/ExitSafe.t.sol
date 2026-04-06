@@ -80,14 +80,13 @@ contract ExitSafeTest is Test {
             currency: IERC20(address(currency)),
             pricePerToken: PRICE_PER_TOKEN,
             claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: TOTAL_CURRENCY
+            drainStart: drainStart
         });
         address cloneAddr = exitFactory.predictCloneAddress(bytes32(0), trustedForwarder, args);
         currency.mint(currencyProvider, TOTAL_CURRENCY);
         vm.prank(currencyProvider);
         currency.approve(cloneAddr, TOTAL_CURRENCY);
-        exitContract = Exit(exitFactory.createExitClone(bytes32(0), trustedForwarder, currencyProvider, args));
+        exitContract = Exit(exitFactory.createExitClone(bytes32(0), trustedForwarder, currencyProvider, args, TOTAL_CURRENCY));
 
         // --- Deploy Gnosis Safe v1.4.1 with safeOwner as sole owner, threshold 1 ---
         Safe singleton = new Safe();

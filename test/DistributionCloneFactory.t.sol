@@ -65,7 +65,6 @@ contract DistributionCloneFactoryTest is Test {
                 snapshotId: snapshotId,
                 currency: IERC20(address(currency)),
                 pricePerToken: EXAMPLE_PRICE_PER_TOKEN,
-                initialFundingAmount: EXAMPLE_INITIAL_FUNDING,
                 reassignOrDrainAfter: reassignOrDrainAfter,
                 initialReassignments: new Reassignment[](0)
             });
@@ -75,15 +74,16 @@ contract DistributionCloneFactoryTest is Test {
     function _deploy(
         bytes32 salt,
         address _trustedForwarder,
-        DistributionInitializerArguments memory args
+        DistributionInitializerArguments memory args,
+        uint256 _initialFundingAmount
     ) internal returns (address) {
         address cloneAddr = factory.predictCloneAddress(salt, _trustedForwarder, args);
-        if (args.initialFundingAmount > 0) {
-            currency.mint(currencyProvider, args.initialFundingAmount);
+        if (_initialFundingAmount > 0) {
+            currency.mint(currencyProvider, _initialFundingAmount);
             vm.prank(currencyProvider);
-            currency.approve(cloneAddr, args.initialFundingAmount);
+            currency.approve(cloneAddr, _initialFundingAmount);
         }
-        return factory.createDistributionClone(salt, _trustedForwarder, currencyProvider, args);
+        return factory.createDistributionClone(salt, _trustedForwarder, currencyProvider, args, _initialFundingAmount);
     }
 
     // ========== F1-D. Address Prediction ==========
@@ -100,19 +100,19 @@ contract DistributionCloneFactoryTest is Test {
     function testActualAddressMatchesPrediction() public {
         DistributionInitializerArguments memory args = _baseArgs();
         address predicted = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
-        address actual = _deploy(EXAMPLE_SALT, trustedForwarder, args);
+        address actual = _deploy(EXAMPLE_SALT, trustedForwarder, args, EXAMPLE_INITIAL_FUNDING);
         assertEq(predicted, actual);
     }
 
     function testNewCloneEventEmitted() public {
         DistributionInitializerArguments memory args = _baseArgs();
         address predicted = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
-        currency.mint(currencyProvider, args.initialFundingAmount);
+        currency.mint(currencyProvider, EXAMPLE_INITIAL_FUNDING);
         vm.prank(currencyProvider);
-        currency.approve(predicted, args.initialFundingAmount);
+        currency.approve(predicted, EXAMPLE_INITIAL_FUNDING);
         vm.expectEmit(true, false, false, false, address(factory));
         emit CloneFactory.NewClone(predicted);
-        factory.createDistributionClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args);
+        factory.createDistributionClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args, EXAMPLE_INITIAL_FUNDING);
     }
 
     // ========== F2-D. Each Salt Parameter Changes the Address ==========
@@ -171,12 +171,12 @@ contract DistributionCloneFactoryTest is Test {
         assertFalse(a1 == a2);
     }
 
-    function testInitialFundingAmountChangesAddress() public view {
+    function testInitialFundingAmountDoesNotAffectAddress() public view {
         DistributionInitializerArguments memory args = _baseArgs();
         address a1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
-        args.initialFundingAmount = EXAMPLE_INITIAL_FUNDING + 1;
+        // initialFundingAmount is no longer part of the salt — same address regardless of funding amount
         address a2 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
-        assertFalse(a1 == a2);
+        assertEq(a1, a2);
     }
 
     function testReassignOrDrainAfterChangesAddress() public view {
@@ -194,10 +194,10 @@ contract DistributionCloneFactoryTest is Test {
         DistributionInitializerArguments memory args = _baseArgs();
         bytes32 salt = bytes32("salt");
         address cloneAddr = factory.predictCloneAddress(salt, trustedForwarder, args);
-        currency.mint(_currencyProvider, args.initialFundingAmount);
+        currency.mint(_currencyProvider, EXAMPLE_INITIAL_FUNDING);
         vm.prank(_currencyProvider);
-        currency.approve(cloneAddr, args.initialFundingAmount);
-        address _distribution = factory.createDistributionClone(salt, trustedForwarder, _currencyProvider, args);
+        currency.approve(cloneAddr, EXAMPLE_INITIAL_FUNDING);
+        address _distribution = factory.createDistributionClone(salt, trustedForwarder, _currencyProvider, args, EXAMPLE_INITIAL_FUNDING);
         assertEq(_distribution, cloneAddr);
     }
 
@@ -207,31 +207,31 @@ contract DistributionCloneFactoryTest is Test {
         DistributionInitializerArguments memory args = _baseArgs();
         address wrongForwarder = address(0xBAD);
         address predicted = factory.predictCloneAddress(EXAMPLE_SALT, wrongForwarder, args);
-        currency.mint(currencyProvider, args.initialFundingAmount);
+        currency.mint(currencyProvider, EXAMPLE_INITIAL_FUNDING);
         vm.prank(currencyProvider);
-        currency.approve(predicted, args.initialFundingAmount);
+        currency.approve(predicted, EXAMPLE_INITIAL_FUNDING);
         vm.expectRevert("DistributionCloneFactory: Unexpected trustedForwarder");
-        factory.createDistributionClone(EXAMPLE_SALT, wrongForwarder, currencyProvider, args);
+        factory.createDistributionClone(EXAMPLE_SALT, wrongForwarder, currencyProvider, args, EXAMPLE_INITIAL_FUNDING);
     }
 
     // ========== F5-D. Second Deployment Fails ==========
 
     function testSecondDeploymentReverts() public {
         DistributionInitializerArguments memory args = _baseArgs();
-        _deploy(EXAMPLE_SALT, trustedForwarder, args);
+        _deploy(EXAMPLE_SALT, trustedForwarder, args, EXAMPLE_INITIAL_FUNDING);
         address cloneAddr = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
-        currency.mint(currencyProvider, args.initialFundingAmount);
+        currency.mint(currencyProvider, EXAMPLE_INITIAL_FUNDING);
         vm.prank(currencyProvider);
-        currency.approve(cloneAddr, args.initialFundingAmount);
+        currency.approve(cloneAddr, EXAMPLE_INITIAL_FUNDING);
         vm.expectRevert("ERC1167: create2 failed");
-        factory.createDistributionClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args);
+        factory.createDistributionClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args, EXAMPLE_INITIAL_FUNDING);
     }
 
     // ========== F6-D. Initialization ==========
 
     function testStateVariablesSetCorrectly() public {
         DistributionInitializerArguments memory args = _baseArgs();
-        Distribution clone = Distribution(_deploy(EXAMPLE_SALT, trustedForwarder, args));
+        Distribution clone = Distribution(_deploy(EXAMPLE_SALT, trustedForwarder, args, EXAMPLE_INITIAL_FUNDING));
 
         assertEq(clone.owner(), args.owner);
         assertEq(address(clone.token()), address(args.token));
@@ -239,52 +239,51 @@ contract DistributionCloneFactoryTest is Test {
         assertEq(address(clone.currency()), address(args.currency));
         assertEq(clone.pricePerToken(), args.pricePerToken);
         assertEq(clone.reassignOrDrainAfter(), args.reassignOrDrainAfter);
-        assertEq(currency.balanceOf(address(clone)), args.initialFundingAmount);
+        assertEq(currency.balanceOf(address(clone)), EXAMPLE_INITIAL_FUNDING);
         assertTrue(clone.isTrustedForwarder(trustedForwarder));
     }
 
     function testReInitializingCloneReverts() public {
         DistributionInitializerArguments memory args = _baseArgs();
-        Distribution clone = Distribution(_deploy(EXAMPLE_SALT, trustedForwarder, args));
+        Distribution clone = Distribution(_deploy(EXAMPLE_SALT, trustedForwarder, args, EXAMPLE_INITIAL_FUNDING));
         vm.expectRevert("Initializable: contract is already initialized");
-        clone.initialize(args, currencyProvider);
+        clone.initialize(args, currencyProvider, 0);
     }
 
     // ========== F7-D. Funding via Clone Address Approval ==========
 
     function testApprovalToFactoryReverts() public {
         DistributionInitializerArguments memory args = _baseArgs();
-        currency.mint(currencyProvider, args.initialFundingAmount);
+        currency.mint(currencyProvider, EXAMPLE_INITIAL_FUNDING);
         vm.prank(currencyProvider);
-        currency.approve(address(factory), args.initialFundingAmount); // wrong target
+        currency.approve(address(factory), EXAMPLE_INITIAL_FUNDING); // wrong target
         vm.expectRevert("ERC20: insufficient allowance");
-        factory.createDistributionClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args);
+        factory.createDistributionClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args, EXAMPLE_INITIAL_FUNDING);
     }
 
     function testApprovalBelowRequiredReverts() public {
         DistributionInitializerArguments memory args = _baseArgs();
         address cloneAddr = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
-        currency.mint(currencyProvider, args.initialFundingAmount);
+        currency.mint(currencyProvider, EXAMPLE_INITIAL_FUNDING);
         vm.prank(currencyProvider);
-        currency.approve(cloneAddr, args.initialFundingAmount - 1);
+        currency.approve(cloneAddr, EXAMPLE_INITIAL_FUNDING - 1);
         vm.expectRevert("ERC20: insufficient allowance");
-        factory.createDistributionClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args);
+        factory.createDistributionClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args, EXAMPLE_INITIAL_FUNDING);
     }
 
     function testExactApprovalSucceeds() public {
         DistributionInitializerArguments memory args = _baseArgs();
         address cloneAddr = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
-        currency.mint(currencyProvider, args.initialFundingAmount);
+        currency.mint(currencyProvider, EXAMPLE_INITIAL_FUNDING);
         vm.prank(currencyProvider);
-        currency.approve(cloneAddr, args.initialFundingAmount);
-        address actual = factory.createDistributionClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args);
-        assertEq(currency.balanceOf(actual), args.initialFundingAmount);
+        currency.approve(cloneAddr, EXAMPLE_INITIAL_FUNDING);
+        address actual = factory.createDistributionClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args, EXAMPLE_INITIAL_FUNDING);
+        assertEq(currency.balanceOf(actual), EXAMPLE_INITIAL_FUNDING);
     }
 
     function testZeroFundingRequiresNoApproval() public {
         DistributionInitializerArguments memory args = _baseArgs();
-        args.initialFundingAmount = 0;
-        address actual = factory.createDistributionClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args);
+        address actual = factory.createDistributionClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args, 0);
         assertEq(currency.balanceOf(actual), 0);
     }
 
@@ -296,7 +295,7 @@ contract DistributionCloneFactoryTest is Test {
         DistributionInitializerArguments memory args = _baseArgs();
         args.currency = IERC20(address(badCurrency));
         vm.expectRevert("currency needs to be on the allowlist with TRUSTED_CURRENCY attribute");
-        factory.createDistributionClone(bytes32("bad"), trustedForwarder, currencyProvider, args);
+        factory.createDistributionClone(bytes32("bad"), trustedForwarder, currencyProvider, args, 0);
     }
 
     function testTrustedNonEuroCurrencyAccepted() public {
@@ -308,10 +307,10 @@ contract DistributionCloneFactoryTest is Test {
         args.currency = IERC20(address(nonEuro));
         // approve and deploy — must succeed
         address cloneAddr = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
-        nonEuro.mint(currencyProvider, args.initialFundingAmount);
+        nonEuro.mint(currencyProvider, EXAMPLE_INITIAL_FUNDING);
         vm.prank(currencyProvider);
-        nonEuro.approve(cloneAddr, args.initialFundingAmount);
-        address actual = factory.createDistributionClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args);
+        nonEuro.approve(cloneAddr, EXAMPLE_INITIAL_FUNDING);
+        address actual = factory.createDistributionClone(EXAMPLE_SALT, trustedForwarder, currencyProvider, args, EXAMPLE_INITIAL_FUNDING);
         assertFalse(actual == address(0));
     }
 }

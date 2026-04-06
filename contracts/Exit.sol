@@ -23,8 +23,6 @@ struct ExitInitializerArguments {
     uint64 claimStart;
     /// @notice Timestamp after which claims expire
     uint64 drainStart;
-    /// @notice Total amount of currency to fund the exit contract with
-    uint256 totalCurrencyAmount;
 }
 
 /**
@@ -54,7 +52,11 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         _disableInitializers();
     }
 
-    function initialize(ExitInitializerArguments memory _arguments, address _currencyProvider) external initializer {
+    function initialize(
+        ExitInitializerArguments memory _arguments,
+        address _currencyProvider,
+        uint256 _totalCurrencyAmount
+    ) external initializer {
         require(_arguments.pricePerToken > 0, "price must be positive");
         require(_arguments.claimStart > 0, "claimStart must be set");
         require(_arguments.drainStart > _arguments.claimStart, "drainStart must be after claimStart");
@@ -70,7 +72,7 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         pricePerToken = _arguments.pricePerToken;
         claimStart = _arguments.claimStart;
         drainStart = _arguments.drainStart;
-        _arguments.currency.safeTransferFrom(_currencyProvider, address(this), _arguments.totalCurrencyAmount);
+        _arguments.currency.safeTransferFrom(_currencyProvider, address(this), _totalCurrencyAmount);
     }
 
     function eligible(address _holder) public view returns (uint256) {

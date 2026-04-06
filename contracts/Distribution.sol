@@ -27,8 +27,6 @@ struct DistributionInitializerArguments {
     IERC20 currency;
     /// @notice Currency amount (in smallest currency units) per 10**token.decimals() token units
     uint256 pricePerToken;
-    /// @notice Amount of currency to transfer from the currency provider at initialization (can be 0)
-    uint256 initialFundingAmount;
     /// @notice Earliest timestamp at which the owner can reassign unclaimed funds or drain the contract
     uint64 reassignOrDrainAfter;
     /// @notice Reassignments to apply immediately at initialization, bypassing the time restriction
@@ -67,7 +65,8 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
 
     function initialize(
         DistributionInitializerArguments memory _arguments,
-        address _currencyProvider
+        address _currencyProvider,
+        uint256 _initialFundingAmount
     ) external initializer {
         require(_arguments.pricePerToken > 0, "price must be positive");
         __Ownable2Step_init();
@@ -84,8 +83,8 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         );
         pricePerToken = _arguments.pricePerToken;
         reassignOrDrainAfter = _arguments.reassignOrDrainAfter;
-        if (_arguments.initialFundingAmount > 0) {
-            _arguments.currency.safeTransferFrom(_currencyProvider, address(this), _arguments.initialFundingAmount);
+        if (_initialFundingAmount > 0) {
+            _arguments.currency.safeTransferFrom(_currencyProvider, address(this), _initialFundingAmount);
         }
         for (uint256 i = 0; i < _arguments.initialReassignments.length; i++) {
             Reassignment memory reassignment = _arguments.initialReassignments[i];
