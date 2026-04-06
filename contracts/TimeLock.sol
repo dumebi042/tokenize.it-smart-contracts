@@ -59,7 +59,7 @@ contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeabl
      * @param _dist the Distribution contract to claim from
      * @param _recipient address to forward the received currency to
      */
-    function distributeDividends(IDistribution _dist, address _recipient) external onlyOwner {
+    function claimDistribution(IDistribution _dist, address _recipient) external onlyOwner {
         require(_recipient != address(0), "recipient can not be zero address");
         IERC20 dividendCurrency = _dist.currency();
         _dist.claim(_recipient);
@@ -72,7 +72,7 @@ contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeabl
      *      and forwards all received currency to _recipient.
      * @param _recipient address to receive the exit proceeds
      */
-    function distributeExit(address _recipient) external onlyOwner {
+    function claimExit(address _recipient) external onlyOwner {
         IExit exit = tokenExitRegistry.exit();
         require(address(exit) != address(0), "no exit set in tokenExitRegistry");
         require(_recipient != address(0), "recipient can not be zero address");

@@ -32,7 +32,7 @@ contract TokenTransferStub {
 
 /**
  * @title CoinvestedPositionDistributionTest
- * @notice Integration tests for CoinvestedPosition.distributeDividends() against a real Distribution contract.
+ * @notice Integration tests for CoinvestedPosition.claimDistribution() against a real Distribution contract.
  * Covers: basic proportional claim, claim ordering, carry fractions, non-EURO currencies,
  * cross-currency isolation, zero-token snapshot, reassignment extra credit, multiple
  * sequential distributions, pre-existing balance isolation, post-snapshot buy(), and fuzz.
@@ -257,7 +257,7 @@ contract CoinvestedPositionDistributionTest is Test {
         uint256 beforeR = usdc.balanceOf(receiver);
 
         vm.prank(owner);
-        coinvestedPosition.distributeDividends(IDistribution(address(distribution)), usdc);
+        coinvestedPosition.claimDistribution(IDistribution(address(distribution)), usdc);
 
         uint256 aGot = usdc.balanceOf(leadA) - beforeA;
         uint256 bGot = usdc.balanceOf(leadB) - beforeB;
@@ -320,7 +320,7 @@ contract CoinvestedPositionDistributionTest is Test {
         uint256 beforeB = usdc.balanceOf(leadB);
 
         vm.prank(owner);
-        coinvestedPosition.distributeDividends(IDistribution(address(distribution)), usdc);
+        coinvestedPosition.claimDistribution(IDistribution(address(distribution)), usdc);
 
         uint256 aGot = usdc.balanceOf(leadA) - beforeA;
         uint256 bGot = usdc.balanceOf(leadB) - beforeB;
@@ -401,7 +401,7 @@ contract CoinvestedPositionDistributionTest is Test {
         uint256 beforeR = usdc.balanceOf(receiver);
 
         vm.prank(owner);
-        coinvestedPosition3.distributeDividends(IDistribution(address(distribution)), usdc);
+        coinvestedPosition3.claimDistribution(IDistribution(address(distribution)), usdc);
 
         assertEq(usdc.balanceOf(leadA) - beforeA, expectedA, "DI-III-A: wrong leadA payout");
         assertEq(usdc.balanceOf(leadB) - beforeB, expectedB, "DI-III-A: wrong leadB payout");
@@ -484,7 +484,7 @@ contract CoinvestedPositionDistributionTest is Test {
         uint256 beforeR = eure.balanceOf(receiver);
 
         vm.prank(owner);
-        coinvestedPosition3.distributeDividends(IDistribution(address(distribution)), eure);
+        coinvestedPosition3.claimDistribution(IDistribution(address(distribution)), eure);
 
         assertEq(eure.balanceOf(leadA) - beforeA, expectedA, "DI-III-B: wrong leadA EURe payout");
         assertEq(eure.balanceOf(leadB) - beforeB, expectedB, "DI-III-B: wrong leadB EURe payout");
@@ -509,7 +509,7 @@ contract CoinvestedPositionDistributionTest is Test {
     // ─────────────────────────────────────────────────────────────────────────
 
     function testDI_IV_NonEuroTrustedCurrency_Accepted() public {
-        // USDC has TRUSTED_CURRENCY bit — must be accepted by distributeDividends
+        // USDC has TRUSTED_CURRENCY bit — must be accepted by claimDistribution
         Distribution distribution = _deployDistribution(bytes32("DI-IV"), usdc, TOTAL_USDC);
 
         uint256 beforeA = usdc.balanceOf(leadA);
@@ -518,7 +518,7 @@ contract CoinvestedPositionDistributionTest is Test {
 
         // Must not revert
         vm.prank(owner);
-        coinvestedPosition.distributeDividends(IDistribution(address(distribution)), usdc);
+        coinvestedPosition.claimDistribution(IDistribution(address(distribution)), usdc);
 
         uint256 aGot = usdc.balanceOf(leadA) - beforeA;
         uint256 bGot = usdc.balanceOf(leadB) - beforeB;
@@ -547,7 +547,7 @@ contract CoinvestedPositionDistributionTest is Test {
 
         vm.expectRevert("dividend currency must be a trusted currency");
         vm.prank(owner);
-        coinvestedPosition.distributeDividends(IDistribution(address(stub)), untrustedCurrency);
+        coinvestedPosition.claimDistribution(IDistribution(address(stub)), untrustedCurrency);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -567,7 +567,7 @@ contract CoinvestedPositionDistributionTest is Test {
         uint256 beforeR = usdc.balanceOf(receiver);
 
         vm.prank(owner);
-        coinvestedPosition.distributeDividends(IDistribution(address(distribution)), usdc);
+        coinvestedPosition.claimDistribution(IDistribution(address(distribution)), usdc);
 
         uint256 aGot = usdc.balanceOf(leadA) - beforeA;
         uint256 bGot = usdc.balanceOf(leadB) - beforeB;
@@ -609,10 +609,10 @@ contract CoinvestedPositionDistributionTest is Test {
         // eligible must be 0
         assertEq(distribution.eligible(address(coinvestedPositionZero)), 0, "DI-VI: eligible not zero");
 
-        // distributeDividends must revert because received = 0
+        // claimDistribution must revert because received = 0
         vm.expectRevert("didn't receive expected currency from distribution");
         vm.prank(owner);
-        coinvestedPositionZero.distributeDividends(IDistribution(address(distribution)), usdc);
+        coinvestedPositionZero.claimDistribution(IDistribution(address(distribution)), usdc);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -658,7 +658,7 @@ contract CoinvestedPositionDistributionTest is Test {
         uint256 beforeR = usdc.balanceOf(receiver);
 
         vm.prank(owner);
-        coinvestedPosition.distributeDividends(IDistribution(address(distribution)), usdc);
+        coinvestedPosition.claimDistribution(IDistribution(address(distribution)), usdc);
 
         uint256 aGot = usdc.balanceOf(leadA) - beforeA;
         uint256 bGot = usdc.balanceOf(leadB) - beforeB;
@@ -703,7 +703,7 @@ contract CoinvestedPositionDistributionTest is Test {
             uint256 beforeR = usdc.balanceOf(receiver);
 
             vm.prank(owner);
-            coinvestedPosition.distributeDividends(IDistribution(address(usdcDistribution)), usdc);
+            coinvestedPosition.claimDistribution(IDistribution(address(usdcDistribution)), usdc);
 
             uint256 aGot = usdc.balanceOf(leadA) - beforeA;
             uint256 bGot = usdc.balanceOf(leadB) - beforeB;
@@ -741,7 +741,7 @@ contract CoinvestedPositionDistributionTest is Test {
             uint256 beforeR = eure.balanceOf(receiver);
 
             vm.prank(owner);
-            coinvestedPosition.distributeDividends(IDistribution(address(eureDistribution)), eure);
+            coinvestedPosition.claimDistribution(IDistribution(address(eureDistribution)), eure);
 
             uint256 aGot = eure.balanceOf(leadA) - beforeA;
             uint256 bGot = eure.balanceOf(leadB) - beforeB;
@@ -769,7 +769,7 @@ contract CoinvestedPositionDistributionTest is Test {
     // ─────────────────────────────────────────────────────────────────────────
 
     function testDI_IX_PreExistingBalance_Isolation() public {
-        // 300e6 USDC already on coinvestedPosition before distributeDividends
+        // 300e6 USDC already on coinvestedPosition before claimDistribution
         uint256 preExisting = 300e6;
         usdc.mint(address(coinvestedPosition), preExisting);
 
@@ -781,7 +781,7 @@ contract CoinvestedPositionDistributionTest is Test {
         uint256 beforeR = usdc.balanceOf(receiver);
 
         vm.prank(owner);
-        coinvestedPosition.distributeDividends(IDistribution(address(distribution)), usdc);
+        coinvestedPosition.claimDistribution(IDistribution(address(distribution)), usdc);
 
         uint256 aGot = usdc.balanceOf(leadA) - beforeA;
         uint256 bGot = usdc.balanceOf(leadB) - beforeB;
@@ -848,13 +848,13 @@ contract CoinvestedPositionDistributionTest is Test {
         );
         assertEq(token.balanceOf(buyer), buyAmount, "DI-X: wrong buyer token balance");
 
-        // distributeDividends still claims full snapshot-eligible 200e6
+        // claimDistribution still claims full snapshot-eligible 200e6
         uint256 beforeA = usdc.balanceOf(leadA);
         uint256 beforeB = usdc.balanceOf(leadB);
         uint256 beforeR = usdc.balanceOf(receiver);
 
         vm.prank(owner);
-        coinvestedPosition.distributeDividends(IDistribution(address(distribution)), usdc);
+        coinvestedPosition.claimDistribution(IDistribution(address(distribution)), usdc);
 
         uint256 aGot = usdc.balanceOf(leadA) - beforeA;
         uint256 bGot = usdc.balanceOf(leadB) - beforeB;
@@ -910,7 +910,7 @@ contract CoinvestedPositionDistributionTest is Test {
     /// DI-XIII: _settle reverts when currency == held token, tested via a stub Distribution
     /// that bypasses Distribution's own guard and actually delivers the equity token to cp.
     function testDI_XIII_SettleRevertsWhenCurrencyIsHeldToken() public {
-        // Give the equity token TRUSTED_CURRENCY so it passes distributeDividends' allowList check
+        // Give the equity token TRUSTED_CURRENCY so it passes claimDistribution' allowList check
         vm.prank(admin);
         allowList.set(address(token), TRUSTED_CURRENCY);
 
@@ -924,7 +924,7 @@ contract CoinvestedPositionDistributionTest is Test {
 
         vm.expectRevert("currency cannot be the held token");
         vm.prank(owner);
-        coinvestedPosition.distributeDividends(IDistribution(address(stub)), tokenCurrency);
+        coinvestedPosition.claimDistribution(IDistribution(address(stub)), tokenCurrency);
     }
 
     /**
@@ -1065,7 +1065,7 @@ contract CoinvestedPositionDistributionTest is Test {
         if (coinvestedPositionEligible == 0) {
             vm.expectRevert("didn't receive expected currency from distribution");
             vm.prank(owner);
-            coinvestedPositionFuzz.distributeDividends(IDistribution(address(distributionFuzz)), usdc);
+            coinvestedPositionFuzz.claimDistribution(IDistribution(address(distributionFuzz)), usdc);
             return;
         }
 
@@ -1078,7 +1078,7 @@ contract CoinvestedPositionDistributionTest is Test {
         snaps[3] = usdc.balanceOf(receiver);
 
         vm.prank(owner);
-        coinvestedPositionFuzz.distributeDividends(IDistribution(address(distributionFuzz)), usdc);
+        coinvestedPositionFuzz.claimDistribution(IDistribution(address(distributionFuzz)), usdc);
 
         uint256 totalGot = 0;
         {
