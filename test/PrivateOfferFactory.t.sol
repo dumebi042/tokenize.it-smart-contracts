@@ -8,7 +8,9 @@ import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/PrivateOffer.sol";
 import "../contracts/factories/PrivateOfferFactory.sol";
 import "../contracts/factories/TimeLockCloneFactory.sol";
+import "../contracts/factories/TokenExitRegistryCloneFactory.sol";
 import "../contracts/TimeLock.sol";
+import "../contracts/TokenExitRegistry.sol";
 import "./resources/CloneCreators.sol";
 import "./resources/ERC20MintableByAnyone.sol";
 
@@ -16,6 +18,7 @@ contract PrivateOfferFactoryTest is Test {
     event Deploy(address indexed privateOffer);
 
     PrivateOfferFactory factory;
+    TokenExitRegistry tokenExitRegistry;
 
     AllowList list;
     FeeSettings feeSettings;
@@ -42,7 +45,7 @@ contract PrivateOfferFactoryTest is Test {
     bytes32 public constant salt = bytes32("234");
 
     function setUp() public {
-        TimeLock timeLockImplementation = new TimeLock();
+        TimeLock timeLockImplementation = new TimeLock(trustedForwarder);
         TimeLockCloneFactory timeLockCloneFactory = new TimeLockCloneFactory(address(timeLockImplementation));
         factory = new PrivateOfferFactory(timeLockCloneFactory);
         currency = new ERC20MintableByAnyone("currency", "CUR");
@@ -57,6 +60,14 @@ contract PrivateOfferFactoryTest is Test {
         TokenProxyFactory tokenCloneFactory = new TokenProxyFactory(address(implementation));
         token = Token(
             tokenCloneFactory.createTokenProxy(0, trustedForwarder, feeSettings, admin, list, 0x0, "token", "TOK")
+        );
+
+        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry(trustedForwarder);
+        TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(
+            address(tokenExitRegistryLogic)
+        );
+        tokenExitRegistry = TokenExitRegistry(
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token)
         );
     }
 
@@ -111,6 +122,7 @@ contract PrivateOfferFactoryTest is Test {
         vm.assume(tokenReceiver != address(0));
         vm.assume(timeLockOwner != address(0));
         vm.assume(tokenReceiver != timeLockOwner);
+        vm.assume(timeLockOwner != trustedForwarder);
 
         // mint currency to buyer
         currency.mint(buyer, currencyAmount);
@@ -132,7 +144,9 @@ contract PrivateOfferFactoryTest is Test {
             salt,
             arguments,
             _lockedUntil,
-            timeLockOwner
+            timeLockOwner,
+            tokenExitRegistry,
+            trustedForwarder
         );
 
         console.log("expectedPrivateOffer", expectedPrivateOffer);
@@ -159,7 +173,14 @@ contract PrivateOfferFactoryTest is Test {
 
         // deploy contracts
         assertEq(
-            factory.deployPrivateOfferWithTimeLock(salt, arguments, _lockedUntil, timeLockOwner),
+            factory.deployPrivateOfferWithTimeLock(
+                salt,
+                arguments,
+                _lockedUntil,
+                timeLockOwner,
+                tokenExitRegistry,
+                trustedForwarder
+            ),
             expectedTimeLock
         );
 

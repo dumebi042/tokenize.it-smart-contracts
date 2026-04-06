@@ -135,7 +135,7 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     }
 
     function claim(address _recipient) external {
-        _claim(_msgSender(), _recipient); //should work for directly calling it (msg.sender), as well as with a meta transaction with a signed message
+        _claim(_msgSender(), _recipient); // works for direct calls and meta-transactions via ERC2771
     }
 
     function _claim(address _holder, address _recipient) internal {

@@ -3,6 +3,7 @@ pragma solidity 0.8.23;
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
+import "./TokenExitRegistry.sol";
 import "./TokenSwapBase.sol";
 import "./IDistribution.sol";
 import "./IExit.sol";
@@ -23,12 +24,14 @@ struct CoinvestedPositionInitializerArguments {
     LeadInvestor[] leadInvestors;
     /// base price per token in bits of baseCurrency
     uint256 basePrice;
-    /// currency used for buy() payments
+    /// currency used for buy() payments. Must have TRUSTED_CURRENCY bit set on the token's allowList.
     IERC20 baseCurrency;
     /// token being held
     Token token;
     /// unix timestamp before which unpause() is blocked; 0 means no lock
     uint64 lockedUntil;
+    /// registry contract; if its exit() is set, the lockedUntil constraint is bypassed
+    TokenExitRegistry tokenExitRegistry;
 }
 
 /**
@@ -40,7 +43,7 @@ struct CoinvestedPositionInitializerArguments {
  *      Any remaining proceeds after fees and coinvestor payout are split among lead investors
  *      according to their carry percentages, with dust going to the coinvestor.
  *      If the sale price minus fees is less than the base price, all proceeds go to the coinvestor.
- *      Any currency may be used for exits and dividends; when a currency different from the stored
+ *      Any trusted currency may be used for exits and dividends; when a currency different from the stored
  *      currency is used, the coinvestor provides an altBasePrice expressing the base price in that
  *      currency's units.
  * @dev Uses clone/proxy pattern. Constructor disables initializers, separate initialize().
@@ -54,6 +57,8 @@ contract CoinvestedPosition is TokenSwapBase {
     uint256 public basePrice;
     /// unix timestamp before which unpause() is blocked; 0 means no lock
     uint64 public lockedUntil;
+    /// registry contract; if its exit() is set, the lockedUntil constraint is bypassed
+    TokenExitRegistry public tokenExitRegistry;
 
     /**
      * This constructor creates a logic contract that is used to clone new contracts.
@@ -71,6 +76,10 @@ contract CoinvestedPosition is TokenSwapBase {
     function initialize(CoinvestedPositionInitializerArguments memory _arguments) external initializer {
         _initializeBase(_arguments.owner, 0, _arguments.baseCurrency, _arguments.token, _arguments.receiver);
 
+        require(
+            _arguments.token.allowList().map(address(_arguments.baseCurrency)) == TRUSTED_CURRENCY,
+            "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
+        );
         require(_arguments.leadInvestors.length > 0, "There must be at least one lead investor");
         uint64 carryFractionsSum = 0;
         for (uint256 i = 0; i < _arguments.leadInvestors.length; i++) {
@@ -79,8 +88,10 @@ contract CoinvestedPosition is TokenSwapBase {
             carryFractionsSum += _arguments.leadInvestors[i].carryFraction; // reverts on overflow
             leadInvestors.push(_arguments.leadInvestors[i]);
         }
+        require(address(_arguments.tokenExitRegistry) != address(0), "tokenExitRegistry can not be zero address");
         basePrice = _arguments.basePrice;
         lockedUntil = _arguments.lockedUntil;
+        tokenExitRegistry = _arguments.tokenExitRegistry;
 
         // Pausing the contract prevents an immediate sell of the tokens. Once they should be sold, update price and unpause.
         _pause();
@@ -99,7 +110,7 @@ contract CoinvestedPosition is TokenSwapBase {
      * @notice Change the payment currency to any trusted EURO currency.
      * @dev basePrice remains in its original canonical units (basePriceDecimals); buy() scales it
      *      dynamically, so no re-scaling of basePrice is needed here.
-     * @param _currency new currency; must have TRUSTED_CURRENCY | EURO_CURRENCY bits set on the token's allowList
+     * @param _currency new currency; must have TRUSTED_CURRENCY bit set on the token's allowList
      */
     function setCurrency(IERC20 _currency, uint256 _altBasePrice) external onlyOwner {
         require(address(_currency) != address(0), "zero address");
@@ -108,6 +119,10 @@ contract CoinvestedPosition is TokenSwapBase {
             require(_altBasePrice > 0, "altBasePrice must be > 0");
             basePrice = _altBasePrice;
         }
+        require(
+            token.allowList().map(address(_currency)) == TRUSTED_CURRENCY,
+            "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
+        );
         currency = _currency;
     }
 
@@ -187,7 +202,7 @@ contract CoinvestedPosition is TokenSwapBase {
 
     /**
      * @notice Claim exit proceeds for this contract's full token balance and split them among the receiver and lead investors.
-     * @dev Transfers all held tokens to the Exit contract in exchange for currency.
+     * @dev Requires tokenExitRegistry.exit() to be set; that also acts as the unlock signal.
      *      If proceeds < base, receiver gets everything.
      *      Carry is split among lead investors by carryFraction; remainder goes to receiver.
      *      Any currency may be used. When _exitCurrency differs from the stored currency, provide
@@ -219,7 +234,7 @@ contract CoinvestedPosition is TokenSwapBase {
 
         IERC20(address(token)).approve(address(_exit), tokenBalance);
         uint256 before = _exitCurrency.balanceOf(address(this));
-        _exit.claim(tokenBalance, address(this));
+        exit.claim(tokenBalance, address(this));
         uint256 received = _exitCurrency.balanceOf(address(this)) - before;
         require(received >= _minCurrencyAmount, "received less than _minCurrencyAmount");
         uint256 carry = basePayout < received ? received - basePayout : 0;

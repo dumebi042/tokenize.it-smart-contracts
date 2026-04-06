@@ -170,7 +170,7 @@ contract Crowdinvesting is
         require(_arguments.tokenPrice != 0, "_tokenPrice needs to be a non-zero amount");
         require(_arguments.maxAmountOfTokenToBeSold != 0, "_maxAmountOfTokenToBeSold needs to be larger than zero");
         require(
-            _arguments.token.allowList().map(address(_arguments.currency)) & TRUSTED_CURRENCY == TRUSTED_CURRENCY,
+            _arguments.token.allowList().map(address(_arguments.currency)) == TRUSTED_CURRENCY,
             "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
         );
         currencyReceiver = _arguments.currencyReceiver;
@@ -417,7 +417,7 @@ contract Crowdinvesting is
         require(address(_currency) != address(0), "currency can not be zero address");
         require(_tokenPrice != 0, "_tokenPrice needs to be a non-zero amount");
         require(
-            token.allowList().map(address(_currency)) & TRUSTED_CURRENCY == TRUSTED_CURRENCY,
+            token.allowList().map(address(_currency)) == TRUSTED_CURRENCY,
             "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
         );
 

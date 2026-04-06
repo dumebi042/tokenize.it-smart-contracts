@@ -25,7 +25,7 @@ contract CoinvestedPositionERC2771Test is CoinvestedPositionTestBase {
 
         eurc = new FakePaymentToken(0, 6);
         vm.prank(admin);
-        allowList.set(address(eurc), TRUSTED_CURRENCY | EURO_CURRENCY);
+        allowList.set(address(eurc), TRUSTED_CURRENCY);
 
         address tokenLogic = address(new Token(trustedForwarder));
         tokenFactory = new TokenProxyFactory(tokenLogic);
@@ -35,6 +35,14 @@ contract CoinvestedPositionERC2771Test is CoinvestedPositionTestBase {
         vm.startPrank(admin);
         token.grantRole(token.MINTALLOWER_ROLE(), admin);
         vm.stopPrank();
+
+        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry(trustedForwarder);
+        TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(
+            address(tokenExitRegistryLogic)
+        );
+        tokenExitRegistry = TokenExitRegistry(
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token)
+        );
 
         coinvestedPosition = _deployCoinvestedPosition(trustedForwarder);
 
@@ -59,7 +67,8 @@ contract CoinvestedPositionERC2771Test is CoinvestedPositionTestBase {
             basePrice: BASE_PRICE,
             baseCurrency: IERC20(address(eurc)),
             token: token,
-            lockedUntil: 0
+            lockedUntil: 0,
+            tokenExitRegistry: tokenExitRegistry
         });
         return CoinvestedPosition(freshFactory.createCoinvestedPositionClone(bytes32(0), forwarder, args));
     }

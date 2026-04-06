@@ -1268,6 +1268,18 @@ contract FeeSettingsTest is Test {
         feeSettings.registerFeeType(feeType, maxNumerator, 0, admin);
     }
 
+    function testFuzz_UnknownFeeTypeReturnsZeroFee(bytes32 feeType, uint256 amount, address tokenAddress) public {
+        // Exclude all fee types that are already registered in setUp
+        vm.assume(feeType != FeeTypes.TOKEN);
+        vm.assume(feeType != FeeTypes.CROWDINVESTING);
+        vm.assume(feeType != FeeTypes.PRIVATE_OFFER);
+        vm.assume(feeType != FeeTypes.SECONDARY_MARKET);
+        vm.assume(feeType != FeeTypes.DISTRIBUTION);
+        vm.assume(feeType != FeeTypes.EXIT);
+
+        assertEq(feeSettings.fee(feeType, amount, tokenAddress), 0, "Unknown fee type must return 0");
+    }
+
     function testFuzz_FeeCalculationAndCollectorReturnedCorrectly(
         bytes32 feeType,
         uint32 maxNumerator,

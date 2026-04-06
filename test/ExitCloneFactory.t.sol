@@ -32,7 +32,7 @@ contract ExitCloneFactoryTest is Test {
         allowList = createAllowList(trustedForwarder, admin);
         currency = new FakePaymentToken(0, 6);
         vm.prank(admin);
-        allowList.set(address(currency), TRUSTED_CURRENCY | EURO_CURRENCY);
+        allowList.set(address(currency), TRUSTED_CURRENCY);
 
         address tokenLogic = address(new Token(trustedForwarder));
         tokenFactory = new TokenProxyFactory(tokenLogic);
@@ -142,7 +142,7 @@ contract ExitCloneFactoryTest is Test {
         address addr1 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
         FakePaymentToken currency2 = new FakePaymentToken(0, 6);
         vm.prank(admin);
-        allowList.set(address(currency2), TRUSTED_CURRENCY | EURO_CURRENCY);
+        allowList.set(address(currency2), TRUSTED_CURRENCY);
         args.currency = IERC20(address(currency2));
         address addr2 = factory.predictCloneAddress(EXAMPLE_SALT, trustedForwarder, args);
         assertFalse(addr1 == addr2);
@@ -281,27 +281,14 @@ contract ExitCloneFactoryTest is Test {
 
     function testMissingTrustedCurrencyBitReverts() public {
         FakePaymentToken badCurrency = new FakePaymentToken(0, 6);
-        // only EURO, no TRUSTED
-        vm.prank(admin);
-        allowList.set(address(badCurrency), EURO_CURRENCY);
+        // not on allowList → 0 attributes
         ExitInitializerArguments memory args = _baseArgs();
         args.currency = IERC20(address(badCurrency));
-        vm.expectRevert("currency needs to be a trusted EURO currency");
+        vm.expectRevert("currency needs to be on the allowlist with TRUSTED_CURRENCY attribute");
         factory.createExitClone(bytes32("bad1"), trustedForwarder, currencyProvider, args);
     }
 
-    function testMissingEuroCurrencyBitReverts() public {
-        FakePaymentToken nonEuro = new FakePaymentToken(0, 6);
-        // only TRUSTED, no EURO
-        vm.prank(admin);
-        allowList.set(address(nonEuro), TRUSTED_CURRENCY);
-        ExitInitializerArguments memory args = _baseArgs();
-        args.currency = IERC20(address(nonEuro));
-        vm.expectRevert("currency needs to be a trusted EURO currency");
-        factory.createExitClone(bytes32("bad2"), trustedForwarder, currencyProvider, args);
-    }
-
-    function testBothBitsSetSucceeds() public {
+    function testTrustedCurrencyBitSucceeds() public {
         ExitInitializerArguments memory args = _baseArgs();
         address actual = _deploy(EXAMPLE_SALT, trustedForwarder, args);
         assertFalse(actual == address(0));

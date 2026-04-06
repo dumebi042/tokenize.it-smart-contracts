@@ -4,7 +4,9 @@ pragma solidity 0.8.23;
 import "../lib/forge-std/src/Test.sol";
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/factories/CoinvestedPositionCloneFactory.sol";
+import "../contracts/factories/TokenExitRegistryCloneFactory.sol";
 import "../contracts/CoinvestedPosition.sol";
+import "../contracts/TokenExitRegistry.sol";
 import "./resources/FakePaymentToken.sol";
 import "./resources/CloneCreators.sol";
 
@@ -22,6 +24,7 @@ contract CoinvestedPositionCloneFactoryTest is Test {
     AllowList allowList;
     FakePaymentToken currency;
     Token token;
+    TokenExitRegistry tokenExitRegistry;
     CoinvestedPositionCloneFactory factory;
     TokenProxyFactory tokenFactory;
 
@@ -29,7 +32,7 @@ contract CoinvestedPositionCloneFactoryTest is Test {
         allowList = createAllowList(trustedForwarder, admin);
         currency = new FakePaymentToken(0, 6);
         vm.prank(admin);
-        allowList.set(address(currency), TRUSTED_CURRENCY | EURO_CURRENCY);
+        allowList.set(address(currency), TRUSTED_CURRENCY);
 
         address tokenLogic = address(new Token(trustedForwarder));
         tokenFactory = new TokenProxyFactory(tokenLogic);
@@ -43,6 +46,14 @@ contract CoinvestedPositionCloneFactoryTest is Test {
         );
 
         factory = new CoinvestedPositionCloneFactory(address(new CoinvestedPosition(trustedForwarder)));
+
+        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry(trustedForwarder);
+        TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(
+            address(tokenExitRegistryLogic)
+        );
+        tokenExitRegistry = TokenExitRegistry(
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token)
+        );
     }
 
     /// @dev Returns baseline arguments with two lead investors.
@@ -59,7 +70,8 @@ contract CoinvestedPositionCloneFactoryTest is Test {
                 basePrice: EXAMPLE_BASE_PRICE,
                 baseCurrency: IERC20(address(currency)),
                 token: token,
-                lockedUntil: 0
+                lockedUntil: 0,
+                tokenExitRegistry: tokenExitRegistry
             });
     }
 
@@ -279,26 +291,14 @@ contract CoinvestedPositionCloneFactoryTest is Test {
 
     function testMissingTrustedCurrencyBitReverts() public {
         FakePaymentToken badCurrency = new FakePaymentToken(0, 6);
-        vm.prank(admin);
-        allowList.set(address(badCurrency), EURO_CURRENCY); // only EURO, no TRUSTED
+        // not on allowList → 0 attributes, no TRUSTED_CURRENCY bit
         CoinvestedPositionInitializerArguments memory args = _baseArgs();
         args.baseCurrency = IERC20(address(badCurrency));
-        // TokenSwapBase._initializeBase() checks TRUSTED_CURRENCY first
         vm.expectRevert("currency needs to be on the allowlist with TRUSTED_CURRENCY attribute");
         factory.createCoinvestedPositionClone(bytes32("bad1"), trustedForwarder, args);
     }
 
-    function testMissingEuroCurrencyBitReverts() public {
-        FakePaymentToken nonEuro = new FakePaymentToken(0, 6);
-        vm.prank(admin);
-        allowList.set(address(nonEuro), TRUSTED_CURRENCY); // only TRUSTED, no EURO
-        CoinvestedPositionInitializerArguments memory args = _baseArgs();
-        args.baseCurrency = IERC20(address(nonEuro));
-        vm.expectRevert("currency must be a trusted EURO currency");
-        factory.createCoinvestedPositionClone(bytes32("bad2"), trustedForwarder, args);
-    }
-
-    function testBothBitsSetSucceeds() public {
+    function testTrustedCurrencyBitSucceeds() public {
         CoinvestedPositionInitializerArguments memory args = _baseArgs();
         address actual = factory.createCoinvestedPositionClone(EXAMPLE_SALT, trustedForwarder, args);
         assertFalse(actual == address(0));

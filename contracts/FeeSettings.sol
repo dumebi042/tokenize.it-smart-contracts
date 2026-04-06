@@ -335,6 +335,7 @@ contract FeeSettings is
     /**
      * @notice Calculates the fee for a given amount and fee type.
      *      If a non-expired custom discount is set for `_token`, the lower of default and custom is used.
+     * @dev A fee type that does not exist will return 0 fee. That is a design choice.
      * @param _feeType The fee type key
      * @param _amount  The base amount
      * @param _token   The token address (used to look up custom discounts)
@@ -345,7 +346,6 @@ contract FeeSettings is
         address _token
     ) public view override(IFeeSettingsV3) returns (uint256) {
         FeeTypeConfig storage config = feeTypeConfigs[_feeType];
-        require(config.maxNumerator > 0, "unknown fee type");
         CustomFee storage custom = customFees[_feeType][_token];
         return _applyCustomFee(_amount, config.defaultNumerator, custom.numerator, custom.validityDate);
     }

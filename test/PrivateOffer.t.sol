@@ -48,7 +48,7 @@ contract PrivateOfferTest is Test {
     uint256 requirements = 92785934;
 
     function setUp() public {
-        TimeLock timeLockImplementation = new TimeLock();
+        TimeLock timeLockImplementation = new TimeLock(trustedForwarder);
         TimeLockCloneFactory timeLockCloneFactory = new TimeLockCloneFactory(address(timeLockImplementation));
         factory = new PrivateOfferFactory(timeLockCloneFactory);
 

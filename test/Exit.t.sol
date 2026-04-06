@@ -41,7 +41,7 @@ contract ExitTest is Test {
         allowList = createAllowList(trustedForwarder, admin);
         currency = new FakePaymentToken(0, CURRENCY_DECIMALS);
         vm.prank(admin);
-        allowList.set(address(currency), TRUSTED_CURRENCY | EURO_CURRENCY);
+        allowList.set(address(currency), TRUSTED_CURRENCY);
 
         address tokenLogic = address(new Token(trustedForwarder));
         tokenFactory = new TokenProxyFactory(tokenLogic);
@@ -215,25 +215,8 @@ contract ExitTest is Test {
             drainStart: drainStart,
             totalCurrencyAmount: 0
         });
-        vm.expectRevert("currency needs to be a trusted EURO currency");
+        vm.expectRevert("currency needs to be on the allowlist with TRUSTED_CURRENCY attribute");
         factory.createExitClone(bytes32("ntc"), trustedForwarder, currencyProvider, args);
-    }
-
-    function testInitializeTrustedNonEuroCurrencyReverts() public {
-        FakePaymentToken nonEuro = new FakePaymentToken(0, 6);
-        vm.prank(admin);
-        allowList.set(address(nonEuro), TRUSTED_CURRENCY); // TRUSTED but not EURO
-        ExitInitializerArguments memory args = ExitInitializerArguments({
-            owner: owner,
-            token: token,
-            currency: IERC20(address(nonEuro)),
-            pricePerToken: PRICE_PER_TOKEN,
-            claimStart: claimStart,
-            drainStart: drainStart,
-            totalCurrencyAmount: 0
-        });
-        vm.expectRevert("currency needs to be a trusted EURO currency");
-        factory.createExitClone(bytes32("nec"), trustedForwarder, currencyProvider, args);
     }
 
     function testInitializeInsufficientAllowanceReverts() public {

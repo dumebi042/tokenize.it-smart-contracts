@@ -6,9 +6,11 @@ import "../lib/forge-std/src/Test.sol";
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/factories/CoinvestedPositionCloneFactory.sol";
 import "../contracts/factories/ExitCloneFactory.sol";
+import "../contracts/factories/TokenExitRegistryCloneFactory.sol";
 import "../contracts/CoinvestedPosition.sol";
 import "../contracts/Exit.sol";
 import "../contracts/FeeSettings.sol";
+import "../contracts/TokenExitRegistry.sol";
 import "./resources/FakePaymentToken.sol";
 import "./resources/CloneCreators.sol";
 
@@ -65,6 +67,8 @@ contract CoinvestedPositionExitTest is Test {
     // Non-EURO trusted token (for negative test)
     FakePaymentToken trustedNonEuro;
 
+    TokenExitRegistry tokenExitRegistry;
+    TokenExitRegistryCloneFactory tokenExitRegistryFactory;
     CoinvestedPosition coinvestedPositionLogic;
     CoinvestedPositionCloneFactory coinvestedPositionFactory;
     Exit exitLogic;
@@ -92,9 +96,9 @@ contract CoinvestedPositionExitTest is Test {
         trustedNonEuro = new FakePaymentToken(0, 6);
 
         vm.startPrank(admin);
-        allowList.set(address(eurc), TRUSTED_CURRENCY | EURO_CURRENCY);
-        allowList.set(address(eure), TRUSTED_CURRENCY | EURO_CURRENCY);
-        allowList.set(address(trustedNonEuro), TRUSTED_CURRENCY); // TRUSTED but not EURO
+        allowList.set(address(eurc), TRUSTED_CURRENCY);
+        allowList.set(address(eure), TRUSTED_CURRENCY);
+        allowList.set(address(trustedNonEuro), TRUSTED_CURRENCY);
         vm.stopPrank();
 
         // Token
@@ -112,6 +116,13 @@ contract CoinvestedPositionExitTest is Test {
         coinvestedPositionFactory = new CoinvestedPositionCloneFactory(address(coinvestedPositionLogic));
         exitLogic = new Exit(trustedForwarder);
         exitFactory = new ExitCloneFactory(address(exitLogic));
+
+        // TokenExitRegistry
+        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry(trustedForwarder);
+        tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(address(tokenExitRegistryLogic));
+        tokenExitRegistry = TokenExitRegistry(
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token)
+        );
 
         // Deploy default CoinvestedPosition
         coinvestedPosition = _deployCp(bytes32(0), BASE_PRICE_EURC, eurc, _defaultLeadInvestors());
@@ -145,7 +156,8 @@ contract CoinvestedPositionExitTest is Test {
             basePrice: basePrice,
             baseCurrency: IERC20(address(baseCurrency)),
             token: token,
-            lockedUntil: 0
+            lockedUntil: 0,
+            tokenExitRegistry: tokenExitRegistry
         });
         return
             CoinvestedPosition(coinvestedPositionFactory.createCoinvestedPositionClone(salt, trustedForwarder, args));
@@ -221,18 +233,22 @@ contract CoinvestedPositionExitTest is Test {
         // Deploy an exit with price 200e6, funded for 200 tokens
         Exit exitContract = _deployExit(bytes32("i1"), eurc, 200e6, CP_TOKEN_AMOUNT);
 
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         // Do NOT warp — still before claimStart
         vm.expectRevert("exit not yet started");
         vm.prank(owner);
-        coinvestedPosition.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 1);
+        coinvestedPosition.distributeExit(IERC20(address(eurc)), 1);
     }
 
     function testDistributeExitSucceedsAfterDrainStart() public {
         Exit exitContract = _deployExit(bytes32("i2"), eurc, 200e6, CP_TOKEN_AMOUNT);
 
         vm.warp(drainStart + 1);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.prank(owner);
-        coinvestedPosition.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 1);
+        coinvestedPosition.distributeExit(IERC20(address(eurc)), 1);
     }
 
     function testDistributeExitRevertsWhenZeroTokens() public {
@@ -246,23 +262,12 @@ contract CoinvestedPositionExitTest is Test {
             _defaultLeadInvestors()
         );
 
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.warp(claimStart);
         vm.expectRevert("no tokens to claim");
         vm.prank(owner);
-        coinvestedPositionEmpty.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 1);
-    }
-
-    function testDistributeExitRevertsForNonEuroCurrency() public {
-        // Deploy an exit with a trusted but non-EURO currency
-        // Note: Exit.initialize itself checks TRUSTED_CURRENCY | EURO_CURRENCY on the exit contract.
-        // The check in distributeExit happens before calling the exit.
-        // We deploy the Exit with eurc (valid), but then try to call distributeExit with trustedNonEuro.
-        Exit exitContract = _deployExit(bytes32("i4"), eurc, 200e6, CP_TOKEN_AMOUNT);
-
-        vm.warp(claimStart);
-        vm.expectRevert("exit currency must be a trusted EURO currency");
-        vm.prank(owner);
-        coinvestedPosition.distributeExit(IExit(address(exitContract)), IERC20(address(trustedNonEuro)), 1);
+        coinvestedPositionEmpty.distributeExit(IERC20(address(eurc)), 1);
     }
 
     function testDistributeExitOnlyOwner() public {
@@ -271,7 +276,7 @@ contract CoinvestedPositionExitTest is Test {
         vm.warp(claimStart);
         vm.expectRevert("Ownable: caller is not the owner");
         // called by address(this) which is not owner
-        coinvestedPosition.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 1);
+        coinvestedPosition.distributeExit(IERC20(address(eurc)), 1);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -290,8 +295,10 @@ contract CoinvestedPositionExitTest is Test {
         uint256 beforeR = eurc.balanceOf(receiver);
 
         vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.prank(owner);
-        coinvestedPosition.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 1);
+        coinvestedPosition.distributeExit(IERC20(address(eurc)), 1);
 
         uint256 received = 40_000e6;
         uint256 carry = 20_000e6; // received - basePayout(20,000e6)
@@ -326,8 +333,10 @@ contract CoinvestedPositionExitTest is Test {
         uint256 beforeR = eurc.balanceOf(receiver);
 
         vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.prank(owner);
-        coinvestedPosition.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 1);
+        coinvestedPosition.distributeExit(IERC20(address(eurc)), 1);
 
         uint256 received = 20_000e6;
         uint256 aGot = eurc.balanceOf(leadA) - beforeA;
@@ -354,8 +363,10 @@ contract CoinvestedPositionExitTest is Test {
         uint256 beforeR = eurc.balanceOf(receiver);
 
         vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.prank(owner);
-        coinvestedPosition.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 1);
+        coinvestedPosition.distributeExit(IERC20(address(eurc)), 1);
 
         uint256 received = 12_000e6; // 200 * 60e6 / 1e18 * 1e18 = 12,000e6
         uint256 aGot = eurc.balanceOf(leadA) - beforeA;
@@ -387,8 +398,10 @@ contract CoinvestedPositionExitTest is Test {
         uint256 beforeEurc = eurc.balanceOf(address(coinvestedPosition));
 
         vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.prank(owner);
-        coinvestedPosition.distributeExit(IExit(address(exitContract)), IERC20(address(eure)), 1);
+        coinvestedPosition.distributeExit(IERC20(address(eure)), 1);
 
         // received: 200e18 * 200e18 / 1e18 = 40,000e18 EURe
         // basePayout: scaleToDecimals(20,000e6, 18) = 20,000e18 EURe
@@ -432,8 +445,10 @@ contract CoinvestedPositionExitTest is Test {
         uint256 beforeR = eurc.balanceOf(receiver);
 
         vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.prank(owner);
-        coinvestedPositionEure.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 1);
+        coinvestedPositionEure.distributeExit(IERC20(address(eurc)), 1);
 
         // received: 200e18 * 200e6 / 1e18 = 40,000e6 EURc
         // basePayout: scaleToDecimals(20,000e18, 6) = 20,000e6 EURc; carry = 20,000e6
@@ -465,8 +480,10 @@ contract CoinvestedPositionExitTest is Test {
         Exit exitContract = _deployExit(bytes32("iiic"), eurc, pricePerToken, CP_TOKEN_AMOUNT);
 
         vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.prank(owner);
-        coinvestedPosition.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 1);
+        coinvestedPosition.distributeExit(IERC20(address(eurc)), 1);
 
         // Same as II-A — using formula-based expected values to confirm no double-scaling
         uint256 carryIIIC = 20_000e6;
@@ -509,8 +526,10 @@ contract CoinvestedPositionExitTest is Test {
         uint256 beforeR = eurc.balanceOf(receiver);
 
         vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.prank(owner);
-        coinvestedPosition3.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 1);
+        coinvestedPosition3.distributeExit(IERC20(address(eurc)), 1);
 
         _checkIVA(beforeA, beforeB, beforeC, beforeR, eurc.balanceOf(receiver) - beforeR, address(coinvestedPosition3));
     }
@@ -559,8 +578,10 @@ contract CoinvestedPositionExitTest is Test {
         uint256 beforeR = eurc.balanceOf(receiver);
 
         vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.prank(owner);
-        coinvestedPositionSingle.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 1);
+        coinvestedPositionSingle.distributeExit(IERC20(address(eurc)), 1);
 
         uint256 received = 40_000e6;
         uint256 carry = 20_000e6; // received - basePayout
@@ -581,7 +602,7 @@ contract CoinvestedPositionExitTest is Test {
 
     /// @dev Deploys a Token with 0.1% fee setting + a CoinvestedPosition for it,
     ///      mints CP_TOKEN_AMOUNT tokens to that coinvestedPosition, returns (token, cp).
-    function _deployFeeTokenAndCp() internal returns (Token, CoinvestedPosition) {
+    function _deployFeeTokenAndCp() internal returns (Token, CoinvestedPosition, TokenExitRegistry) {
         IFeeSettingsV2 fsWithFee = createFeeSettings(
             trustedForwarder,
             admin,
@@ -603,6 +624,10 @@ contract CoinvestedPositionExitTest is Test {
         tokenWithFee.grantRole(tokenWithFee.MINTALLOWER_ROLE(), admin);
         vm.stopPrank();
 
+        TokenExitRegistry tokenExitRegistryForFeeToken = TokenExitRegistry(
+            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32("fee_token"), trustedForwarder, tokenWithFee)
+        );
+
         CoinvestedPositionInitializerArguments memory coinvestedPositionArgs = CoinvestedPositionInitializerArguments({
             owner: owner,
             receiver: receiver,
@@ -610,7 +635,8 @@ contract CoinvestedPositionExitTest is Test {
             basePrice: BASE_PRICE_EURC,
             baseCurrency: IERC20(address(eurc)),
             token: tokenWithFee,
-            lockedUntil: 0
+            lockedUntil: 0,
+            tokenExitRegistry: tokenExitRegistryForFeeToken
         });
         CoinvestedPosition coinvestedPositionFee = CoinvestedPosition(
             coinvestedPositionFactory.createCoinvestedPositionClone(
@@ -621,7 +647,7 @@ contract CoinvestedPositionExitTest is Test {
         );
         vm.prank(admin);
         tokenWithFee.mint(address(coinvestedPositionFee), CP_TOKEN_AMOUNT);
-        return (tokenWithFee, coinvestedPositionFee);
+        return (tokenWithFee, coinvestedPositionFee, tokenExitRegistryForFeeToken);
     }
 
     /// @dev Deploys an Exit for `_token` using eurc at 200e6 price for CP_TOKEN_AMOUNT tokens
@@ -645,7 +671,11 @@ contract CoinvestedPositionExitTest is Test {
 
     /// V: distributeExit does NOT apply fees — full received amount is distributed
     function testV_NoFeeDeductedInDistributeExit() public {
-        (Token tokenWithFee, CoinvestedPosition coinvestedPositionFee) = _deployFeeTokenAndCp();
+        (
+            Token tokenWithFee,
+            CoinvestedPosition coinvestedPositionFee,
+            TokenExitRegistry tokenExitRegistryForFeeToken
+        ) = _deployFeeTokenAndCp();
         Exit exitContract = _deployFeeExit(tokenWithFee);
 
         uint256 beforeA = eurc.balanceOf(leadA);
@@ -653,8 +683,10 @@ contract CoinvestedPositionExitTest is Test {
         uint256 beforeR = eurc.balanceOf(receiver);
 
         vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistryForFeeToken.setExit(IExit(address(exitContract)));
         vm.prank(owner);
-        coinvestedPositionFee.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 1);
+        coinvestedPositionFee.distributeExit(IERC20(address(eurc)), 1);
 
         // Full 40,000e6 distributed; no fee deducted
         uint256 received = 40_000e6;
@@ -688,8 +720,10 @@ contract CoinvestedPositionExitTest is Test {
         uint256 beforeR = eurc.balanceOf(receiver);
 
         vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.prank(owner);
-        coinvestedPosition.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 1);
+        coinvestedPosition.distributeExit(IERC20(address(eurc)), 1);
 
         // received computed via before-snapshot excludes the 500e6 pre-existing
         // => received = 40,000e6; carry = 20,000e6; A=2,000; B=1,000; receiver gets 37,000 + 500 = 37,500
@@ -723,8 +757,10 @@ contract CoinvestedPositionExitTest is Test {
         uint256 eureBalanceBefore = eure.balanceOf(address(coinvestedPosition));
 
         vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.prank(owner);
-        coinvestedPosition.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 1);
+        coinvestedPosition.distributeExit(IERC20(address(eurc)), 1);
 
         // EURe balance on cp is unchanged
         assertEq(eure.balanceOf(address(coinvestedPosition)), eureBalanceBefore, "VIB: EURe balance changed");
@@ -744,10 +780,12 @@ contract CoinvestedPositionExitTest is Test {
 
         uint256 cpTokensBefore = token.balanceOf(address(coinvestedPosition));
 
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.warp(claimStart);
         vm.expectRevert("ERC20: transfer amount exceeds balance");
         vm.prank(owner);
-        coinvestedPosition.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 1);
+        coinvestedPosition.distributeExit(IERC20(address(eurc)), 1);
 
         // cp retains its tokens
         assertEq(token.balanceOf(address(coinvestedPosition)), cpTokensBefore, "VIIA: cp lost tokens despite revert");
@@ -760,8 +798,10 @@ contract CoinvestedPositionExitTest is Test {
         Exit exitContract = _deployExit(bytes32("viib"), eurc, pricePerToken, CP_TOKEN_AMOUNT);
 
         vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.prank(owner);
-        coinvestedPosition.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 1);
+        coinvestedPosition.distributeExit(IERC20(address(eurc)), 1);
 
         // Exit currency balance = 0 after full claim
         assertEq(eurc.balanceOf(address(exitContract)), 0, "VIIB: exit EURc not fully exhausted");
@@ -780,8 +820,10 @@ contract CoinvestedPositionExitTest is Test {
         assertEq(token.balanceOf(address(coinvestedPosition)), CP_TOKEN_AMOUNT, "VIII: wrong cp token balance before");
 
         vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.prank(owner);
-        coinvestedPosition.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 1);
+        coinvestedPosition.distributeExit(IERC20(address(eurc)), 1);
 
         assertEq(token.balanceOf(address(coinvestedPosition)), 0, "VIII: cp still holds tokens after");
         assertEq(token.balanceOf(address(exitContract)), CP_TOKEN_AMOUNT, "VIII: exit does not hold tokens");
@@ -834,8 +876,10 @@ contract CoinvestedPositionExitTest is Test {
         uint256 beforeR = eurc.balanceOf(receiver);
 
         vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.prank(owner);
-        coinvestedPositionFuzz.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 1);
+        coinvestedPositionFuzz.distributeExit(IERC20(address(eurc)), 1);
 
         uint256 aGot = eurc.balanceOf(leadA) - beforeA;
         uint256 bGot = eurc.balanceOf(leadB) - beforeB;
@@ -862,8 +906,10 @@ contract CoinvestedPositionExitTest is Test {
         uint256 beforeR = eurc.balanceOf(receiver);
 
         vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.prank(owner);
-        coinvestedPosition.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 1);
+        coinvestedPosition.distributeExit(IERC20(address(eurc)), 1);
 
         uint256 received = 40_000e6; // snapshot-based, excludes preExisting
         uint256 carry = 20_000e6;
@@ -937,8 +983,10 @@ contract CoinvestedPositionExitTest is Test {
         uint256 beforeR = eurc.balanceOf(receiver);
 
         vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.prank(owner);
-        coinvestedPosition.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 1);
+        coinvestedPosition.distributeExit(IERC20(address(eurc)), 1);
 
         // received = 150e18 * 200e6 / 1e18 = 30,000e6
         // basePayout = scaleToDecimals((100e6 * 150e18) / 1e18, 6) = 15,000e6
@@ -970,8 +1018,10 @@ contract CoinvestedPositionExitTest is Test {
         Exit exitContract = _deployExit(bytes32("ki"), eurc, 200e6, CP_TOKEN_AMOUNT);
 
         vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.prank(owner);
-        coinvestedPosition.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 1);
+        coinvestedPosition.distributeExit(IERC20(address(eurc)), 1);
 
         assertEq(token.balanceOf(address(coinvestedPosition)), 0, "KI: cp still holds tokens after exit");
     }
@@ -986,10 +1036,12 @@ contract CoinvestedPositionExitTest is Test {
         uint256 totalCurrency = (CP_TOKEN_AMOUNT * pricePerToken) / (10 ** token.decimals()); // 40,000e6
         Exit exitContract = _deployExit(bytes32("xia"), eurc, pricePerToken, CP_TOKEN_AMOUNT);
 
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.warp(claimStart);
         vm.prank(owner);
         vm.expectRevert("received less than _minCurrencyAmount");
-        coinvestedPosition.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), totalCurrency + 1);
+        coinvestedPosition.distributeExit(IERC20(address(eurc)), totalCurrency + 1);
     }
 
     /// XI-B: succeeds when received == _minCurrencyAmount (exact boundary)
@@ -999,8 +1051,10 @@ contract CoinvestedPositionExitTest is Test {
         Exit exitContract = _deployExit(bytes32("xib"), eurc, pricePerToken, CP_TOKEN_AMOUNT);
 
         vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.prank(owner);
-        coinvestedPosition.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), totalCurrency);
+        coinvestedPosition.distributeExit(IERC20(address(eurc)), totalCurrency);
 
         assertEq(token.balanceOf(address(coinvestedPosition)), 0, "XIB: cp still holds tokens after exit");
     }
@@ -1011,8 +1065,10 @@ contract CoinvestedPositionExitTest is Test {
         Exit exitContract = _deployExit(bytes32("xic"), eurc, pricePerToken, CP_TOKEN_AMOUNT);
 
         vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.prank(owner);
-        coinvestedPosition.distributeExit(IExit(address(exitContract)), IERC20(address(eurc)), 0);
+        coinvestedPosition.distributeExit(IERC20(address(eurc)), 0);
 
         assertEq(token.balanceOf(address(coinvestedPosition)), 0, "XIC: cp still holds tokens after exit");
     }
@@ -1024,15 +1080,17 @@ contract CoinvestedPositionExitTest is Test {
     /// XII: distributeExit reverts when exitCurrency is the held token.
     /// Uses a no-op Exit stub so received == 0 (>= _minCurrencyAmount 0), reaching _settle.
     function testXII_DistributeExitRevertsWhenCurrencyIsHeldToken() public {
-        // Give the equity token TRUSTED_CURRENCY | EURO_CURRENCY to pass the exit currency check
+        // Give the equity token TRUSTED_CURRENCY to pass the exit currency check
         vm.prank(admin);
-        allowList.set(address(token), TRUSTED_CURRENCY | EURO_CURRENCY);
+        allowList.set(address(token), TRUSTED_CURRENCY);
 
         NoOpExit noOpExit = new NoOpExit();
 
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(noOpExit)));
         vm.expectRevert("currency cannot be the held token");
         vm.prank(owner);
-        coinvestedPosition.distributeExit(IExit(address(noOpExit)), IERC20(address(token)), 0);
+        coinvestedPosition.distributeExit(IERC20(address(token)), 0);
     }
 
     /// XI-D: fuzz — reverts iff _minCurrencyAmount > received; succeeds otherwise
@@ -1047,15 +1105,13 @@ contract CoinvestedPositionExitTest is Test {
 
         Exit exitContract = _deployExit(bytes32("xid_exit"), eurc, pricePerToken, CP_TOKEN_AMOUNT);
 
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(exitContract)));
         vm.warp(claimStart);
         vm.prank(owner);
         if (uint256(minCurrencyAmount) > received) {
             vm.expectRevert("received less than _minCurrencyAmount");
         }
-        coinvestedPositionFuzz.distributeExit(
-            IExit(address(exitContract)),
-            IERC20(address(eurc)),
-            uint256(minCurrencyAmount)
-        );
+        coinvestedPositionFuzz.distributeExit(IERC20(address(eurc)), uint256(minCurrencyAmount));
     }
 }
