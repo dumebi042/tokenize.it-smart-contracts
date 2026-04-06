@@ -673,6 +673,7 @@ contract FeeSettingsTest is Test {
         address someTokenAddress = address(74);
         vm.assume(_rando != address(0));
         vm.assume(_rando != admin);
+        vm.assume(_rando != trustedForwarder);
 
         vm.expectRevert("Only managers can call this function");
         vm.prank(_rando);
@@ -779,6 +780,7 @@ contract FeeSettingsTest is Test {
     function testOnlyManagerCanRemoveCustomFees(address _rando) public {
         address someTokenAddress = address(74);
         vm.assume(feeSettings.managers(_rando) == false);
+        vm.assume(_rando != trustedForwarder);
         vm.expectRevert("Only managers can call this function");
         vm.prank(_rando);
         feeSettings.removeCustomFee(FeeTypes.TOKEN, someTokenAddress);
@@ -802,6 +804,7 @@ contract FeeSettingsTest is Test {
     function testRandoCanNotAddManager(address _rando) public {
         vm.assume(_rando != address(0));
         vm.assume(_rando != admin);
+        vm.assume(_rando != trustedForwarder);
 
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(_rando);
@@ -829,6 +832,7 @@ contract FeeSettingsTest is Test {
     function testRandoCanNotRemoveManager(address _rando) public {
         vm.assume(_rando != address(0));
         vm.assume(_rando != admin);
+        vm.assume(_rando != trustedForwarder);
 
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(_rando);
@@ -1076,6 +1080,7 @@ contract FeeSettingsTest is Test {
     function testRandoCanNotSetOrRemoveCustomFeeCollectors(address _rando, address _customFeeCollector) public {
         vm.assume(_rando != address(0));
         vm.assume(_rando != admin);
+        vm.assume(_rando != trustedForwarder);
         vm.assume(_customFeeCollector != address(0));
         vm.assume(_customFeeCollector != admin);
 

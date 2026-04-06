@@ -369,7 +369,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
     }
 
     function testFuzz_SetCurrencyOnlyOwner(address caller) public {
-        vm.assume(caller != owner && caller != address(0));
+        vm.assume(caller != owner && caller != address(0) && caller != trustedForwarder);
         vm.prank(caller);
         vm.expectRevert("Ownable: caller is not the owner");
         coinvestedPosition.setCurrency(IERC20(address(eure)));
@@ -1344,28 +1344,28 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
     // ─────────────────────────────────────────────────────────────────────────
 
     function testFuzz_AccessControl_SetCurrency(address caller) public {
-        vm.assume(caller != address(0) && caller != owner);
+        vm.assume(caller != address(0) && caller != owner && caller != trustedForwarder);
         vm.prank(caller);
         vm.expectRevert("Ownable: caller is not the owner");
         coinvestedPosition.setCurrency(IERC20(address(eure)));
     }
 
     function testFuzz_AccessControl_SetTokenPrice(address caller) public {
-        vm.assume(caller != address(0) && caller != owner);
+        vm.assume(caller != address(0) && caller != owner && caller != trustedForwarder);
         vm.prank(caller);
         vm.expectRevert("Ownable: caller is not the owner");
         coinvestedPosition.setTokenPrice(200e6);
     }
 
     function testFuzz_AccessControl_SetReceiver(address caller) public {
-        vm.assume(caller != address(0) && caller != owner);
+        vm.assume(caller != address(0) && caller != owner && caller != trustedForwarder);
         vm.prank(caller);
         vm.expectRevert("Ownable: caller is not the owner");
         coinvestedPosition.setReceiver(caller);
     }
 
     function testFuzz_AccessControl_Pause(address caller) public {
-        vm.assume(caller != address(0) && caller != owner);
+        vm.assume(caller != address(0) && caller != owner && caller != trustedForwarder);
         vm.prank(owner);
         coinvestedPosition.setTokenPrice(200e6);
         vm.prank(owner);
@@ -1376,7 +1376,7 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
     }
 
     function testFuzz_AccessControl_Unpause(address caller) public {
-        vm.assume(caller != address(0) && caller != owner);
+        vm.assume(caller != address(0) && caller != owner && caller != trustedForwarder);
         vm.prank(owner);
         coinvestedPosition.setTokenPrice(200e6);
         vm.prank(caller);

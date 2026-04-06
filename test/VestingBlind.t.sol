@@ -45,6 +45,7 @@ contract VestingBlindTest is Test {
 
     function testCommitNoManager(address noOwner, bytes32 hash) public {
         vm.assume(noOwner != address(0));
+        vm.assume(noOwner != trustedForwarder);
         vm.assume(vesting.managers(noOwner) == false);
         vm.assume(hash != bytes32(0));
         vm.expectRevert("Caller is not a manager");
@@ -75,6 +76,7 @@ contract VestingBlindTest is Test {
 
     function testRevokeNoOwner(address noOwner, bytes32 hash) public {
         vm.assume(noOwner != address(0));
+        vm.assume(noOwner != trustedForwarder);
         vm.assume(vesting.managers(noOwner) == false);
         vm.assume(hash != bytes32(0));
         vm.prank(owner);

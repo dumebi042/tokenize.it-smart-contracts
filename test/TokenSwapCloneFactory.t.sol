@@ -355,8 +355,10 @@ contract TokenSwapCloneFactoryTest is Test {
     */
     function testPausing(address _admin, address rando) public {
         vm.assume(_admin != address(0));
+        vm.assume(_admin != trustedForwarder);
         vm.assume(rando != address(0));
         vm.assume(rando != _admin);
+        vm.assume(rando != trustedForwarder);
 
         TokenSwapInitializerArguments memory arguments = TokenSwapInitializerArguments(
             _admin,

@@ -385,6 +385,7 @@ contract ExitTest is Test {
     function testFuzzDrainNonOwnerReverts(address caller) public {
         vm.assume(caller != owner);
         vm.assume(caller != address(0));
+        vm.assume(caller != trustedForwarder);
         vm.warp(drainStart + 1);
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(caller);
