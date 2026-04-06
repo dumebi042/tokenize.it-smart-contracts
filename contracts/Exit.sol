@@ -75,8 +75,22 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         _arguments.currency.safeTransferFrom(_currencyProvider, address(this), _totalCurrencyAmount);
     }
 
+    function _feeInfo(uint256 _amount, bytes32 _feeType) internal view returns (uint256 fee, address feeCollector) {
+        IFeeSettingsV2 feeSettingsV2 = token.feeSettings();
+        if (feeSettingsV2.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
+            IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(feeSettingsV2));
+            fee = feeSettings.fee(_feeType, _amount, address(token));
+            feeCollector = feeSettings.feeCollector(_feeType, address(token));
+        } else {
+            fee = feeSettingsV2.privateOfferFee(_amount, address(token));
+            feeCollector = feeSettingsV2.privateOfferFeeCollector(address(token));
+        }
+    }
+
     function eligible(address _holder) public view returns (uint256) {
-        return (token.balanceOf(_holder) * pricePerToken) / 10 ** token.decimals();
+        uint256 gross = (token.balanceOf(_holder) * pricePerToken) / 10 ** token.decimals();
+        (uint256 fee, ) = _feeInfo(gross, FeeTypes.EXIT);
+        return gross - fee;
     }
 
     function claim(uint256 _tokenAmount, address _recipient, uint256 _minPayout) external {
@@ -92,17 +106,7 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         require(block.timestamp >= claimStart, "exit not yet started");
         IERC20(address(token)).safeTransferFrom(_holder, address(this), _tokenAmount);
         uint256 currencyAmount = (_tokenAmount * pricePerToken) / 10 ** token.decimals();
-        IFeeSettingsV2 feeSettingsV2 = token.feeSettings();
-        uint256 fee;
-        address feeCollector;
-        if (feeSettingsV2.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
-            IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(feeSettingsV2));
-            fee = feeSettings.fee(FeeTypes.EXIT, currencyAmount, address(token));
-            feeCollector = feeSettings.feeCollector(FeeTypes.EXIT, address(token));
-        } else {
-            fee = feeSettingsV2.privateOfferFee(currencyAmount, address(token));
-            feeCollector = feeSettingsV2.privateOfferFeeCollector(address(token));
-        }
+        (uint256 fee, address feeCollector) = _feeInfo(currencyAmount, FeeTypes.EXIT);
         require(currencyAmount - fee >= _minPayout, "payout below minimum");
         if (fee != 0) {
             currency.safeTransfer(feeCollector, fee);

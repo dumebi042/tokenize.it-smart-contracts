@@ -820,10 +820,9 @@ contract DistributionTest is Test {
 
     function testFeeDeductedAtClaimTime() public {
         Distribution d = _deployDistWithNonZeroFee();
-        uint256 eligibleA = d.eligible(holderA); // 120e6
-        // 1% fee on 120e6 = 1.2e6
-        uint256 expectedFee = eligibleA / 100;
-        uint256 expectedNet = eligibleA - expectedFee;
+        uint256 grossA = SUPPLY_A * PRICE_PER_TOKEN / 1e18; // 120e6
+        uint256 expectedFee = grossA / 100; // 1% of gross
+        uint256 expectedNet = grossA - expectedFee; // 118.8e6
 
         vm.prank(holderA);
         d.claim(holderA, 0);
@@ -846,12 +845,15 @@ contract DistributionTest is Test {
         assertGt(feeAfterB, feeAfterA, "feeCollector should have received additional fee from holderB claim");
     }
 
-    function testEligibleUnaffectedByFee() public {
+    function testEligibleDeductsFee() public {
         Distribution d = _deployDistWithNonZeroFee();
-        // eligible is gross (before fee), same as without fee
-        assertEq(d.eligible(holderA), 120e6, "holderA eligible should be based on price, not net of fee");
-        assertEq(d.eligible(holderB), 60e6, "holderB eligible should be based on price, not net of fee");
-        assertEq(d.eligible(holderC), 20e6, "holderC eligible should be based on price, not net of fee");
+        // eligible() deducts the 1% fee, returning net payout amount
+        uint256 grossA = SUPPLY_A * PRICE_PER_TOKEN / 1e18; // 120e6
+        uint256 grossB = SUPPLY_B * PRICE_PER_TOKEN / 1e18; // 60e6
+        uint256 grossC = SUPPLY_C * PRICE_PER_TOKEN / 1e18; // 20e6
+        assertEq(d.eligible(holderA), grossA - grossA / 100, "holderA eligible should be net after fee");
+        assertEq(d.eligible(holderB), grossB - grossB / 100, "holderB eligible should be net after fee");
+        assertEq(d.eligible(holderC), grossC - grossC / 100, "holderC eligible should be net after fee");
     }
 
     // ========== D_MinPayout. minPayout guard ==========
@@ -879,24 +881,22 @@ contract DistributionTest is Test {
         dist.claim(holderA, expectedNet + 1);
     }
 
-    /// With a fee, minPayout exactly equal to net-after-fee succeeds
-    function testClaimMinPayoutExactNetAfterFeeSucceeds() public {
+    /// With a fee, minPayout exactly equal to eligible() succeeds because eligible() already deducts the fee
+    function testClaimMinPayoutEligibleWithFeeSucceeds() public {
         Distribution d = _deployDistWithNonZeroFee();
-        uint256 eligible = d.eligible(holderA); // 120e6
-        uint256 fee = eligible / 100; // 1%
-        uint256 expectedNet = eligible - fee;
+        uint256 expectedNet = d.eligible(holderA); // eligible() returns net after fee
         vm.prank(holderA);
         d.claim(holderA, expectedNet);
-        assertEq(currency.balanceOf(holderA), expectedNet, "holderA should receive net after fee");
+        assertEq(currency.balanceOf(holderA), expectedNet, "holderA should receive exactly eligible");
     }
 
-    /// With a fee, minPayout equal to gross eligible reverts because actual payout is eligible - fee
-    function testClaimMinPayoutAboveNetAfterFeeReverts() public {
+    /// With a fee, minPayout above eligible() (i.e. the gross amount) reverts
+    function testClaimMinPayoutAboveEligibleWithFeeReverts() public {
         Distribution d = _deployDistWithNonZeroFee();
-        uint256 eligible = d.eligible(holderA); // 120e6
+        uint256 gross = SUPPLY_A * PRICE_PER_TOKEN / 1e18; // 120e6, before fee
         vm.prank(holderA);
         vm.expectRevert("payout below minimum");
-        d.claim(holderA, eligible); // eligible > net after fee
+        d.claim(holderA, gross); // gross > eligible() (net)
     }
 
     /// Fuzz: claim always succeeds when minPayout <= net, reverts when minPayout > net (no fees)
@@ -914,26 +914,29 @@ contract DistributionTest is Test {
 
     function testFuzzReassignAndClaimWithFee(uint256 amount) public {
         Distribution d = _deployDistWithNonZeroFee();
+        uint256 grossA = SUPPLY_A * PRICE_PER_TOKEN / 1e18; // 120e6
+        uint256 grossB = SUPPLY_B * PRICE_PER_TOKEN / 1e18; // 60e6
+        uint256 grossC = SUPPLY_C * PRICE_PER_TOKEN / 1e18; // 20e6
 
-        uint256 eligibleA = d.eligible(holderA);
-        uint256 eligibleB = d.eligible(holderB);
-        uint256 eligibleC = d.eligible(holderC);
-
-        amount = bound(amount, 1, eligibleA);
+        amount = bound(amount, 1, grossA); // can reassign up to full gross allocation
 
         vm.warp(reassignOrDrainAfter);
         vm.prank(owner);
         d.reassign(holderA, holderB, amount);
 
-        assertEq(d.eligible(holderA), eligibleA - amount, "holderA eligible wrong after reassign");
-        assertEq(d.eligible(holderB), eligibleB + amount, "holderB eligible wrong after reassign");
-        assertEq(d.eligible(holderC), eligibleC, "holderC eligible unchanged after reassign");
+        uint256 grossANew = grossA - amount;
+        uint256 grossBNew = grossB + amount;
+        // eligible() returns net after 1% fee
+        assertEq(d.eligible(holderA), grossANew - grossANew / 100, "holderA eligible wrong after reassign");
+        assertEq(d.eligible(holderB), grossBNew - grossBNew / 100, "holderB eligible wrong after reassign");
+        assertEq(d.eligible(holderC), grossC - grossC / 100, "holderC eligible unchanged after reassign");
 
-        // Claims with fee: each holder gets (eligible - 1% fee)
-        uint256 newEligibleA = d.eligible(holderA);
-        uint256 newEligibleB = d.eligible(holderB);
+        // Store expected balances (net = gross - fee) before claims consume eligible
+        uint256 expectedBalanceA = grossANew - grossANew / 100;
+        uint256 expectedBalanceB = grossBNew - grossBNew / 100;
+        uint256 expectedBalanceC = grossC - grossC / 100;
 
-        if (newEligibleA > 0) {
+        if (grossANew > 0) {
             vm.prank(holderA);
             d.claim(holderA, 0);
         }
@@ -942,11 +945,11 @@ contract DistributionTest is Test {
         vm.prank(holderC);
         d.claim(holderC, 0);
 
-        // Each gets 99% of eligible (1% fee)
-        if (newEligibleA > 0) {
-            assertEq(currency.balanceOf(holderA), newEligibleA - newEligibleA / 100, "holderA balance wrong");
+        // Each holder receives eligible() (net after fee)
+        if (grossANew > 0) {
+            assertEq(currency.balanceOf(holderA), expectedBalanceA, "holderA balance wrong");
         }
-        assertEq(currency.balanceOf(holderB), newEligibleB - newEligibleB / 100, "holderB balance wrong");
-        assertEq(currency.balanceOf(holderC), eligibleC - eligibleC / 100, "holderC balance wrong");
+        assertEq(currency.balanceOf(holderB), expectedBalanceB, "holderB balance wrong");
+        assertEq(currency.balanceOf(holderC), expectedBalanceC, "holderC balance wrong");
     }
 }

@@ -671,6 +671,26 @@ contract ExitTest is Test {
         feeExit.claim(claimAmt, recipient, gross); // gross > net
     }
 
+    /// With a fee, using eligible() as minPayout succeeds because eligible() already deducts the fee
+    function testClaimMinPayoutEligibleWithFeeSucceeds() public {
+        (Exit feeExit, , Token feeToken) = _deployExitWithNonZeroFee();
+        uint256 minPayout = feeExit.eligible(holder); // eligible() returns net after fee
+        vm.warp(claimStart);
+        vm.prank(holder);
+        feeExit.claim(TOKEN_SUPPLY, recipient, minPayout);
+        assertEq(currency.balanceOf(recipient), minPayout, "recipient should receive exactly eligible");
+    }
+
+    /// With a fee, minPayout above eligible() (i.e. the gross amount) reverts
+    function testClaimMinPayoutAboveEligibleWithFeeReverts() public {
+        (Exit feeExit, , Token feeToken) = _deployExitWithNonZeroFee();
+        uint256 gross = (TOKEN_SUPPLY * PRICE_PER_TOKEN) / 10 ** feeToken.decimals();
+        vm.warp(claimStart);
+        vm.prank(holder);
+        vm.expectRevert("payout below minimum");
+        feeExit.claim(TOKEN_SUPPLY, recipient, gross); // gross > eligible() (net)
+    }
+
     /// Fuzz: claim always succeeds when minPayout <= net, reverts when minPayout > net
     function testFuzzClaimMinPayoutBoundary(uint256 claimAmt, uint256 minPayout) public {
         claimAmt = bound(claimAmt, 1e15, TOKEN_SUPPLY); // at least 0.001 tokens
@@ -731,6 +751,13 @@ contract ExitTest is Test {
         token.mint(testHolder, tokenBalance);
         uint256 expectedCurrency = (uint256(tokenBalance) * PRICE_PER_TOKEN) / 1e18;
         assertEq(exitContract.eligible(testHolder), expectedCurrency, "eligible fuzz mismatch");
+    }
+
+    /// eligible() deducts the fee, returning net payout amount
+    function testEligibleDeductsFee() public {
+        (Exit feeExit, , Token feeToken) = _deployExitWithNonZeroFee();
+        uint256 gross = (TOKEN_SUPPLY * PRICE_PER_TOKEN) / 10 ** feeToken.decimals();
+        assertEq(feeExit.eligible(holder), gross - gross / 100, "eligible should be net after fee deduction");
     }
 
     function testDrainWithFeeReflectsCorrectRemainder() public {

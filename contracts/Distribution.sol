@@ -92,12 +92,30 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         }
     }
 
-    function eligible(address _holder) public view returns (uint256) {
+    function _grossEligible(address _holder) internal view returns (uint256) {
         return
             (token.balanceOfAt(_holder, snapshotId) * pricePerToken) /
             (10 ** token.decimals()) +
             extraCredit[_holder] -
             paidOut[_holder];
+    }
+
+    function _feeInfo(uint256 _amount, bytes32 _feeType) internal view returns (uint256 fee, address feeCollector) {
+        IFeeSettingsV2 feeSettingsV2 = token.feeSettings();
+        if (feeSettingsV2.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
+            IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(feeSettingsV2));
+            fee = feeSettings.fee(_feeType, _amount, address(token));
+            feeCollector = feeSettings.feeCollector(_feeType, address(token));
+        } else {
+            fee = feeSettingsV2.privateOfferFee(_amount, address(token));
+            feeCollector = feeSettingsV2.privateOfferFeeCollector(address(token));
+        }
+    }
+
+    function eligible(address _holder) public view returns (uint256) {
+        uint256 gross = _grossEligible(_holder);
+        (uint256 fee, ) = _feeInfo(gross, FeeTypes.DISTRIBUTION);
+        return gross - fee;
     }
 
     /**
@@ -120,7 +138,7 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     function _reassign(address _from, address _to, uint256 _amount) internal {
         require(_to != address(0), "to can not be zero address");
         require(_amount > 0, "amount must be positive");
-        require(_amount <= eligible(_from), "amount exceeds eligible");
+        require(_amount <= _grossEligible(_from), "amount exceeds eligible");
         paidOut[_from] += _amount;
         extraCredit[_to] += _amount;
         emit Reassigned(_from, _to, _amount);
@@ -131,25 +149,16 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     }
 
     function _claim(address _holder, address _recipient, uint256 _minPayout) internal {
-        uint256 amount = eligible(_holder);
-        require(amount > 0, "nothing to claim");
-        paidOut[_holder] += amount;
-        IFeeSettingsV2 feeSettingsV2 = token.feeSettings();
-        uint256 fee;
-        address feeCollector;
-        if (feeSettingsV2.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
-            IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(feeSettingsV2));
-            fee = feeSettings.fee(FeeTypes.DISTRIBUTION, amount, address(token));
-            feeCollector = feeSettings.feeCollector(FeeTypes.DISTRIBUTION, address(token));
-        } else {
-            fee = feeSettingsV2.privateOfferFee(amount, address(token));
-            feeCollector = feeSettingsV2.privateOfferFeeCollector(address(token));
-        }
-        require(amount - fee >= _minPayout, "payout below minimum");
+        uint256 gross = _grossEligible(_holder);
+        require(gross > 0, "nothing to claim");
+        paidOut[_holder] += gross;
+        (uint256 fee, address feeCollector) = _feeInfo(gross, FeeTypes.DISTRIBUTION);
+        uint256 net = gross - fee;
+        require(net >= _minPayout, "payout below minimum");
         if (fee != 0) {
             currency.safeTransfer(feeCollector, fee);
         }
-        currency.safeTransfer(_recipient, amount - fee);
+        currency.safeTransfer(_recipient, net);
     }
 
     function drain(address _recipient) external onlyOwner {
