@@ -168,7 +168,7 @@ contract CoinvestedPosition is TokenSwapBase {
      * @dev The sweep covers the base price portion and any rounding dust. Pass carry=0 when there is
      *      no surplus above base price; the loop produces no transfers and the full balance goes to receiver.
      * @param carry surplus above base price to split among lead investors
-     * @param _currency the token to settle
+     * @param _currency the ERC20 token to use as currency for the settlement
      */
     function _settle(uint256 carry, IERC20 _currency) internal {
         require(address(_currency) != address(token), "currency cannot be the held token");
