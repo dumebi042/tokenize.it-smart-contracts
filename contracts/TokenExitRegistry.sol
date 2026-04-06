@@ -20,6 +20,8 @@ contract TokenExitRegistry is ERC2771ContextUpgradeable {
     /// @notice The authorized exit contract. Non-zero value signals that the timelock is bypassed.
     IExit public exit;
 
+    /// @param token The token this registry is associated with.
+    event Initialized(Token indexed token);
     /// @param exit The exit contract that has been set.
     event ExitSet(IExit indexed exit);
 
@@ -39,6 +41,7 @@ contract TokenExitRegistry is ERC2771ContextUpgradeable {
     function initialize(Token _token) public initializer {
         require(address(_token) != address(0), "token can not be zero address");
         token = _token;
+        emit Initialized(_token);
     }
 
     /**
