@@ -59,7 +59,12 @@ contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeabl
      * @param _dist the Distribution contract to claim from
      * @param _recipient address to forward the received currency to
      */
-    function claimDistribution(IDistribution _dist, IERC20 _dividendCurrency, address _recipient, uint256 _minPayout) external onlyOwner {
+    function claimDistribution(
+        IDistribution _dist,
+        IERC20 _dividendCurrency,
+        address _recipient,
+        uint256 _minPayout
+    ) external onlyOwner {
         require(_recipient != address(0), "recipient can not be zero address");
         uint256 before = _dividendCurrency.balanceOf(_recipient);
         _dist.claim(_recipient, _minPayout);

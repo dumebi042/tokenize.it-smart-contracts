@@ -18,9 +18,11 @@ import "./resources/FixedPayoutExit.sol";
 /// @dev Minimal IExit stub: claim() does nothing, so claimExit measures received == 0.
 contract NoOpExit {
     function claim(uint256, address, uint256) external {}
-    function currency() external pure returns (IERC20) { return IERC20(address(0)); }
-}
 
+    function currency() external pure returns (IERC20) {
+        return IERC20(address(0));
+    }
+}
 
 /**
  * @title CoinvestedPositionExitTest

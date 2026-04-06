@@ -525,7 +525,12 @@ contract ExitTest is Test {
         assertEq(token.balanceOf(holder), TOKEN_SUPPLY, "holder token balance should be full before meta-tx");
         // Build meta-tx calldata: claim(tokenAmount, recipient) + appended holder address
         bytes memory callData = abi.encodePacked(
-            abi.encodeWithSelector(bytes4(keccak256("claim(uint256,address,uint256)")), claimAmt, recipient, uint256(0)),
+            abi.encodeWithSelector(
+                bytes4(keccak256("claim(uint256,address,uint256)")),
+                claimAmt,
+                recipient,
+                uint256(0)
+            ),
             holder
         );
         vm.prank(trustedForwarder);
@@ -667,7 +672,7 @@ contract ExitTest is Test {
 
     /// With a fee, minPayout equal to gross (before fee) reverts because actual payout is gross - fee
     function testClaimMinPayoutAboveNetAfterFeeReverts() public {
-        (Exit feeExit,, Token feeToken) = _deployExitWithNonZeroFee();
+        (Exit feeExit, , Token feeToken) = _deployExitWithNonZeroFee();
         uint256 claimAmt = 1e18;
         uint256 gross = (claimAmt * PRICE_PER_TOKEN) / 10 ** feeToken.decimals();
         vm.warp(claimStart);

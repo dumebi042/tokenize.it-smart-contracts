@@ -720,8 +720,18 @@ contract CoinvestedPositionDistributionTest is Test {
     // ─────────────────────────────────────────────────────────────────────────
 
     function testDI_VIII_MultipleDistributions_Sequential() public {
-        Distribution usdcDistribution = _deployDistribution(bytes32("DI-VIII-usdc"), usdc, TOTAL_USDC, PRICE_PER_TOKEN_USDC);
-        Distribution eureDistribution = _deployDistribution(bytes32("DI-VIII-eure"), eure, 1000e18, PRICE_PER_TOKEN_EURE);
+        Distribution usdcDistribution = _deployDistribution(
+            bytes32("DI-VIII-usdc"),
+            usdc,
+            TOTAL_USDC,
+            PRICE_PER_TOKEN_USDC
+        );
+        Distribution eureDistribution = _deployDistribution(
+            bytes32("DI-VIII-eure"),
+            eure,
+            1000e18,
+            PRICE_PER_TOKEN_EURE
+        );
 
         // --- Claim USDC distribution ---
         {

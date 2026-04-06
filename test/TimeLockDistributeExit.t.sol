@@ -20,7 +20,12 @@ import "./resources/FixedPayoutExit.sol";
 contract FixedPayoutDistribution {
     IERC20 public currency;
     uint256 public payout;
-    constructor(IERC20 _currency, uint256 _payout) { currency = _currency; payout = _payout; }
+
+    constructor(IERC20 _currency, uint256 _payout) {
+        currency = _currency;
+        payout = _payout;
+    }
+
     function claim(address _recipient, uint256) external {
         if (payout > 0) currency.transfer(_recipient, payout);
     }

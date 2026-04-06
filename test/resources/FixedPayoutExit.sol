@@ -8,7 +8,12 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 contract FixedPayoutExit {
     IERC20 public currency;
     uint256 public payout;
-    constructor(IERC20 _currency, uint256 _payout) { currency = _currency; payout = _payout; }
+
+    constructor(IERC20 _currency, uint256 _payout) {
+        currency = _currency;
+        payout = _payout;
+    }
+
     function claim(uint256, address _recipient, uint256) external {
         if (payout > 0) currency.transfer(_recipient, payout);
     }

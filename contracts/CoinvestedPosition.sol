@@ -188,7 +188,11 @@ contract CoinvestedPosition is TokenSwapBase {
      * @param _dist the Distribution (dividend) contract to claim from
      * @param _dividendCurrency the currency paid out by the distribution; must be trusted
      */
-    function claimDistribution(IDistribution _dist, IERC20 _dividendCurrency, uint256 _minPayout) external onlyOwner nonReentrant {
+    function claimDistribution(
+        IDistribution _dist,
+        IERC20 _dividendCurrency,
+        uint256 _minPayout
+    ) external onlyOwner nonReentrant {
         require(
             token.allowList().map(address(_dividendCurrency)) == TRUSTED_CURRENCY,
             "dividend currency must be a trusted currency"
