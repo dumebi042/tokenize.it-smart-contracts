@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./Token.sol";
-import "./interfaces/IFeeSettings.sol";
+import "./common/IFeeSettings.sol";
 
 struct ExitInitializerArguments {
     /// @notice Owner of the contract

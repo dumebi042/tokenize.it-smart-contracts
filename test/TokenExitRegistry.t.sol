@@ -6,7 +6,7 @@ import "../lib/forge-std/src/Test.sol";
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/factories/TokenExitRegistryCloneFactory.sol";
 import "../contracts/TokenExitRegistry.sol";
-import "../contracts/IExit.sol";
+import "../contracts/common/IExit.sol";
 import "../contracts/Token.sol";
 import "./resources/CloneCreators.sol";
 import "./resources/FakePaymentToken.sol";

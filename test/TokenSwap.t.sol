@@ -6,7 +6,7 @@ import "../lib/forge-std/src/console.sol";
 
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/FeeSettings.sol";
-import "../contracts/interfaces/IFeeSettings.sol";
+import "../contracts/common/IFeeSettings.sol";
 import "../contracts/factories/TokenSwapCloneFactory.sol";
 import "./resources/FakePaymentToken.sol";
 import "./resources/MaliciousPaymentToken.sol";

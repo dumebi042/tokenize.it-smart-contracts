@@ -4,9 +4,9 @@ pragma solidity 0.8.23;
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
 import "./TokenExitRegistry.sol";
-import "./TokenSwapBase.sol";
-import "./IDistribution.sol";
-import "./IExit.sol";
+import "./common/TokenSwapBase.sol";
+import "./common/IDistribution.sol";
+import "./common/IExit.sol";
 
 struct LeadInvestor {
     /// lead investor address that receives carry

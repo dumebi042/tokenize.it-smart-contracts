@@ -3,7 +3,7 @@ pragma solidity 0.8.23;
 
 import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
 
-import "./IExit.sol";
+import "./common/IExit.sol";
 import "./Token.sol";
 
 /**

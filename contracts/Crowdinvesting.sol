@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
 import "./Token.sol";
-import "./interfaces/IPriceDynamic.sol";
+import "./common/IPriceDynamic.sol";
 
 /// this struct is used to circumvent the stack too deep error that occurs when passing too many arguments to a function
 struct CrowdinvestingInitializerArguments {

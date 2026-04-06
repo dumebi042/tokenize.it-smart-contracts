@@ -5,7 +5,7 @@ import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
 
-import "./interfaces/IFeeSettings.sol";
+import "./common/IFeeSettings.sol";
 
 /**
  * @title FeeSettings

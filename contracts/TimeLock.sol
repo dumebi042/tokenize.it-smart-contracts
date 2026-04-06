@@ -7,7 +7,7 @@ import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import "./IDistribution.sol";
+import "./common/IDistribution.sol";
 import "./TokenExitRegistry.sol";
 
 /**

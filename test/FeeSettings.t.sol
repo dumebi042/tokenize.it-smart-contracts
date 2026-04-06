@@ -5,7 +5,7 @@ import "../lib/forge-std/src/Test.sol";
 import "../lib/forge-std/src/console.sol";
 import "../contracts/Token.sol";
 import "../contracts/factories/FeeSettingsCloneFactory.sol";
-import "../contracts/interfaces/IFeeSettings.sol";
+import "../contracts/common/IFeeSettings.sol";
 import "./resources/CloneCreators.sol";
 
 contract FeeSettingsTest is Test {

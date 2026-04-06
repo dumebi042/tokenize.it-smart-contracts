@@ -5,7 +5,7 @@ import "../lib/forge-std/src/Test.sol";
 import "../lib/forge-std/src/console.sol";
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/FeeSettings.sol";
-import "../contracts/interfaces/IFeeSettings.sol";
+import "../contracts/common/IFeeSettings.sol";
 import "./resources/WrongFeeSettings.sol";
 import "./resources/CloneCreators.sol";
 
