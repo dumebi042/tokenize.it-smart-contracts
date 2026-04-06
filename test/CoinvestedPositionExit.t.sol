@@ -13,11 +13,14 @@ import "../contracts/FeeSettings.sol";
 import "../contracts/TokenExitRegistry.sol";
 import "./resources/FakePaymentToken.sol";
 import "./resources/CloneCreators.sol";
+import "./resources/FixedPayoutExit.sol";
 
 /// @dev Minimal IExit stub: claim() does nothing, so claimExit measures received == 0.
 contract NoOpExit {
     function claim(uint256, address, uint256) external {}
+    function currency() external pure returns (IERC20) { return IERC20(address(0)); }
 }
+
 
 /**
  * @title CoinvestedPositionExitTest
@@ -1110,5 +1113,35 @@ contract CoinvestedPositionExitTest is Test {
             vm.expectRevert("payout below minimum");
         }
         coinvestedPositionFuzz.claimExit(IERC20(address(eurc)), uint256(minCurrencyAmount), 0);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ── XIII. CoinvestedPosition balance-diff minPayout check ────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// XIII-A: NoOpExit (pays 0) + _minCurrencyAmount=1 triggers CP's balance-diff check.
+    /// NoOpExit ignores _minPayout so the revert originates in CoinvestedPosition, not Exit.
+    function testXIII_BalanceDiffRejectsShortfall() public {
+        NoOpExit noOpExit = new NoOpExit();
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(noOpExit)));
+
+        vm.prank(owner);
+        vm.expectRevert("received less than _minCurrencyAmount");
+        coinvestedPosition.claimExit(IERC20(address(eurc)), 1, 0);
+    }
+
+    /// XIII-B: FixedPayoutExit pays exactly _minCurrencyAmount → balance-diff check passes
+    function testXIII_BalanceDiffAcceptsExactMinimum() public {
+        uint256 minCurrencyAmount = 1e6;
+        eurc.mint(address(this), minCurrencyAmount);
+        FixedPayoutExit stub = new FixedPayoutExit(IERC20(address(eurc)), minCurrencyAmount);
+        IERC20(address(eurc)).transfer(address(stub), minCurrencyAmount);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(IExit(address(stub)));
+
+        vm.prank(owner);
+        coinvestedPosition.claimExit(IERC20(address(eurc)), minCurrencyAmount, 0);
+        assertEq(eurc.balanceOf(address(coinvestedPosition)), 0, "cp should hold no eurc after settle");
     }
 }

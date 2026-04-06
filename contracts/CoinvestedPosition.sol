@@ -197,6 +197,7 @@ contract CoinvestedPosition is TokenSwapBase {
         _dist.claim(address(this), _minPayout);
         uint256 received = _dividendCurrency.balanceOf(address(this)) - before;
         require(received > 0, "didn't receive expected currency from distribution");
+        require(received >= _minPayout, "received less than _minPayout");
         _settle(received, _dividendCurrency);
     }
 

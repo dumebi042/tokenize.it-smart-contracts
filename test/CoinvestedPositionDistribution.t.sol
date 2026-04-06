@@ -1136,4 +1136,32 @@ contract CoinvestedPositionDistributionTest is Test {
         assertEq(totalGot, coinvestedPositionEligible, "DI-XI: sum of payouts != received");
         assertEq(distributionFuzz.eligible(address(coinvestedPositionFuzz)), 0, "DI-XI: eligible not zero after claim");
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ── DI-XIV. CoinvestedPosition balance-diff minPayout check ──────────────
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// DI-XIV-A: stub pays 1 but _minPayout=2 → CP's balance-diff check reverts.
+    /// TokenTransferStub ignores _minPayout so the revert originates in CoinvestedPosition.
+    function testDI_XIV_BalanceDiffRejectsShortfall() public {
+        usdc.mint(address(this), 1);
+        TokenTransferStub stub = new TokenTransferStub(IERC20(address(usdc)), 1);
+        IERC20(address(usdc)).transfer(address(stub), 1);
+
+        vm.prank(owner);
+        vm.expectRevert("received less than _minPayout");
+        coinvestedPosition.claimDistribution(IDistribution(address(stub)), usdc, 2);
+    }
+
+    /// DI-XIV-B: stub pays exactly _minPayout → balance-diff check passes
+    function testDI_XIV_BalanceDiffAcceptsExactMinimum() public {
+        uint256 minPayout = 1e6;
+        usdc.mint(address(this), minPayout);
+        TokenTransferStub stub = new TokenTransferStub(IERC20(address(usdc)), minPayout);
+        IERC20(address(usdc)).transfer(address(stub), minPayout);
+
+        vm.prank(owner);
+        coinvestedPosition.claimDistribution(IDistribution(address(stub)), usdc, minPayout);
+        assertEq(usdc.balanceOf(address(coinvestedPosition)), 0, "cp should hold no usdc after settle");
+    }
 }
