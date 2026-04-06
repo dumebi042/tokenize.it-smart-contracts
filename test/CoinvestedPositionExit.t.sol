@@ -271,9 +271,6 @@ contract CoinvestedPositionExitTest is Test {
     }
 
     function testDistributeExitOnlyOwner() public {
-        Exit exitContract = _deployExit(bytes32("i5"), eurc, 200e6, CP_TOKEN_AMOUNT);
-
-        vm.warp(claimStart);
         vm.expectRevert("Ownable: caller is not the owner");
         // called by address(this) which is not owner
         coinvestedPosition.distributeExit(IERC20(address(eurc)), 1, 0);

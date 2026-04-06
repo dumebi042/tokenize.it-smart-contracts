@@ -187,16 +187,6 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         assertEq(frac1, CARRY_5PCT, "leadB fraction");
     }
 
-    function testInitBasePriceDecimalsReflectsBaseCurrency() public {
-        // Deploy with 18-dec currency → basePriceDecimals = 18
-        CoinvestedPosition coinvestedPosition18 = _deployCoinvestedPosition(
-            bytes32("salt"),
-            100e18,
-            eure,
-            _defaultLeadInvestors()
-        );
-    }
-
     function testFuzz_InitBasePriceDecimalsAndPriceStoredCorrectly(uint8 decimals, uint256 basePrice) public {
         vm.assume(basePrice > 0);
         vm.assume(decimals <= 30);
@@ -324,10 +314,10 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
     }
 
     function testInitCarryFractionsSumOverflowReverts() public {
-        // Two investors each with uint64.max: sum overflows uint64 → arithmetic revert
+        // (max/2 + 1) + (max/2 + 1) = max + 1: sum overflows uint64 → arithmetic revert
         LeadInvestor[] memory leadInvestors = new LeadInvestor[](2);
-        leadInvestors[0] = LeadInvestor({account: leadA, carryFraction: type(uint64).max});
-        leadInvestors[1] = LeadInvestor({account: leadB, carryFraction: 1});
+        leadInvestors[0] = LeadInvestor({account: leadA, carryFraction: type(uint64).max / 2 + 1});
+        leadInvestors[1] = LeadInvestor({account: leadB, carryFraction: type(uint64).max / 2 + 1});
         CoinvestedPositionInitializerArguments memory args = CoinvestedPositionInitializerArguments({
             owner: owner,
             receiver: receiver,
