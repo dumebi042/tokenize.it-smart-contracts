@@ -24,6 +24,13 @@ Distributes a fixed currency amount among token holders proportional to their ba
 
 Allows token holders to redeem tokens for a fixed currency payout within a configurable duration after the exit date. Deployed via an atomic clone-and-fund factory.
 
+## `TokenExitRegistry`
+
+Links a token to its authorized `Exit` contract. `TimeLock` and `CoinvestedPosition` contracts query this registry to determine whether an exit has been set and which contract to claim proceeds from.
+
+- **One-time registration:** `setExit()` can be called exactly once and only by a `DEFAULT_ADMIN_ROLE` address of the associated token. The exit contract address cannot be changed after it is set.
+- **Signal semantics:** A non-zero `exit` value signals to connected `TimeLock` and `CoinvestedPosition` contracts that the time-lock bypass for exit claims is active — they call `claimExit()` without checking `lockedUntil`.
+
 ## `TimeLock`
 
 Holds ERC20 tokens on behalf of an owner and blocks withdrawals until a configurable timestamp.
@@ -60,15 +67,15 @@ The lockup mechanism has been replaced: `deployPrivateOfferWithTimeLock` previou
 
 # Reviewer questions
 
-## Is the V2 fallback in `Distribution` and `Exit` worth the added complexity?
+### Is the V2 fallback in `Distribution` and `Exit` worth the added complexity?
 
 `Distribution` and `Exit` are new contracts, maybe they will only ever be deployed after a FeeSettings upgrade on that token. Additionally, for the first uses, we will likely offer 0 fees. So alternatively we could just **charge no fee** when the `FeeSettings` contract does not support V3 — simpler code, no silent mis-pricing risk, and old deployments simply waive the fee rather than approximating it with a V2 type that may not match the intended fee category.
 
-## Should we integrate ExitRegistry into a new TokenVersion?
+### Should we integrate ExitRegistry into a new TokenVersion?
 
 We could keep the ExitRegistry as a separate contract, to support legacy tokens, but integrate it into the Token for new deployments. Just a thought.
 
-## Fees in Exit and Distribution
+### Fees in Exit and Distribution
 
 What should be true:
 
@@ -77,9 +84,13 @@ What should be true:
 
 Note that with option 1, a fee change during an exit or distribution would mean different investors effectively get different prices.
 
+### Meaning of ExitSignal
+
+Should an exit Signal through TokenExitRegistry generally unlock all Timelocks, or just allow them to claim this one Exit?
+
 # Todo
 
-Stuff that still needs to be done, after this PR is merged:
+Stuff that still needs to be done (after this PR is merged):
 
 - docstrings for new contracts
 - update specifications in docs
