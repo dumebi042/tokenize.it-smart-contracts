@@ -56,7 +56,8 @@ contract CoinvestedPosition is TokenSwapBase {
     uint256 public basePrice;
     /// unix timestamp before which unpause() is blocked; 0 means no lock
     uint64 public lockedUntil;
-    /// registry contract; if its exit() is set, the lockedUntil constraint is bypassed
+    /// registry contract; if its exit() is set, an exit reward can be claimed from that address even
+    /// if lockedUntil has not passed yet
     TokenExitRegistry public tokenExitRegistry;
 
     /**

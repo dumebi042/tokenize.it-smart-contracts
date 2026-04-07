@@ -39,3 +39,11 @@ A standalone `MasterUnlock` contract solves this without touching the token cont
 | `ERC20PermitUpgradeable` + `ERC20SnapshotUpgradeable` + `PausableUpgradeable` + `AccessControlUpgradeable` | Token                                                   |
 
 Two base contracts would cover 7 of the 10 cases, but the saving is marginal and the indirection adds complexity. The overrides are therefore repeated in every affected contract by necessity, not by oversight.
+
+---
+
+## Clone Factories: Post-Deploy trustedForwarder Verification
+
+**Decision:** After deploying a clone, each factory explicitly calls `isTrustedForwarder(_trustedForwarder)` on the new clone and reverts if the result is false.
+
+**Rationale:** The `trustedForwarder` is an extremely privileged position: it can impersonate any address when calling contracts that implement ERC2771. If the logic contract were deployed with the wrong forwarder set (e.g. due to a misconfiguration or a compromised implementation), every clone created from it would silently inherit that wrong forwarder — giving an attacker the ability to act as any user across all deployed instances. The post-deploy check catches this at deployment time and prevents a bad clone from ever being returned to the caller.

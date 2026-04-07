@@ -36,7 +36,7 @@ struct DistributionInitializerArguments {
 /**
  * @title tokenize.it Distribution
  * @author malteish, cjentzsch
- * @notice This contract implements the distribution of any proceeds (Liquidation, Dividends)
+ * @notice This contract implements the distribution of any proceeds (e.g. Dividends)
  *      based on a snapshot of Token.sol
  */
 contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
