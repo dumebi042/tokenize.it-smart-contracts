@@ -52,6 +52,13 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         _disableInitializers();
     }
 
+    /**
+     * @notice Initializes the exit contract. Can only be called once.
+     * @param _arguments Struct containing all configuration parameters
+     * @param _currencyProvider Address that provides the currency funding; must have approved this contract
+     * @param _totalCurrencyAmount Amount of currency to transfer from _currencyProvider at initialization;
+     *  should cover all eligible payouts plus fees (totalTokenSupply * pricePerToken + fees)
+     */
     function initialize(
         ExitInitializerArguments memory _arguments,
         address _currencyProvider,
@@ -75,48 +82,73 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         _arguments.currency.safeTransferFrom(_currencyProvider, address(this), _totalCurrencyAmount);
     }
 
-    function _feeInfo(uint256 _amount, bytes32 _feeType) internal view returns (uint256 fee, address feeCollector) {
-        IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(token.feeSettings()));
-        if (feeSettings.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
-            fee = feeSettings.fee(_feeType, _amount, address(token));
-            feeCollector = feeSettings.feeCollector(_feeType, address(token));
-        }
-        // if v3 is not supported, fee stays 0 and feeCollector stays address(0)
-    }
 
+    /**
+     * @notice Returns the currency amount a holder would receive for their entire current token balance.
+     * @param _holder Address of the token holder
+     * @return Currency amount the holder would receive for all their tokens at the current price
+     */
     function eligible(address _holder) public view returns (uint256) {
         return (token.balanceOf(_holder) * pricePerToken) / 10 ** token.decimals();
     }
 
+    /**
+     * @notice Transfers _tokenAmount tokens from the caller to this contract and sends the
+     *  corresponding currency payout to _recipient. Supports ERC2771 meta-transactions.
+     * @param _tokenAmount Amount of tokens to exchange; caller must have approved this contract
+     * @param _recipient Address that receives the currency payout
+     * @param _minPayout Minimum acceptable payout; reverts if the resulting currency amount is below this
+     */
     function claim(uint256 _tokenAmount, address _recipient, uint256 _minPayout) external {
         _claim(_msgSender(), _tokenAmount, _recipient, _minPayout);
     }
 
+    /**
+     * @notice Transfers the entire currency balance of this contract to _recipient.
+     *  Can only be called by the owner after drainStart has passed.
+     *  Intended to recover unclaimed funds once the exit window is closed.
+     * @param _recipient Address that receives the remaining currency balance
+     */
     function drain(address _recipient) external onlyOwner {
         require(block.timestamp > drainStart, "exit window not yet closed");
         currency.safeTransfer(_recipient, currency.balanceOf(address(this)));
     }
 
+    /**
+     * @notice Internal claim logic. Pulls tokens from _holder, sends currency to _recipient and, if IFeeSettingsV3
+     *  is supported, additionally transfers the fee to the fee collector from the contract's balance.
+     * @param _holder Address whose tokens are transferred
+     * @param _tokenAmount Amount of tokens to exchange
+     * @param _recipient Address that receives the currency payout
+     * @param _minPayout Minimum acceptable payout; reverts if the resulting currency amount is below this
+     */
     function _claim(address _holder, uint256 _tokenAmount, address _recipient, uint256 _minPayout) internal {
         require(block.timestamp >= claimStart, "exit not yet started");
         IERC20(address(token)).safeTransferFrom(_holder, address(this), _tokenAmount);
         uint256 currencyAmount = (_tokenAmount * pricePerToken) / 10 ** token.decimals();
         require(currencyAmount >= _minPayout, "payout below minimum");
-        (uint256 fee, address feeCollector) = _feeInfo(currencyAmount, FeeTypes.EXIT);
-        if (fee != 0) {
-            currency.safeTransfer(feeCollector, fee);
+        IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(token.feeSettings()));
+        if (feeSettings.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
+            uint256 fee = feeSettings.fee(FeeTypes.EXIT, currencyAmount, address(token));
+            address feeCollector = feeSettings.feeCollector(FeeTypes.EXIT, address(token));
+            if (fee != 0) {
+                currency.safeTransfer(feeCollector, fee);
+            }
         }
         currency.safeTransfer(_recipient, currencyAmount);
     }
 
+    /// @inheritdoc ERC2771ContextUpgradeable
     function _msgSender() internal view override(ContextUpgradeable, ERC2771ContextUpgradeable) returns (address) {
         return ERC2771ContextUpgradeable._msgSender();
     }
 
+    /// @inheritdoc ERC2771ContextUpgradeable
     function _msgData() internal view override(ContextUpgradeable, ERC2771ContextUpgradeable) returns (bytes calldata) {
         return ERC2771ContextUpgradeable._msgData();
     }
 
+    /// @inheritdoc ERC2771ContextUpgradeable
     function _contextSuffixLength()
         internal
         view

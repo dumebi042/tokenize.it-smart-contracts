@@ -37,7 +37,9 @@ struct DistributionInitializerArguments {
  * @title tokenize.it Distribution
  * @author malteish, cjentzsch
  * @notice This contract implements the distribution of any proceeds (e.g. Dividends)
- *      based on a snapshot of Token.sol
+ *      based on a snapshot of Token.sol.
+ *      Initial funding ideally covers all eligible payouts plus fees (tokenSupplyAtSnapshot * pricePerToken + fees),
+ *      but that is not enforced. More funds can be added later.
  */
 contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     using SafeERC20 for IERC20;
@@ -63,6 +65,12 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         _disableInitializers();
     }
 
+    /**
+     * @notice Initializes the distribution contract. Can only be called once.
+     * @param _arguments Struct containing all configuration parameters
+     * @param _currencyProvider Address that provides the initial currency funding; must have approved this contract
+     * @param _initialFundingAmount Amount of currency to transfer from _currencyProvider at initialization
+     */
     function initialize(
         DistributionInitializerArguments memory _arguments,
         address _currencyProvider,
@@ -92,15 +100,14 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         }
     }
 
-    function _feeInfo(uint256 _amount, bytes32 _feeType) internal view returns (uint256 fee, address feeCollector) {
-        IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(token.feeSettings()));
-        if (feeSettings.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
-            fee = feeSettings.fee(_feeType, _amount, address(token));
-            feeCollector = feeSettings.feeCollector(_feeType, address(token));
-        }
-        // if v3 is not supported, fee stays 0 and feeCollector stays address(0)
-    }
 
+    /**
+     * @notice Returns the amount of currency a holder can claim.
+     *  Equals the holder's token balance at the snapshot multiplied by pricePerToken,
+     *  plus any extra credit from reassignments, minus already paid out amounts.
+     * @param _holder Address of the token holder
+     * @return Amount of currency claimable by _holder
+     */
     function eligible(address _holder) public view returns (uint256) {
         return
             (token.balanceOfAt(_holder, snapshotId) * pricePerToken) /
@@ -126,6 +133,12 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         _reassign(_from, _to, _amount);
     }
 
+    /**
+     * @notice Internal reassignment logic shared by reassign() and initialize().
+     * @param _from Address whose eligible amount is reduced
+     * @param _to Address that receives the extra credit
+     * @param _amount Amount of currency to reassign; must not exceed eligible(_from)
+     */
     function _reassign(address _from, address _to, uint256 _amount) internal {
         require(_to != address(0), "to can not be zero address");
         require(_amount > 0, "amount must be positive");
@@ -135,35 +148,61 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         emit Reassigned(_from, _to, _amount);
     }
 
+    /**
+     * @notice Claims the full eligible amount for the caller and sends it to _recipient.
+     *  Supports both direct calls and meta-transactions via ERC2771.
+     * @param _recipient Address that receives the currency payout
+     * @param _minPayout Minimum acceptable payout; reverts if eligible amount is below this
+     */
     function claim(address _recipient, uint256 _minPayout) external {
         _claim(_msgSender(), _recipient, _minPayout); // works for direct calls and meta-transactions via ERC2771
     }
 
+    /**
+     * @notice Internal claim logic. Transfers the eligible amount to _recipient and, if IFeeSettingsV3 is
+     *  supported, additionally transfers the fee to the fee collector from the contract's balance.
+     * @param _holder Address whose eligibility is consumed
+     * @param _recipient Address that receives the currency payout
+     * @param _minPayout Minimum acceptable payout; reverts if eligible amount is below this
+     */
     function _claim(address _holder, address _recipient, uint256 _minPayout) internal {
         uint256 eligibleAmount = eligible(_holder);
         require(eligibleAmount > 0, "nothing to claim");
         paidOut[_holder] += eligibleAmount;
         require(eligibleAmount >= _minPayout, "payout below minimum");
-        (uint256 fee, address feeCollector) = _feeInfo(eligibleAmount, FeeTypes.DISTRIBUTION);
-        if (fee != 0) {
-            currency.safeTransfer(feeCollector, fee);
+        IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(token.feeSettings()));
+        if (feeSettings.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
+            uint256 fee = feeSettings.fee(FeeTypes.DISTRIBUTION, eligibleAmount, address(token));
+            address feeCollector = feeSettings.feeCollector(FeeTypes.DISTRIBUTION, address(token));
+            if (fee != 0) {
+                currency.safeTransfer(feeCollector, fee);
+            }
         }
         currency.safeTransfer(_recipient, eligibleAmount);
     }
 
+    /**
+     * @notice Transfers the entire currency balance of this contract to _recipient.
+     *  Can only be called by the owner after reassignOrDrainAfter has passed.
+     *  Intended to recover unclaimed funds once the distribution period is over.
+     * @param _recipient Address that receives the remaining currency balance
+     */
     function drain(address _recipient) external onlyOwner {
         require(block.timestamp >= reassignOrDrainAfter, "drain not yet available");
         currency.safeTransfer(_recipient, currency.balanceOf(address(this)));
     }
 
+    /// @inheritdoc ERC2771ContextUpgradeable
     function _msgSender() internal view override(ContextUpgradeable, ERC2771ContextUpgradeable) returns (address) {
         return ERC2771ContextUpgradeable._msgSender();
     }
 
+    /// @inheritdoc ERC2771ContextUpgradeable
     function _msgData() internal view override(ContextUpgradeable, ERC2771ContextUpgradeable) returns (bytes calldata) {
         return ERC2771ContextUpgradeable._msgData();
     }
 
+    /// @inheritdoc ERC2771ContextUpgradeable
     function _contextSuffixLength()
         internal
         view
