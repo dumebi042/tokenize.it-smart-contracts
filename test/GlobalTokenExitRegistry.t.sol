@@ -15,6 +15,19 @@ contract FakeExit {
     function claim(uint256, address) external {}
 }
 
+/// @dev Minimal Ownable token stub — has owner() but no AccessControl
+contract FakeOwnableToken {
+    address private _owner;
+
+    constructor(address tokenOwner) {
+        _owner = tokenOwner;
+    }
+
+    function owner() external view returns (address) {
+        return _owner;
+    }
+}
+
 /**
  * @title GlobalTokenExitRegistryTest
  * @notice Tests for GlobalTokenExitRegistry.
@@ -86,7 +99,7 @@ contract GlobalTokenExitRegistryTest is Test {
         FakeExit fakeExit = new FakeExit();
 
         vm.prank(nonAdmin);
-        vm.expectRevert("caller is not token admin");
+        vm.expectRevert("caller is not token admin or owner");
         registry.setExit(token, IExit(address(fakeExit)));
     }
 
@@ -131,6 +144,26 @@ contract GlobalTokenExitRegistryTest is Test {
         assertEq(address(registry.exits(token)), address(fakeExit), "exit not set by new admin");
     }
 
+    function testSetExitViaTokenOwner() public {
+        FakeOwnableToken ownableToken = new FakeOwnableToken(admin);
+        FakeExit fakeExit = new FakeExit();
+
+        // admin is the owner() of ownableToken — should be allowed
+        vm.prank(admin);
+        registry.setExit(Token(address(ownableToken)), IExit(address(fakeExit)));
+
+        assertEq(address(registry.exits(Token(address(ownableToken)))), address(fakeExit), "exit not set via owner()");
+    }
+
+    function testSetExitRevertsForNonOwnerOfOwnableToken() public {
+        FakeOwnableToken ownableToken = new FakeOwnableToken(admin);
+        FakeExit fakeExit = new FakeExit();
+
+        vm.prank(nonAdmin);
+        vm.expectRevert("caller is not token admin or owner");
+        registry.setExit(Token(address(ownableToken)), IExit(address(fakeExit)));
+    }
+
     function testSetExitIndependentPerToken() public {
         Token token2 = Token(
             tokenFactory.createTokenProxy(
@@ -166,7 +199,7 @@ contract GlobalTokenExitRegistryTest is Test {
         vm.assume(!token.hasRole(token.DEFAULT_ADMIN_ROLE(), caller));
         FakeExit fakeExit = new FakeExit();
         vm.prank(caller);
-        vm.expectRevert("caller is not token admin");
+        vm.expectRevert("caller is not token admin or owner");
         registry.setExit(token, IExit(address(fakeExit)));
     }
 
