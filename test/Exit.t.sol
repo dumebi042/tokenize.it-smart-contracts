@@ -623,7 +623,11 @@ contract ExitTest is Test {
         feeExit.claim(claimAmt, recipient, 0);
 
         assertGt(fee, 0, "fee should be positive");
-        assertEq(currency.balanceOf(recipient), currencyAmount - fee, "recipient should receive currency amount minus fee");
+        assertEq(
+            currency.balanceOf(recipient),
+            currencyAmount - fee,
+            "recipient should receive currency amount minus fee"
+        );
     }
 
     function testClaimWithFeeSendsToFeeCollector() public {
@@ -789,7 +793,11 @@ contract ExitTest is Test {
         uint256 currencyAmount = (claimAmt * PRICE_PER_TOKEN) / 10 ** feeToken.decimals();
 
         vm.warp(claimStart);
-        assertEq(currency.balanceOf(address(feeExit)), TOTAL_CURRENCY, "feeExit should hold full currency before claim");
+        assertEq(
+            currency.balanceOf(address(feeExit)),
+            TOTAL_CURRENCY,
+            "feeExit should hold full currency before claim"
+        );
         assertEq(currency.balanceOf(feeCollector), 0, "feeCollector should start with zero balance");
 
         uint256 fee = feeSettingsWithFee.privateOfferFee(currencyAmount, address(feeToken));
@@ -964,7 +972,9 @@ contract ExitTest is Test {
         currency.mint(currencyProvider, TOTAL_CURRENCY);
         vm.prank(currencyProvider);
         currency.approve(cloneAddr, TOTAL_CURRENCY);
-        Exit exitWithRate = Exit(factory.createExitClone(bytes32("stored"), trustedForwarder, currencyProvider, args, TOTAL_CURRENCY));
+        Exit exitWithRate = Exit(
+            factory.createExitClone(bytes32("stored"), trustedForwarder, currencyProvider, args, TOTAL_CURRENCY)
+        );
 
         assertEq(exitWithRate.referenceToExitRate(IERC20(address(refCurrency))), 1e6, "rate not stored correctly");
         assertEq(exitWithRate.referenceToExitRate(IERC20(address(currency))), 0, "exit currency should have no rate");

@@ -100,7 +100,11 @@ contract TimeLockDistributeExitTest is Test {
         exitFactory = new ExitCloneFactory(address(exitLogic));
     }
 
-    function _deployExit(uint256 pricePerToken, IERC20[] memory referenceCurrencies, uint256[] memory rates) internal returns (Exit) {
+    function _deployExit(
+        uint256 pricePerToken,
+        IERC20[] memory referenceCurrencies,
+        uint256[] memory rates
+    ) internal returns (Exit) {
         uint256 totalCurrency = (TOKEN_AMOUNT * pricePerToken) / (10 ** token.decimals());
         ExitInitializerArguments memory args = ExitInitializerArguments({
             owner: owner,
@@ -280,5 +284,4 @@ contract TimeLockDistributeExitTest is Test {
         assertEq(eurc.balanceOf(recipient), expectedPayout, "wrong payout");
         assertEq(token.balanceOf(address(timeLock)), 0, "timeLock should have no tokens");
     }
-
 }

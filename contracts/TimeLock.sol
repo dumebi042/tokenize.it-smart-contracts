@@ -82,11 +82,7 @@ contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeabl
      * @param _token the token to exit
      * @param _recipient address to receive the exit proceeds
      */
-    function claimExit(
-        Token _token,
-        address _recipient,
-        uint256 _minPayout
-    ) external onlyOwner nonReentrant {
+    function claimExit(Token _token, address _recipient, uint256 _minPayout) external onlyOwner nonReentrant {
         IExit exit = tokenExitRegistry.exits(_token);
         require(address(exit) != address(0), "no exit set in tokenExitRegistry");
         require(_recipient != address(0), "recipient can not be zero address");

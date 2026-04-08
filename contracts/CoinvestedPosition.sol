@@ -191,10 +191,7 @@ contract CoinvestedPosition is TokenSwapBase {
      * @param _dist the Distribution (dividend) contract to claim from
      * @param _minPayout minimum currency the call must receive; passed through to the distribution
      */
-    function claimDistribution(
-        IDistribution _dist,
-        uint256 _minPayout
-    ) external onlyOwner nonReentrant {
+    function claimDistribution(IDistribution _dist, uint256 _minPayout) external onlyOwner nonReentrant {
         IERC20 dividendCurrency = _dist.currency();
         require(
             token.allowList().map(address(dividendCurrency)) == TRUSTED_CURRENCY,
@@ -216,10 +213,7 @@ contract CoinvestedPosition is TokenSwapBase {
      * @param _minCurrencyAmount minimum currency the call must receive; passed through to the exit contract.
      * @param _basePrice base price in exit currency's units; ignored when exit currency matches stored currency
      */
-    function claimExit(
-        uint256 _minCurrencyAmount,
-        uint256 _basePrice
-    ) external onlyOwner nonReentrant {
+    function claimExit(uint256 _minCurrencyAmount, uint256 _basePrice) external onlyOwner nonReentrant {
         IExit _exit = tokenExitRegistry.exits(token);
         require(address(_exit) != address(0), "no exit set in tokenExitRegistry");
         uint256 tokenBalance = token.balanceOf(address(this));
@@ -232,9 +226,7 @@ contract CoinvestedPosition is TokenSwapBase {
         } else {
             uint256 rate = _exit.referenceToExitRate(currency);
             if (rate > 0) {
-                effectiveBasePrice =
-                    (basePrice * rate) /
-                    10 ** IERC20Metadata(address(currency)).decimals();
+                effectiveBasePrice = (basePrice * rate) / 10 ** IERC20Metadata(address(currency)).decimals();
             } else {
                 require(_basePrice > 0, "altBasePrice must be > 0");
                 effectiveBasePrice = _basePrice;
