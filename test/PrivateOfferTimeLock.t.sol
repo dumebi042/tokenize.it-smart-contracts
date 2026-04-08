@@ -7,15 +7,14 @@ import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/PrivateOffer.sol";
 import "../contracts/factories/PrivateOfferFactory.sol";
 import "../contracts/factories/TimeLockCloneFactory.sol";
-import "../contracts/factories/TokenExitRegistryCloneFactory.sol";
 import "../contracts/TimeLock.sol";
-import "../contracts/TokenExitRegistry.sol";
+import "../contracts/GlobalTokenExitRegistry.sol";
 import "./resources/CloneCreators.sol";
 import "./resources/FakePaymentToken.sol";
 
 contract PrivateOfferTimeLockTest is Test {
     PrivateOfferFactory privateOfferFactory;
-    TokenExitRegistry tokenExitRegistry;
+    GlobalTokenExitRegistry tokenExitRegistry;
 
     AllowList list;
     FeeSettings feeSettings;
@@ -70,13 +69,7 @@ contract PrivateOfferTimeLockTest is Test {
             )
         );
 
-        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry(trustedForwarder);
-        TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(
-            address(tokenExitRegistryLogic)
-        );
-        tokenExitRegistry = TokenExitRegistry(
-            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token)
-        );
+        tokenExitRegistry = new GlobalTokenExitRegistry(trustedForwarder);
     }
 
     /**

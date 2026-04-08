@@ -82,14 +82,8 @@ contract CoinvestedPositionTest is CoinvestedPositionTestBase {
         logic = new CoinvestedPosition(trustedForwarder);
         factory = new CoinvestedPositionCloneFactory(address(logic));
 
-        // TokenExitRegistry
-        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry(trustedForwarder);
-        TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(
-            address(tokenExitRegistryLogic)
-        );
-        tokenExitRegistry = TokenExitRegistry(
-            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token)
-        );
+        // GlobalTokenExitRegistry
+        tokenExitRegistry = new GlobalTokenExitRegistry(trustedForwarder);
 
         // Deploy default clone: basePrice=100e6 EURc, 10%+5% carry
         coinvestedPosition = _deployCoinvestedPosition(bytes32(0), 100e6, eurc, _defaultLeadInvestors());

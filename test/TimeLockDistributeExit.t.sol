@@ -5,10 +5,9 @@ import "../lib/forge-std/src/Test.sol";
 
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/factories/TimeLockCloneFactory.sol";
-import "../contracts/factories/TokenExitRegistryCloneFactory.sol";
 import "../contracts/factories/ExitCloneFactory.sol";
 import "../contracts/TimeLock.sol";
-import "../contracts/TokenExitRegistry.sol";
+import "../contracts/GlobalTokenExitRegistry.sol";
 import "../contracts/Exit.sol";
 import "../contracts/Token.sol";
 import "../contracts/common/IDistribution.sol";
@@ -53,7 +52,7 @@ contract TimeLockDistributeExitTest is Test {
     Token token;
     FakePaymentToken eurc;
 
-    TokenExitRegistry tokenExitRegistry;
+    GlobalTokenExitRegistry tokenExitRegistry;
     TimeLock timeLock;
     Exit exitLogic;
     ExitCloneFactory exitFactory;
@@ -82,14 +81,8 @@ contract TimeLockDistributeExitTest is Test {
         token.grantRole(token.MINTALLOWER_ROLE(), admin);
         vm.stopPrank();
 
-        // TokenExitRegistry
-        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry(trustedForwarder);
-        TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(
-            address(tokenExitRegistryLogic)
-        );
-        tokenExitRegistry = TokenExitRegistry(
-            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token)
-        );
+        // GlobalTokenExitRegistry
+        tokenExitRegistry = new GlobalTokenExitRegistry(trustedForwarder);
 
         // TimeLock (locked for 1 year)
         TimeLock timeLockLogic = new TimeLock(trustedForwarder);
@@ -132,14 +125,14 @@ contract TimeLockDistributeExitTest is Test {
         Exit exitContract = _deployExit(200e6);
 
         vm.prank(admin);
-        tokenExitRegistry.setExit(IExit(address(exitContract)));
+        tokenExitRegistry.setExit(token, IExit(address(exitContract)));
 
         // Still locked (lockedUntil = now + 365 days)
         assertLt(block.timestamp, lockedUntil, "should still be locked");
 
         vm.warp(claimStart);
         vm.prank(owner);
-        timeLock.claimExit(eurc, recipient, 0);
+        timeLock.claimExit(token, eurc, recipient, 0);
 
         assertEq(token.balanceOf(address(timeLock)), 0, "timeLock should have no tokens after exit");
         assertEq(
@@ -162,7 +155,7 @@ contract TimeLockDistributeExitTest is Test {
         Exit exitContract = _deployExit(200e6);
 
         vm.prank(admin);
-        tokenExitRegistry.setExit(IExit(address(exitContract)));
+        tokenExitRegistry.setExit(token, IExit(address(exitContract)));
 
         vm.prank(owner);
         vm.expectRevert("timelock has not expired");
@@ -176,30 +169,30 @@ contract TimeLockDistributeExitTest is Test {
         vm.warp(claimStart);
         vm.prank(owner);
         vm.expectRevert("no exit set in tokenExitRegistry");
-        timeLock.claimExit(eurc, recipient, 0);
+        timeLock.claimExit(token, eurc, recipient, 0);
     }
 
     /// Reverts when recipient is zero address
     function testDistributeExitRevertsIfRecipientZero() public {
         Exit exitContract = _deployExit(200e6);
         vm.prank(admin);
-        tokenExitRegistry.setExit(IExit(address(exitContract)));
+        tokenExitRegistry.setExit(token, IExit(address(exitContract)));
 
         vm.warp(claimStart);
         vm.prank(owner);
         vm.expectRevert("recipient can not be zero address");
-        timeLock.claimExit(eurc, address(0), 0);
+        timeLock.claimExit(token, eurc, address(0), 0);
     }
 
     /// Only owner can call claimExit
     function testDistributeExitRevertsIfNotOwner() public {
         Exit exitContract = _deployExit(200e6);
         vm.prank(admin);
-        tokenExitRegistry.setExit(IExit(address(exitContract)));
+        tokenExitRegistry.setExit(token, IExit(address(exitContract)));
 
         vm.warp(claimStart);
         vm.expectRevert("Ownable: caller is not the owner");
-        timeLock.claimExit(eurc, recipient, 0);
+        timeLock.claimExit(token, eurc, recipient, 0);
     }
 
     /// Reverts when timeLock holds no tokens (drain after lock expires, then try claimExit)
@@ -215,12 +208,12 @@ contract TimeLockDistributeExitTest is Test {
 
         // Now set exit and try claimExit — should revert because no tokens remain
         vm.prank(admin);
-        tokenExitRegistry.setExit(IExit(address(exitContract)));
+        tokenExitRegistry.setExit(token, IExit(address(exitContract)));
 
         vm.warp(lockedUntil + 1 days);
         vm.prank(owner);
         vm.expectRevert("no tokens to exit");
-        timeLock.claimExit(eurc, recipient, 0);
+        timeLock.claimExit(token, eurc, recipient, 0);
     }
 
     // ── Balance-diff minPayout checks (stub-based) ────────────────────────────
@@ -231,11 +224,11 @@ contract TimeLockDistributeExitTest is Test {
         FixedPayoutExit stub = new FixedPayoutExit(IERC20(address(eurc)), 1);
         IERC20(address(eurc)).transfer(address(stub), 1);
         vm.prank(admin);
-        tokenExitRegistry.setExit(IExit(address(stub)));
+        tokenExitRegistry.setExit(token, IExit(address(stub)));
 
         vm.prank(owner);
         vm.expectRevert("received less than _minPayout");
-        timeLock.claimExit(IERC20(address(eurc)), recipient, 2);
+        timeLock.claimExit(token, IERC20(address(eurc)), recipient, 2);
     }
 
     /// FixedPayoutExit pays exactly _minPayout: balance-diff check passes
@@ -245,10 +238,10 @@ contract TimeLockDistributeExitTest is Test {
         FixedPayoutExit stub = new FixedPayoutExit(IERC20(address(eurc)), minPayout);
         IERC20(address(eurc)).transfer(address(stub), minPayout);
         vm.prank(admin);
-        tokenExitRegistry.setExit(IExit(address(stub)));
+        tokenExitRegistry.setExit(token, IExit(address(stub)));
 
         vm.prank(owner);
-        timeLock.claimExit(IERC20(address(eurc)), recipient, minPayout);
+        timeLock.claimExit(token, IERC20(address(eurc)), recipient, minPayout);
         assertEq(eurc.balanceOf(recipient), minPayout, "recipient should receive exactly minPayout");
     }
 

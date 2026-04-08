@@ -5,7 +5,7 @@ pragma solidity 0.8.23;
 import "@openzeppelin/contracts/proxy/Clones.sol";
 
 import "../TimeLock.sol";
-import "../TokenExitRegistry.sol";
+import "../GlobalTokenExitRegistry.sol";
 import "./CloneFactory.sol";
 
 /**
@@ -29,7 +29,7 @@ contract TimeLockCloneFactory is CloneFactory {
         address _trustedForwarder,
         address _owner,
         uint64 _lockedUntil,
-        TokenExitRegistry _tokenExitRegistry
+        GlobalTokenExitRegistry _tokenExitRegistry
     ) external returns (address) {
         bytes32 salt = _getSalt(_rawSalt, _trustedForwarder, _owner, _lockedUntil, _tokenExitRegistry);
         TimeLock clone = TimeLock(Clones.cloneDeterministic(implementation, salt));
@@ -52,7 +52,7 @@ contract TimeLockCloneFactory is CloneFactory {
         address _trustedForwarder,
         address _owner,
         uint64 _lockedUntil,
-        TokenExitRegistry _tokenExitRegistry
+        GlobalTokenExitRegistry _tokenExitRegistry
     ) external view returns (address) {
         bytes32 salt = _getSalt(_rawSalt, _trustedForwarder, _owner, _lockedUntil, _tokenExitRegistry);
         return Clones.predictDeterministicAddress(implementation, salt);
@@ -66,7 +66,7 @@ contract TimeLockCloneFactory is CloneFactory {
         address _trustedForwarder,
         address _owner,
         uint64 _lockedUntil,
-        TokenExitRegistry _tokenExitRegistry
+        GlobalTokenExitRegistry _tokenExitRegistry
     ) internal pure returns (bytes32) {
         return keccak256(abi.encode(_rawSalt, _trustedForwarder, _owner, _lockedUntil, _tokenExitRegistry));
     }
