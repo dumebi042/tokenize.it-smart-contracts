@@ -92,14 +92,6 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         }
     }
 
-    function _grossEligible(address _holder) internal view returns (uint256) {
-        return
-            (token.balanceOfAt(_holder, snapshotId) * pricePerToken) /
-            (10 ** token.decimals()) +
-            extraCredit[_holder] -
-            paidOut[_holder];
-    }
-
     function _feeInfo(uint256 _amount, bytes32 _feeType) internal view returns (uint256 fee, address feeCollector) {
         IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(token.feeSettings()));
         if (feeSettings.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
@@ -110,9 +102,11 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     }
 
     function eligible(address _holder) public view returns (uint256) {
-        uint256 gross = _grossEligible(_holder);
-        (uint256 fee, ) = _feeInfo(gross, FeeTypes.DISTRIBUTION);
-        return gross - fee;
+        return
+            (token.balanceOfAt(_holder, snapshotId) * pricePerToken) /
+            (10 ** token.decimals()) +
+            extraCredit[_holder] -
+            paidOut[_holder];
     }
 
     /**
@@ -135,7 +129,7 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     function _reassign(address _from, address _to, uint256 _amount) internal {
         require(_to != address(0), "to can not be zero address");
         require(_amount > 0, "amount must be positive");
-        require(_amount <= _grossEligible(_from), "amount exceeds eligible");
+        require(_amount <= eligible(_from), "amount exceeds eligible");
         paidOut[_from] += _amount;
         extraCredit[_to] += _amount;
         emit Reassigned(_from, _to, _amount);
@@ -146,16 +140,15 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     }
 
     function _claim(address _holder, address _recipient, uint256 _minPayout) internal {
-        uint256 gross = _grossEligible(_holder);
-        require(gross > 0, "nothing to claim");
-        paidOut[_holder] += gross;
-        (uint256 fee, address feeCollector) = _feeInfo(gross, FeeTypes.DISTRIBUTION);
-        uint256 net = gross - fee;
-        require(net >= _minPayout, "payout below minimum");
+        uint256 eligibleAmount = eligible(_holder);
+        require(eligibleAmount > 0, "nothing to claim");
+        paidOut[_holder] += eligibleAmount;
+        require(eligibleAmount >= _minPayout, "payout below minimum");
+        (uint256 fee, address feeCollector) = _feeInfo(eligibleAmount, FeeTypes.DISTRIBUTION);
         if (fee != 0) {
             currency.safeTransfer(feeCollector, fee);
         }
-        currency.safeTransfer(_recipient, net);
+        currency.safeTransfer(_recipient, eligibleAmount);
     }
 
     function drain(address _recipient) external onlyOwner {

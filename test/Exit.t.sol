@@ -579,11 +579,12 @@ contract ExitTest is Test {
             drainStart: drainStart
         });
         address cloneAddr = factory.predictCloneAddress(bytes32("feeExit"), trustedForwarder, args);
-        currency.mint(currencyProvider, TOTAL_CURRENCY);
+        uint256 fundedAmount = TOTAL_CURRENCY * 101 / 100; // gross + 1% fee paid by company
+        currency.mint(currencyProvider, fundedAmount);
         vm.prank(currencyProvider);
-        currency.approve(cloneAddr, TOTAL_CURRENCY);
+        currency.approve(cloneAddr, fundedAmount);
         feeExit = Exit(
-            factory.createExitClone(bytes32("feeExit"), trustedForwarder, currencyProvider, args, TOTAL_CURRENCY)
+            factory.createExitClone(bytes32("feeExit"), trustedForwarder, currencyProvider, args, fundedAmount)
         );
 
         vm.prank(holder);
@@ -602,7 +603,7 @@ contract ExitTest is Test {
         feeExit.claim(claimAmt, recipient, 0);
 
         assertGt(fee, 0, "fee should be positive");
-        assertEq(currency.balanceOf(recipient), currencyAmount - fee, "recipient should receive currency minus fee");
+        assertEq(currency.balanceOf(recipient), currencyAmount, "recipient should receive full currency amount");
     }
 
     function testClaimWithFeeSendsToFeeCollector() public {
@@ -649,20 +650,18 @@ contract ExitTest is Test {
         exitContract.claim(claimAmt, recipient, expectedNet + 1);
     }
 
-    /// With a fee, minPayout exactly equal to net-after-fee succeeds
+    /// With a fee, minPayout exactly equal to gross succeeds (recipient receives full gross)
     function testClaimMinPayoutExactNetAfterFeeSucceeds() public {
-        (Exit feeExit, IFeeSettingsV2 feeSettingsWithFee, Token feeToken) = _deployExitWithNonZeroFee();
+        (Exit feeExit, , Token feeToken) = _deployExitWithNonZeroFee();
         uint256 claimAmt = 1e18;
         uint256 gross = (claimAmt * PRICE_PER_TOKEN) / 10 ** feeToken.decimals();
-        uint256 fee = feeSettingsWithFee.privateOfferFee(gross, address(feeToken));
-        uint256 expectedNet = gross - fee;
         vm.warp(claimStart);
         vm.prank(holder);
-        feeExit.claim(claimAmt, recipient, expectedNet);
-        assertEq(currency.balanceOf(recipient), expectedNet, "recipient should receive net after fee");
+        feeExit.claim(claimAmt, recipient, gross);
+        assertEq(currency.balanceOf(recipient), gross, "recipient should receive full payout amount");
     }
 
-    /// With a fee, minPayout equal to gross (before fee) reverts because actual payout is gross - fee
+    /// With a fee, minPayout one above gross reverts
     function testClaimMinPayoutAboveNetAfterFeeReverts() public {
         (Exit feeExit, , Token feeToken) = _deployExitWithNonZeroFee();
         uint256 claimAmt = 1e18;
@@ -670,27 +669,27 @@ contract ExitTest is Test {
         vm.warp(claimStart);
         vm.prank(holder);
         vm.expectRevert("payout below minimum");
-        feeExit.claim(claimAmt, recipient, gross); // gross > net
+        feeExit.claim(claimAmt, recipient, gross + 1); // gross + 1 > payout
     }
 
-    /// With a fee, using eligible() as minPayout succeeds because eligible() already deducts the fee
+    /// With a fee, using eligible() as minPayout succeeds
     function testClaimMinPayoutEligibleWithFeeSucceeds() public {
         (Exit feeExit, , Token feeToken) = _deployExitWithNonZeroFee();
-        uint256 minPayout = feeExit.eligible(holder); // eligible() returns net after fee
+        uint256 minPayout = feeExit.eligible(holder); // eligible() returns full payout amount
         vm.warp(claimStart);
         vm.prank(holder);
         feeExit.claim(TOKEN_SUPPLY, recipient, minPayout);
         assertEq(currency.balanceOf(recipient), minPayout, "recipient should receive exactly eligible");
     }
 
-    /// With a fee, minPayout above eligible() (i.e. the gross amount) reverts
+    /// With a fee, minPayout one above eligible() reverts
     function testClaimMinPayoutAboveEligibleWithFeeReverts() public {
         (Exit feeExit, , Token feeToken) = _deployExitWithNonZeroFee();
         uint256 gross = (TOKEN_SUPPLY * PRICE_PER_TOKEN) / 10 ** feeToken.decimals();
         vm.warp(claimStart);
         vm.prank(holder);
         vm.expectRevert("payout below minimum");
-        feeExit.claim(TOKEN_SUPPLY, recipient, gross); // gross > eligible() (net)
+        feeExit.claim(TOKEN_SUPPLY, recipient, gross + 1); // gross + 1 > eligible()
     }
 
     /// Fuzz: claim always succeeds when minPayout <= net, reverts when minPayout > net
@@ -755,11 +754,11 @@ contract ExitTest is Test {
         assertEq(exitContract.eligible(testHolder), expectedCurrency, "eligible fuzz mismatch");
     }
 
-    /// eligible() deducts the fee, returning net payout amount
+    /// eligible() returns the full payout amount; fee is paid by company separately
     function testEligibleDeductsFee() public {
         (Exit feeExit, , Token feeToken) = _deployExitWithNonZeroFee();
         uint256 gross = (TOKEN_SUPPLY * PRICE_PER_TOKEN) / 10 ** feeToken.decimals();
-        assertEq(feeExit.eligible(holder), gross - gross / 100, "eligible should be net after fee deduction");
+        assertEq(feeExit.eligible(holder), gross, "eligible should be full payout amount");
     }
 
     function testDrainWithFeeReflectsCorrectRemainder() public {
@@ -768,9 +767,10 @@ contract ExitTest is Test {
         uint256 currencyAmount = (claimAmt * PRICE_PER_TOKEN) / 10 ** feeToken.decimals();
 
         vm.warp(claimStart);
+        uint256 fundedAmount = TOTAL_CURRENCY * 101 / 100;
         assertEq(
             currency.balanceOf(address(feeExit)),
-            TOTAL_CURRENCY,
+            fundedAmount,
             "feeExit should hold full currency before claim"
         );
         assertEq(currency.balanceOf(feeCollector), 0, "feeCollector should start with zero balance");
@@ -781,8 +781,8 @@ contract ExitTest is Test {
 
         assertEq(currency.balanceOf(feeCollector), fee, "feeCollector should receive fee on claim");
 
-        // Both the fee and the net payout leave the contract, so the remainder is TOTAL_CURRENCY - currencyAmount
-        uint256 expected = TOTAL_CURRENCY - currencyAmount;
+        // Payout (currencyAmount) and fee both leave the contract
+        uint256 expected = fundedAmount - currencyAmount - fee;
         assertEq(
             currency.balanceOf(address(feeExit)),
             expected,

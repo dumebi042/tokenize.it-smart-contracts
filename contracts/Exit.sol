@@ -85,9 +85,7 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     }
 
     function eligible(address _holder) public view returns (uint256) {
-        uint256 gross = (token.balanceOf(_holder) * pricePerToken) / 10 ** token.decimals();
-        (uint256 fee, ) = _feeInfo(gross, FeeTypes.EXIT);
-        return gross - fee;
+        return (token.balanceOf(_holder) * pricePerToken) / 10 ** token.decimals();
     }
 
     function claim(uint256 _tokenAmount, address _recipient, uint256 _minPayout) external {
@@ -103,12 +101,12 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         require(block.timestamp >= claimStart, "exit not yet started");
         IERC20(address(token)).safeTransferFrom(_holder, address(this), _tokenAmount);
         uint256 currencyAmount = (_tokenAmount * pricePerToken) / 10 ** token.decimals();
+        require(currencyAmount >= _minPayout, "payout below minimum");
         (uint256 fee, address feeCollector) = _feeInfo(currencyAmount, FeeTypes.EXIT);
-        require(currencyAmount - fee >= _minPayout, "payout below minimum");
         if (fee != 0) {
             currency.safeTransfer(feeCollector, fee);
         }
-        currency.safeTransfer(_recipient, currencyAmount - fee);
+        currency.safeTransfer(_recipient, currencyAmount);
     }
 
     function _msgSender() internal view override(ContextUpgradeable, ERC2771ContextUpgradeable) returns (address) {
