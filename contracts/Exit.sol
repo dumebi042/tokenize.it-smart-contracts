@@ -4,6 +4,7 @@ pragma solidity 0.8.23;
 
 import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -33,7 +34,7 @@ struct ExitInitializerArguments {
  *  Claims are only valid within the exit window set at initialization.
  *  Received tokens are held in this contract (not burned).
  */
-contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
+contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
 
     Token public token;
@@ -65,6 +66,7 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         uint256 _totalCurrencyAmount
     ) external initializer {
         require(_arguments.pricePerToken > 0, "price must be positive");
+        __ReentrancyGuard_init();
         require(_arguments.claimStart > 0, "claimStart must be set");
         require(_arguments.drainStart > _arguments.claimStart, "drainStart must be after claimStart");
         require(address(_arguments.currency) != address(_arguments.token), "currency and token must be different");
@@ -95,36 +97,14 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     /**
      * @notice Transfers _tokenAmount tokens from the caller to this contract and sends the
      *  corresponding currency payout to _recipient. Supports ERC2771 meta-transactions.
+     *  Transfers the fee to the fee collector from the contract's balance if IFeeSettingsV3 is supported.
      * @param _tokenAmount Amount of tokens to exchange; caller must have approved this contract
      * @param _recipient Address that receives the currency payout
      * @param _minPayout Minimum acceptable payout; reverts if the resulting currency amount is below this
      */
-    function claim(uint256 _tokenAmount, address _recipient, uint256 _minPayout) external {
-        _claim(_msgSender(), _tokenAmount, _recipient, _minPayout);
-    }
-
-    /**
-     * @notice Transfers the entire currency balance of this contract to _recipient.
-     *  Can only be called by the owner after drainStart has passed.
-     *  Intended to recover unclaimed funds once the exit window is closed.
-     * @param _recipient Address that receives the remaining currency balance
-     */
-    function drain(address _recipient) external onlyOwner {
-        require(block.timestamp > drainStart, "exit window not yet closed");
-        currency.safeTransfer(_recipient, currency.balanceOf(address(this)));
-    }
-
-    /**
-     * @notice Internal claim logic. Pulls tokens from _holder, sends currency to _recipient and, if IFeeSettingsV3
-     *  is supported, additionally transfers the fee to the fee collector from the contract's balance.
-     * @param _holder Address whose tokens are transferred
-     * @param _tokenAmount Amount of tokens to exchange
-     * @param _recipient Address that receives the currency payout
-     * @param _minPayout Minimum acceptable payout; reverts if the resulting currency amount is below this
-     */
-    function _claim(address _holder, uint256 _tokenAmount, address _recipient, uint256 _minPayout) internal {
+    function claim(uint256 _tokenAmount, address _recipient, uint256 _minPayout) external nonReentrant {
         require(block.timestamp >= claimStart, "exit not yet started");
-        IERC20(address(token)).safeTransferFrom(_holder, address(this), _tokenAmount);
+        IERC20(address(token)).safeTransferFrom(_msgSender(), address(this), _tokenAmount);
         uint256 currencyAmount = (_tokenAmount * pricePerToken) / 10 ** token.decimals();
         require(currencyAmount >= _minPayout, "payout below minimum");
         IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(token.feeSettings()));
@@ -136,6 +116,17 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
             }
         }
         currency.safeTransfer(_recipient, currencyAmount);
+    }
+
+    /**
+     * @notice Transfers the entire currency balance of this contract to _recipient.
+     *  Can only be called by the owner after drainStart has passed.
+     *  Intended to recover unclaimed funds once the exit window is closed.
+     * @param _recipient Address that receives the remaining currency balance
+     */
+    function drain(address _recipient) external onlyOwner nonReentrant {
+        require(block.timestamp > drainStart, "exit window not yet closed");
+        currency.safeTransfer(_recipient, currency.balanceOf(address(this)));
     }
 
     /// @inheritdoc ERC2771ContextUpgradeable

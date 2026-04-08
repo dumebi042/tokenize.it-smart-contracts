@@ -4,6 +4,7 @@ pragma solidity 0.8.23;
 
 import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -41,7 +42,7 @@ struct DistributionInitializerArguments {
  *      Initial funding ideally covers all eligible payouts plus fees (tokenSupplyAtSnapshot * pricePerToken + fees),
  *      but that is not enforced. More funds can be added later.
  */
-contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
+contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
 
     Token public token;
@@ -77,6 +78,7 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
         uint256 _initialFundingAmount
     ) external initializer {
         require(_arguments.pricePerToken > 0, "price must be positive");
+        __ReentrancyGuard_init();
         __Ownable2Step_init();
         _transferOwnership(_arguments.owner);
         token = _arguments.token;
@@ -151,24 +153,15 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     /**
      * @notice Claims the full eligible amount for the caller and sends it to _recipient.
      *  Supports both direct calls and meta-transactions via ERC2771.
+     *  Transfers the fee to the fee collector from the contract's balance if IFeeSettingsV3 is supported.
      * @param _recipient Address that receives the currency payout
      * @param _minPayout Minimum acceptable payout; reverts if eligible amount is below this
      */
-    function claim(address _recipient, uint256 _minPayout) external {
-        _claim(_msgSender(), _recipient, _minPayout); // works for direct calls and meta-transactions via ERC2771
-    }
-
-    /**
-     * @notice Internal claim logic. Transfers the eligible amount to _recipient and, if IFeeSettingsV3 is
-     *  supported, additionally transfers the fee to the fee collector from the contract's balance.
-     * @param _holder Address whose eligibility is consumed
-     * @param _recipient Address that receives the currency payout
-     * @param _minPayout Minimum acceptable payout; reverts if eligible amount is below this
-     */
-    function _claim(address _holder, address _recipient, uint256 _minPayout) internal {
-        uint256 eligibleAmount = eligible(_holder);
+    function claim(address _recipient, uint256 _minPayout) external nonReentrant {
+        address holder = _msgSender();
+        uint256 eligibleAmount = eligible(holder);
         require(eligibleAmount > 0, "nothing to claim");
-        paidOut[_holder] += eligibleAmount;
+        paidOut[holder] += eligibleAmount;
         require(eligibleAmount >= _minPayout, "payout below minimum");
         IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(token.feeSettings()));
         if (feeSettings.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
@@ -187,7 +180,7 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
      *  Intended to recover unclaimed funds once the distribution period is over.
      * @param _recipient Address that receives the remaining currency balance
      */
-    function drain(address _recipient) external onlyOwner {
+    function drain(address _recipient) external onlyOwner nonReentrant {
         require(block.timestamp >= reassignOrDrainAfter, "drain not yet available");
         currency.safeTransfer(_recipient, currency.balanceOf(address(this)));
     }
