@@ -102,7 +102,6 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, Ree
         }
     }
 
-
     /**
      * @notice Returns the amount of currency a holder can claim.
      *  Equals the holder's token balance at the snapshot multiplied by pricePerToken,
@@ -175,14 +174,15 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, Ree
     }
 
     /**
-     * @notice Transfers the entire currency balance of this contract to _recipient.
+     * @notice Transfers the entire balance of _token held by this contract to _recipient.
      *  Can only be called by the owner after reassignOrDrainAfter has passed.
-     *  Intended to recover unclaimed funds once the distribution period is over.
-     * @param _recipient Address that receives the remaining currency balance
+     *  Intended to recover any erc20 tokens held by the contract.
+     * @param _recipient Address that receives the token balance
+     * @param _token ERC20 token to recover
      */
-    function drain(address _recipient) external onlyOwner nonReentrant {
+    function drain(address _recipient, IERC20 _token) external onlyOwner nonReentrant {
         require(block.timestamp >= reassignOrDrainAfter, "drain not yet available");
-        currency.safeTransfer(_recipient, currency.balanceOf(address(this)));
+        _token.safeTransfer(_recipient, _token.balanceOf(address(this)));
     }
 
     /// @inheritdoc ERC2771ContextUpgradeable

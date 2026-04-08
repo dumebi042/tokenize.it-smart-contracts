@@ -84,7 +84,6 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, ReentrancyG
         _arguments.currency.safeTransferFrom(_currencyProvider, address(this), _totalCurrencyAmount);
     }
 
-
     /**
      * @notice Returns the currency amount a holder would receive for their entire current token balance.
      * @param _holder Address of the token holder
@@ -119,14 +118,15 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, ReentrancyG
     }
 
     /**
-     * @notice Transfers the entire currency balance of this contract to _recipient.
+     * @notice Transfers the entire balance of _token held by this contract to _recipient.
      *  Can only be called by the owner after drainStart has passed.
-     *  Intended to recover unclaimed funds once the exit window is closed.
-     * @param _recipient Address that receives the remaining currency balance
+     *  Intended to recover any erc20 tokens held by the contract.
+     * @param _recipient Address that receives the token balance
+     * @param _token ERC20 token to recover
      */
-    function drain(address _recipient) external onlyOwner nonReentrant {
+    function drain(address _recipient, IERC20 _token) external onlyOwner nonReentrant {
         require(block.timestamp > drainStart, "exit window not yet closed");
-        currency.safeTransfer(_recipient, currency.balanceOf(address(this)));
+        _token.safeTransfer(_recipient, _token.balanceOf(address(this)));
     }
 
     /// @inheritdoc ERC2771ContextUpgradeable

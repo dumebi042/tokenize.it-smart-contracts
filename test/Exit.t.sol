@@ -127,7 +127,7 @@ contract ExitTest is Test {
         // owner is address(0) on uninitialized logic contract → onlyOwner blocks everyone
         vm.warp(block.timestamp + 365 days);
         vm.expectRevert("Ownable: caller is not the owner");
-        exitLogic.drain(recipient);
+        exitLogic.drain(recipient, currency);
     }
 
     function testSecondInitializeReverts() public {
@@ -371,7 +371,7 @@ contract ExitTest is Test {
         vm.warp(drainStart + 1);
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(holder);
-        exitContract.drain(recipient);
+        exitContract.drain(recipient, currency);
     }
 
     function testFuzzDrainNonOwnerReverts(address caller) public {
@@ -381,7 +381,7 @@ contract ExitTest is Test {
         vm.warp(drainStart + 1);
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(caller);
-        exitContract.drain(recipient);
+        exitContract.drain(recipient, currency);
     }
 
     function testFuzzDrainTiming(uint64 timestamp) public {
@@ -390,12 +390,12 @@ contract ExitTest is Test {
         if (timestamp <= drainStart) {
             vm.expectRevert("exit window not yet closed");
             vm.prank(owner);
-            exitContract.drain(recipient);
+            exitContract.drain(recipient, currency);
         } else {
             uint256 contractBalance = currency.balanceOf(address(exitContract));
             uint256 balBefore = currency.balanceOf(recipient);
             vm.prank(owner);
-            exitContract.drain(recipient);
+            exitContract.drain(recipient, currency);
             assertEq(
                 currency.balanceOf(recipient),
                 balBefore + contractBalance,
@@ -409,7 +409,7 @@ contract ExitTest is Test {
         vm.warp(drainStart);
         vm.expectRevert("exit window not yet closed");
         vm.prank(owner);
-        exitContract.drain(recipient);
+        exitContract.drain(recipient, currency);
     }
 
     function testDrainAfterDrainStartTransfersFullBalance() public {
@@ -421,7 +421,7 @@ contract ExitTest is Test {
             "exitContract should hold full currency before drain"
         );
         vm.prank(owner);
-        exitContract.drain(recipient);
+        exitContract.drain(recipient, currency);
         assertEq(
             currency.balanceOf(recipient),
             TOTAL_CURRENCY,
@@ -580,7 +580,7 @@ contract ExitTest is Test {
             drainStart: drainStart
         });
         address cloneAddr = factory.predictCloneAddress(bytes32("feeExit"), trustedForwarder, args);
-        uint256 fundedAmount = TOTAL_CURRENCY * 101 / 100; // gross + 1% fee paid by company
+        uint256 fundedAmount = (TOTAL_CURRENCY * 101) / 100; // gross + 1% fee paid by company
         currency.mint(currencyProvider, fundedAmount);
         vm.prank(currencyProvider);
         currency.approve(cloneAddr, fundedAmount);
@@ -768,12 +768,8 @@ contract ExitTest is Test {
         uint256 currencyAmount = (claimAmt * PRICE_PER_TOKEN) / 10 ** feeToken.decimals();
 
         vm.warp(claimStart);
-        uint256 fundedAmount = TOTAL_CURRENCY * 101 / 100;
-        assertEq(
-            currency.balanceOf(address(feeExit)),
-            fundedAmount,
-            "feeExit should hold full currency before claim"
-        );
+        uint256 fundedAmount = (TOTAL_CURRENCY * 101) / 100;
+        assertEq(currency.balanceOf(address(feeExit)), fundedAmount, "feeExit should hold full currency before claim");
         assertEq(currency.balanceOf(feeCollector), 0, "feeCollector should start with zero balance");
 
         uint256 fee = feeSettingsWithFee.privateOfferFee(currencyAmount, address(feeToken));
@@ -792,7 +788,7 @@ contract ExitTest is Test {
 
         vm.warp(drainStart + 1);
         vm.prank(owner);
-        feeExit.drain(owner);
+        feeExit.drain(owner, currency);
         assertEq(currency.balanceOf(owner), expected, "owner should receive remaining currency after drain");
         assertEq(currency.balanceOf(address(feeExit)), 0, "feeExit should be empty after drain");
         assertEq(currency.balanceOf(feeCollector), fee, "feeCollector should not receive additional currency on drain");
@@ -820,9 +816,7 @@ contract ExitTest is Test {
         maliciousCurrency.mint(currencyProvider, funding);
         vm.prank(currencyProvider);
         maliciousCurrency.approve(cloneAddr, funding);
-        return Exit(
-            factory.createExitClone(bytes32("malicious"), trustedForwarder, currencyProvider, args, funding)
-        );
+        return Exit(factory.createExitClone(bytes32("malicious"), trustedForwarder, currencyProvider, args, funding));
     }
 
     /// claim() reverts when the currency reenters claim() during the payout transfer
@@ -848,6 +842,6 @@ contract ExitTest is Test {
         vm.warp(drainStart + 1);
         vm.prank(owner);
         vm.expectRevert("ReentrancyGuard: reentrant call");
-        exitWithMaliciousCurrency.drain(owner);
+        exitWithMaliciousCurrency.drain(owner, IERC20(address(maliciousCurrency)));
     }
 }

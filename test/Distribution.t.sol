@@ -411,19 +411,19 @@ contract DistributionTest is Test {
         vm.warp(reassignOrDrainAfter);
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(holderA);
-        dist.drain(holderA);
+        dist.drain(holderA, currency);
     }
 
     function testDrainBeforeDeadlineReverts() public {
         vm.expectRevert("drain not yet available");
         vm.prank(owner);
-        dist.drain(owner);
+        dist.drain(owner, currency);
     }
 
     function testDrainAtExactDeadlineSucceeds() public {
         vm.warp(reassignOrDrainAfter);
         vm.prank(owner);
-        dist.drain(owner);
+        dist.drain(owner, currency);
         assertEq(currency.balanceOf(owner), TOTAL_CURRENCY, "owner should receive full balance after drain");
         assertEq(currency.balanceOf(address(dist)), 0, "dist should be empty after drain");
     }
@@ -436,7 +436,7 @@ contract DistributionTest is Test {
 
         vm.warp(reassignOrDrainAfter);
         vm.prank(owner);
-        dist.drain(owner);
+        dist.drain(owner, currency);
         assertEq(currency.balanceOf(owner), remaining, "owner should receive remaining balance after drain");
         assertEq(currency.balanceOf(address(dist)), 0, "dist should be empty after drain");
     }
@@ -447,10 +447,10 @@ contract DistributionTest is Test {
         if (warpTo < reassignOrDrainAfter) {
             vm.expectRevert("drain not yet available");
             vm.prank(owner);
-            dist.drain(owner);
+            dist.drain(owner, currency);
         } else {
             vm.prank(owner);
-            dist.drain(owner);
+            dist.drain(owner, currency);
             assertEq(currency.balanceOf(address(dist)), 0, "dist should be empty after drain");
         }
     }
@@ -813,18 +813,12 @@ contract DistributionTest is Test {
             initialReassignments: new Reassignment[](0)
         });
         address cloneAddr = factory.predictCloneAddress(bytes32("feeDist"), trustedForwarder, args);
-        uint256 fundedAmount = TOTAL_CURRENCY * 101 / 100; // gross + 1% fee paid by company
+        uint256 fundedAmount = (TOTAL_CURRENCY * 101) / 100; // gross + 1% fee paid by company
         currency.mint(currencyProvider, fundedAmount);
         vm.prank(currencyProvider);
         currency.approve(cloneAddr, fundedAmount);
         d = Distribution(
-            factory.createDistributionClone(
-                bytes32("feeDist"),
-                trustedForwarder,
-                currencyProvider,
-                args,
-                fundedAmount
-            )
+            factory.createDistributionClone(bytes32("feeDist"), trustedForwarder, currencyProvider, args, fundedAmount)
         );
     }
 
@@ -991,9 +985,10 @@ contract DistributionTest is Test {
         maliciousCurrency.mint(currencyProvider, funding);
         vm.prank(currencyProvider);
         maliciousCurrency.approve(cloneAddr, funding);
-        return Distribution(
-            factory.createDistributionClone(bytes32("malicious"), trustedForwarder, currencyProvider, args, funding)
-        );
+        return
+            Distribution(
+                factory.createDistributionClone(bytes32("malicious"), trustedForwarder, currencyProvider, args, funding)
+            );
     }
 
     /// claim() reverts when the currency reenters claim() during the payout transfer
@@ -1016,6 +1011,6 @@ contract DistributionTest is Test {
         vm.warp(reassignOrDrainAfter);
         vm.prank(owner);
         vm.expectRevert("ReentrancyGuard: reentrant call");
-        distribution.drain(owner);
+        distribution.drain(owner, IERC20(address(maliciousCurrency)));
     }
 }
