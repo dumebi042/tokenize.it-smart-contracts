@@ -38,9 +38,7 @@ struct DistributionInitializerArguments {
  * @title tokenize.it Distribution
  * @author malteish, cjentzsch
  * @notice This contract implements the distribution of any proceeds (e.g. Dividends)
- *      based on a snapshot of Token.sol.
- *      Initial funding ideally covers all eligible payouts plus fees (tokenSupplyAtSnapshot * pricePerToken + fees),
- *      but that is not enforced. More funds can be added later.
+ *      based on a snapshot of Token.sol
  */
 contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
@@ -66,12 +64,6 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, Ree
         _disableInitializers();
     }
 
-    /**
-     * @notice Initializes the distribution contract. Can only be called once.
-     * @param _arguments Struct containing all configuration parameters
-     * @param _currencyProvider Address that provides the initial currency funding; must have approved this contract
-     * @param _initialFundingAmount Amount of currency to transfer from _currencyProvider at initialization
-     */
     function initialize(
         DistributionInitializerArguments memory _arguments,
         address _currencyProvider,
@@ -102,19 +94,27 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, Ree
         }
     }
 
-    /**
-     * @notice Returns the amount of currency a holder can claim.
-     *  Equals the holder's token balance at the snapshot multiplied by pricePerToken,
-     *  plus any extra credit from reassignments, minus already paid out amounts.
-     * @param _holder Address of the token holder
-     * @return Amount of currency claimable by _holder
-     */
-    function eligible(address _holder) public view returns (uint256) {
+    function _grossEligible(address _holder) internal view returns (uint256) {
         return
             (token.balanceOfAt(_holder, snapshotId) * pricePerToken) /
             (10 ** token.decimals()) +
             extraCredit[_holder] -
             paidOut[_holder];
+    }
+
+    function _feeInfo(uint256 _amount, bytes32 _feeType) internal view returns (uint256 fee, address feeCollector) {
+        IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(token.feeSettings()));
+        if (feeSettings.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
+            fee = feeSettings.fee(_feeType, _amount, address(token));
+            feeCollector = feeSettings.feeCollector(_feeType, address(token));
+        }
+        // if v3 is not supported, fee stays 0 and feeCollector stays address(0)
+    }
+
+    function eligible(address _holder) public view returns (uint256) {
+        uint256 gross = _grossEligible(_holder);
+        (uint256 fee, ) = _feeInfo(gross, FeeTypes.DISTRIBUTION);
+        return gross - fee;
     }
 
     /**
@@ -134,43 +134,30 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, Ree
         _reassign(_from, _to, _amount);
     }
 
-    /**
-     * @notice Internal reassignment logic shared by reassign() and initialize().
-     * @param _from Address whose eligible amount is reduced
-     * @param _to Address that receives the extra credit
-     * @param _amount Amount of currency to reassign; must not exceed eligible(_from)
-     */
     function _reassign(address _from, address _to, uint256 _amount) internal {
         require(_to != address(0), "to can not be zero address");
         require(_amount > 0, "amount must be positive");
-        require(_amount <= eligible(_from), "amount exceeds eligible");
+        require(_amount <= _grossEligible(_from), "amount exceeds eligible");
         paidOut[_from] += _amount;
         extraCredit[_to] += _amount;
         emit Reassigned(_from, _to, _amount);
     }
 
-    /**
-     * @notice Claims the full eligible amount for the caller and sends it to _recipient.
-     *  Supports both direct calls and meta-transactions via ERC2771.
-     *  Transfers the fee to the fee collector from the contract's balance if IFeeSettingsV3 is supported.
-     * @param _recipient Address that receives the currency payout
-     * @param _minPayout Minimum acceptable payout; reverts if eligible amount is below this
-     */
     function claim(address _recipient, uint256 _minPayout) external nonReentrant {
-        address holder = _msgSender();
-        uint256 eligibleAmount = eligible(holder);
-        require(eligibleAmount > 0, "nothing to claim");
-        paidOut[holder] += eligibleAmount;
-        require(eligibleAmount >= _minPayout, "payout below minimum");
-        IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(token.feeSettings()));
-        if (feeSettings.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
-            uint256 fee = feeSettings.fee(FeeTypes.DISTRIBUTION, eligibleAmount, address(token));
-            address feeCollector = feeSettings.feeCollector(FeeTypes.DISTRIBUTION, address(token));
-            if (fee != 0) {
-                currency.safeTransfer(feeCollector, fee);
-            }
+        _claim(_msgSender(), _recipient, _minPayout); // works for direct calls and meta-transactions via ERC2771
+    }
+
+    function _claim(address _holder, address _recipient, uint256 _minPayout) internal {
+        uint256 gross = _grossEligible(_holder);
+        require(gross > 0, "nothing to claim");
+        paidOut[_holder] += gross;
+        (uint256 fee, address feeCollector) = _feeInfo(gross, FeeTypes.DISTRIBUTION);
+        uint256 net = gross - fee;
+        require(net >= _minPayout, "payout below minimum");
+        if (fee != 0) {
+            currency.safeTransfer(feeCollector, fee);
         }
-        currency.safeTransfer(_recipient, eligibleAmount);
+        currency.safeTransfer(_recipient, net);
     }
 
     /**
@@ -185,17 +172,14 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, Ree
         _token.safeTransfer(_recipient, _token.balanceOf(address(this)));
     }
 
-    /// @inheritdoc ERC2771ContextUpgradeable
     function _msgSender() internal view override(ContextUpgradeable, ERC2771ContextUpgradeable) returns (address) {
         return ERC2771ContextUpgradeable._msgSender();
     }
 
-    /// @inheritdoc ERC2771ContextUpgradeable
     function _msgData() internal view override(ContextUpgradeable, ERC2771ContextUpgradeable) returns (bytes calldata) {
         return ERC2771ContextUpgradeable._msgData();
     }
 
-    /// @inheritdoc ERC2771ContextUpgradeable
     function _contextSuffixLength()
         internal
         view
