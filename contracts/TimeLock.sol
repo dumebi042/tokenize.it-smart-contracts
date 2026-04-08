@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "./common/IDistribution.sol";
-import "./TokenExitRegistry.sol";
+import "./GlobalTokenExitRegistry.sol";
 
 /**
  * @title TimeLock
@@ -23,8 +23,8 @@ contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeabl
 
     /// unix timestamp before which drain() is blocked
     uint64 public lockedUntil;
-    /// registry contract; if its exit() is set, the lockedUntil constraint is bypassed
-    TokenExitRegistry public tokenExitRegistry;
+    /// registry contract; if an exit is set for the token, it can be claimed
+    GlobalTokenExitRegistry public tokenExitRegistry;
 
     event Drained(IERC20 indexed token, address indexed recipient, uint256 amount);
     event DividendsDistributed(IDistribution indexed distribution, IERC20 indexed currency, address indexed recipient);
@@ -45,7 +45,11 @@ contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeabl
      * @param _lockedUntil unix timestamp before which drain() is blocked; 0 means no lock
      * @param _tokenExitRegistry registry contract; setting exit on it bypasses lockedUntil
      */
-    function initialize(address _owner, uint64 _lockedUntil, TokenExitRegistry _tokenExitRegistry) public initializer {
+    function initialize(
+        address _owner,
+        uint64 _lockedUntil,
+        GlobalTokenExitRegistry _tokenExitRegistry
+    ) public initializer {
         require(_owner != address(0), "owner can not be zero address");
         require(_lockedUntil > block.timestamp, "lockedUntil must be in the future");
         require(address(_tokenExitRegistry) != address(0), "tokenExitRegistry can not be zero address");
@@ -76,19 +80,24 @@ contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeabl
     }
 
     /**
-     * @notice Claim exit proceeds for this contract's full token balance and forward to _recipient.
-     * @dev Requires tokenExitRegistry.exit() to be set. Approves the exit contract, calls claim(),
-     *      and forwards all received currency to _recipient.
+     * @notice Claim exit proceeds for this contract's full balance of `_token` and forward to _recipient.
+     * @dev Requires an exit to be set for `_token` in tokenExitRegistry. Approves the exit contract,
+     *      calls claim(), and forwards all received currency to _recipient.
+     * @param _token the token to exit
      * @param _recipient address to receive the exit proceeds
      */
-    function claimExit(IERC20 _exitCurrency, address _recipient, uint256 _minPayout) external onlyOwner nonReentrant {
-        IExit exit = tokenExitRegistry.exit();
+    function claimExit(
+        Token _token,
+        IERC20 _exitCurrency,
+        address _recipient,
+        uint256 _minPayout
+    ) external onlyOwner nonReentrant {
+        IExit exit = tokenExitRegistry.exits(_token);
         require(address(exit) != address(0), "no exit set in tokenExitRegistry");
         require(_recipient != address(0), "recipient can not be zero address");
-        Token token = tokenExitRegistry.token();
-        uint256 tokenBalance = token.balanceOf(address(this));
+        uint256 tokenBalance = _token.balanceOf(address(this));
         require(tokenBalance > 0, "no tokens to exit");
-        IERC20(address(token)).approve(address(exit), tokenBalance);
+        IERC20(address(_token)).approve(address(exit), tokenBalance);
         uint256 before = _exitCurrency.balanceOf(_recipient);
         exit.claim(tokenBalance, _recipient, _minPayout);
         uint256 received = _exitCurrency.balanceOf(_recipient) - before;

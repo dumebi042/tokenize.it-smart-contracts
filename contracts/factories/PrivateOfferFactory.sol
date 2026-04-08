@@ -3,7 +3,7 @@ pragma solidity 0.8.23;
 
 import "@openzeppelin/contracts/utils/Create2.sol";
 import "../PrivateOffer.sol";
-import "../TokenExitRegistry.sol";
+import "../GlobalTokenExitRegistry.sol";
 import "./TimeLockCloneFactory.sol";
 
 /**
@@ -43,14 +43,14 @@ contract PrivateOfferFactory {
      * @param _arguments Arguments for the PrivateOffer contract.
      * @param _lockedUntil Unix timestamp before which the TimeLock's drain() is blocked.
      * @param _timeLockOwner Owner of the TimeLock contract.
-     * @param _tokenExitRegistry Registry contract; setting exit on it bypasses lockedUntil.
+     * @param _tokenExitRegistry Global registry contract; setting an exit for the token bypasses lockedUntil.
      */
     function deployPrivateOfferWithTimeLock(
         bytes32 _rawSalt,
         PrivateOfferArguments calldata _arguments,
         uint64 _lockedUntil,
         address _timeLockOwner,
-        TokenExitRegistry _tokenExitRegistry,
+        GlobalTokenExitRegistry _tokenExitRegistry,
         address _trustedForwarder
     ) external returns (address) {
         // deploy the time lock contract
@@ -83,7 +83,7 @@ contract PrivateOfferFactory {
      * @param _arguments Arguments for the PrivateOffer contract.
      * @param _lockedUntil Unix timestamp before which the TimeLock's drain() is blocked.
      * @param _timeLockOwner Owner of the TimeLock contract.
-     * @param _tokenExitRegistry Registry contract; setting exit on it bypasses lockedUntil.
+     * @param _tokenExitRegistry Global registry contract; setting an exit for the token bypasses lockedUntil.
      * @return privateOfferAddress The address of the PrivateOffer contract that would be deployed.
      * @return timeLockAddress The address of the TimeLock contract that would be deployed.
      */
@@ -92,7 +92,7 @@ contract PrivateOfferFactory {
         PrivateOfferArguments calldata _arguments,
         uint64 _lockedUntil,
         address _timeLockOwner,
-        TokenExitRegistry _tokenExitRegistry,
+        GlobalTokenExitRegistry _tokenExitRegistry,
         address _trustedForwarder
     ) public view returns (address privateOfferAddress, address timeLockAddress) {
         timeLockAddress = timeLockCloneFactory.predictCloneAddress(

@@ -8,9 +8,8 @@ import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/PrivateOffer.sol";
 import "../contracts/factories/PrivateOfferFactory.sol";
 import "../contracts/factories/TimeLockCloneFactory.sol";
-import "../contracts/factories/TokenExitRegistryCloneFactory.sol";
 import "../contracts/TimeLock.sol";
-import "../contracts/TokenExitRegistry.sol";
+import "../contracts/GlobalTokenExitRegistry.sol";
 import "./resources/CloneCreators.sol";
 import "./resources/ERC20MintableByAnyone.sol";
 
@@ -18,7 +17,7 @@ contract PrivateOfferFactoryTest is Test {
     event Deploy(address indexed privateOffer);
 
     PrivateOfferFactory factory;
-    TokenExitRegistry tokenExitRegistry;
+    GlobalTokenExitRegistry tokenExitRegistry;
 
     AllowList list;
     FeeSettings feeSettings;
@@ -62,13 +61,7 @@ contract PrivateOfferFactoryTest is Test {
             tokenCloneFactory.createTokenProxy(0, trustedForwarder, feeSettings, admin, list, 0x0, "token", "TOK")
         );
 
-        TokenExitRegistry tokenExitRegistryLogic = new TokenExitRegistry(trustedForwarder);
-        TokenExitRegistryCloneFactory tokenExitRegistryFactory = new TokenExitRegistryCloneFactory(
-            address(tokenExitRegistryLogic)
-        );
-        tokenExitRegistry = TokenExitRegistry(
-            tokenExitRegistryFactory.createTokenExitRegistryClone(bytes32(0), trustedForwarder, token)
-        );
+        tokenExitRegistry = new GlobalTokenExitRegistry(trustedForwarder);
     }
 
     function testDeployContract(bytes32 _salt) public {

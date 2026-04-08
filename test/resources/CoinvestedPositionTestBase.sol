@@ -4,9 +4,8 @@ pragma solidity 0.8.23;
 import "../../lib/forge-std/src/Test.sol";
 import "../../contracts/factories/TokenProxyFactory.sol";
 import "../../contracts/factories/CoinvestedPositionCloneFactory.sol";
-import "../../contracts/factories/TokenExitRegistryCloneFactory.sol";
 import "../../contracts/CoinvestedPosition.sol";
-import "../../contracts/TokenExitRegistry.sol";
+import "../../contracts/GlobalTokenExitRegistry.sol";
 import "../../contracts/FeeSettings.sol";
 import "./FakePaymentToken.sol";
 import "./CloneCreators.sol";
@@ -33,7 +32,7 @@ abstract contract CoinvestedPositionTestBase is Test {
 
     // The clone deployed for most tests
     CoinvestedPosition coinvestedPosition;
-    TokenExitRegistry tokenExitRegistry;
+    GlobalTokenExitRegistry tokenExitRegistry;
 
     // ── Internal helpers ──────────────────────────────────────────────────────
 

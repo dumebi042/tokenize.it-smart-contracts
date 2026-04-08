@@ -3,7 +3,7 @@ pragma solidity 0.8.23;
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
-import "./TokenExitRegistry.sol";
+import "./GlobalTokenExitRegistry.sol";
 import "./common/TokenSwapBase.sol";
 import "./common/IDistribution.sol";
 import "./common/IExit.sol";
@@ -30,8 +30,8 @@ struct CoinvestedPositionInitializerArguments {
     Token token;
     /// unix timestamp before which unpause() is blocked; 0 means no lock
     uint64 lockedUntil;
-    /// registry contract; if its exit() is set, the lockedUntil constraint is bypassed
-    TokenExitRegistry tokenExitRegistry;
+    /// registry contract; if an exit is set for the token, it can be claimed
+    GlobalTokenExitRegistry tokenExitRegistry;
 }
 
 /**
@@ -56,9 +56,9 @@ contract CoinvestedPosition is TokenSwapBase {
     uint256 public basePrice;
     /// unix timestamp before which unpause() is blocked; 0 means no lock
     uint64 public lockedUntil;
-    /// registry contract; if its exit() is set, an exit reward can be claimed from that address even
-    /// if lockedUntil has not passed yet
-    TokenExitRegistry public tokenExitRegistry;
+    /// registry contract; if an exit is set for the token, an exit reward can be claimed from that
+    /// address even if lockedUntil has not passed yet
+    GlobalTokenExitRegistry public tokenExitRegistry;
 
     /**
      * This constructor creates a logic contract that is used to clone new contracts.
@@ -223,7 +223,7 @@ contract CoinvestedPosition is TokenSwapBase {
         uint256 _minCurrencyAmount,
         uint256 _basePrice
     ) external onlyOwner nonReentrant {
-        IExit _exit = tokenExitRegistry.exit();
+        IExit _exit = tokenExitRegistry.exits(token);
         require(address(_exit) != address(0), "no exit set in tokenExitRegistry");
         uint256 tokenBalance = token.balanceOf(address(this));
         require(tokenBalance > 0, "no tokens to claim");
