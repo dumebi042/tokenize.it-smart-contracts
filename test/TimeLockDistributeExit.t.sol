@@ -100,7 +100,7 @@ contract TimeLockDistributeExitTest is Test {
         exitFactory = new ExitCloneFactory(address(exitLogic));
     }
 
-    function _deployExit(uint256 pricePerToken) internal returns (Exit) {
+    function _deployExit(uint256 pricePerToken, IERC20[] memory referenceCurrencies, uint256[] memory rates) internal returns (Exit) {
         uint256 totalCurrency = (TOKEN_AMOUNT * pricePerToken) / (10 ** token.decimals());
         ExitInitializerArguments memory args = ExitInitializerArguments({
             owner: owner,
@@ -109,8 +109,8 @@ contract TimeLockDistributeExitTest is Test {
             pricePerToken: pricePerToken,
             claimStart: claimStart,
             drainStart: drainStart,
-            referenceCurrencies: new IERC20[](0),
-            referenceToExitRates: new uint256[](0)
+            referenceCurrencies: referenceCurrencies,
+            referenceToExitRates: rates
         });
         address cloneAddr = exitFactory.predictCloneAddress(bytes32("exit"), trustedForwarder, args);
         eurc.mint(currencyProvider, totalCurrency);
@@ -118,6 +118,10 @@ contract TimeLockDistributeExitTest is Test {
         eurc.approve(cloneAddr, totalCurrency);
         return
             Exit(exitFactory.createExitClone(bytes32("exit"), trustedForwarder, currencyProvider, args, totalCurrency));
+    }
+
+    function _deployExit(uint256 pricePerToken) internal returns (Exit) {
+        return _deployExit(pricePerToken, new IERC20[](0), new uint256[](0));
     }
 
     // ── claimExit bypasses lockedUntil ──────────────────────────────────
@@ -245,4 +249,36 @@ contract TimeLockDistributeExitTest is Test {
         timeLock.claimDistribution(IDistribution(address(stub)), recipient, minPayout);
         assertEq(eurc.balanceOf(recipient), minPayout, "recipient should receive exactly minPayout");
     }
+
+    // ── referenceToExitRate ──────────────────────────────────────────────────
+
+    /// TimeLock receives the correct payout from an Exit that has reference rates set.
+    /// The reference rates are irrelevant to TimeLock (no carry), so payout must be identical
+    /// to an exit without reference rates.
+    function testClaimExitPayoutUnaffectedByReferenceRates() public {
+        FakePaymentToken eure = new FakePaymentToken(0, 18);
+        vm.prank(admin);
+        allowList.set(address(eure), TRUSTED_CURRENCY);
+
+        IERC20[] memory referenceCurrencies = new IERC20[](1);
+        referenceCurrencies[0] = IERC20(address(eure));
+        uint256[] memory rates = new uint256[](1);
+        rates[0] = 1e6; // 1 EURe (18 dec) = 1 EURc (6 dec)
+
+        Exit exitContract = _deployExit(200e6, referenceCurrencies, rates);
+
+        assertEq(exitContract.referenceToExitRate(IERC20(address(eure))), 1e6, "rate not stored");
+
+        vm.prank(admin);
+        tokenExitRegistry.setExit(token, IExit(address(exitContract)));
+
+        vm.warp(claimStart);
+        vm.prank(owner);
+        timeLock.claimExit(token, recipient, 0);
+
+        uint256 expectedPayout = (TOKEN_AMOUNT * 200e6) / (10 ** token.decimals());
+        assertEq(eurc.balanceOf(recipient), expectedPayout, "wrong payout");
+        assertEq(token.balanceOf(address(timeLock)), 0, "timeLock should have no tokens");
+    }
+
 }

@@ -134,7 +134,7 @@ contract CoinvestedPositionExitTest is Test {
         tokenExitRegistry = new GlobalTokenExitRegistry(trustedForwarder);
 
         // Deploy default CoinvestedPosition
-        coinvestedPosition = _deployCp(bytes32(0), BASE_PRICE_EURC, eurc, _defaultLeadInvestors());
+        coinvestedPosition = _deployCoinvestedPosition(bytes32(0), BASE_PRICE_EURC, eurc, _defaultLeadInvestors());
 
         // Mint 200 tokens directly to cp
         vm.prank(admin);
@@ -152,7 +152,7 @@ contract CoinvestedPositionExitTest is Test {
         return leadInvestors;
     }
 
-    function _deployCp(
+    function _deployCoinvestedPosition(
         bytes32 salt,
         uint256 basePrice,
         FakePaymentToken baseCurrency,
@@ -266,7 +266,7 @@ contract CoinvestedPositionExitTest is Test {
         Exit exitContract = _deployExit(bytes32("i3"), eurc, 200e6, CP_TOKEN_AMOUNT);
 
         // Deploy a fresh cp with no tokens minted
-        CoinvestedPosition coinvestedPositionEmpty = _deployCp(
+        CoinvestedPosition coinvestedPositionEmpty = _deployCoinvestedPosition(
             bytes32("i3empty"),
             BASE_PRICE_EURC,
             eurc,
@@ -437,7 +437,12 @@ contract CoinvestedPositionExitTest is Test {
 
     function _deployEureCp() internal returns (CoinvestedPosition) {
         LeadInvestor[] memory leadInvestors = _defaultLeadInvestors();
-        CoinvestedPosition coinvestedPositionEure = _deployCp(bytes32("iiib"), 100e18, eure, leadInvestors);
+        CoinvestedPosition coinvestedPositionEure = _deployCoinvestedPosition(
+            bytes32("iiib"),
+            100e18,
+            eure,
+            leadInvestors
+        );
         vm.prank(admin);
         token.mint(address(coinvestedPositionEure), CP_TOKEN_AMOUNT);
         return coinvestedPositionEure;
@@ -516,7 +521,12 @@ contract CoinvestedPositionExitTest is Test {
         leadInvestors[0] = LeadInvestor({account: leadA, carryFraction: IVA_FRAC_A});
         leadInvestors[1] = LeadInvestor({account: leadB, carryFraction: IVA_FRAC_B});
         leadInvestors[2] = LeadInvestor({account: leadC, carryFraction: IVA_FRAC_C});
-        CoinvestedPosition coinvestedPosition3 = _deployCp(bytes32("iva"), BASE_PRICE_EURC, eurc, leadInvestors);
+        CoinvestedPosition coinvestedPosition3 = _deployCoinvestedPosition(
+            bytes32("iva"),
+            BASE_PRICE_EURC,
+            eurc,
+            leadInvestors
+        );
         vm.prank(admin);
         token.mint(address(coinvestedPosition3), CP_TOKEN_AMOUNT);
         return coinvestedPosition3;
@@ -575,7 +585,12 @@ contract CoinvestedPositionExitTest is Test {
         LeadInvestor[] memory leadInvestors = new LeadInvestor[](1);
         leadInvestors[0] = LeadInvestor({account: leadA, carryFraction: fracNearMax});
 
-        CoinvestedPosition coinvestedPositionSingle = _deployCp(bytes32("ivb"), BASE_PRICE_EURC, eurc, leadInvestors);
+        CoinvestedPosition coinvestedPositionSingle = _deployCoinvestedPosition(
+            bytes32("ivb"),
+            BASE_PRICE_EURC,
+            eurc,
+            leadInvestors
+        );
         vm.prank(admin);
         token.mint(address(coinvestedPositionSingle), CP_TOKEN_AMOUNT);
 
@@ -851,7 +866,7 @@ contract CoinvestedPositionExitTest is Test {
 
         // Deploy cp with fuzzed basePrice using EURc (6 dec)
         LeadInvestor[] memory leadInvestors = _defaultLeadInvestors();
-        CoinvestedPosition coinvestedPositionFuzz = _deployCp(
+        CoinvestedPosition coinvestedPositionFuzz = _deployCoinvestedPosition(
             bytes32("fuzz_a"),
             uint256(basePrice),
             eurc,
@@ -1117,7 +1132,12 @@ contract CoinvestedPositionExitTest is Test {
         uint256 received = (CP_TOKEN_AMOUNT * pricePerToken) / (10 ** token.decimals()); // 40,000e6
 
         LeadInvestor[] memory leadInvestors = _defaultLeadInvestors();
-        CoinvestedPosition coinvestedPositionFuzz = _deployCp(bytes32("xid"), uint256(100e6), eurc, leadInvestors);
+        CoinvestedPosition coinvestedPositionFuzz = _deployCoinvestedPosition(
+            bytes32("xid"),
+            uint256(100e6),
+            eurc,
+            leadInvestors
+        );
         vm.prank(admin);
         token.mint(address(coinvestedPositionFuzz), CP_TOKEN_AMOUNT);
 
@@ -1149,6 +1169,72 @@ contract CoinvestedPositionExitTest is Test {
         vm.prank(owner);
         coinvestedPosition.claimExit(minCurrencyAmount, 0);
         assertEq(eurc.balanceOf(address(coinvestedPosition)), 0, "cp should hold no eurc after settle");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ── XV. Full cross-currency carry scenario ────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// Cross-currency carry: CP in EURe, exit in USDC, conversion stored in Exit.
+    ///
+    /// Setup:
+    ///   10 tokens, base price 10 EURe/token (total 100 EURe invested)
+    ///   Exit price: 300 USDC/token → received = 3000 USDC
+    ///   Conversion: 1 EURe = 5 USDC  (referenceToExitRate[EURe] = 5e6)
+    ///
+    /// Derivation:
+    ///   effectiveBasePrice = 10e18 EURe/tok × 5e6 USDC/EURe / 1e18 = 50e6 USDC/tok
+    ///   basePayout  = 50e6 × 10 tokens = 500 USDC  (= 100 EURe × 5)
+    ///   carry       = 3000 − 500       = 2500 USDC  (≡ 500 EURe at 5 USDC/EURe)
+    ///   investor A (10%) → 250 USDC    (≡ 50 EURe in value)
+    ///   investor B  (5%) → 125 USDC    (≡ 25 EURe in value)
+    function testXV_CrossCurrencyCarryScenario() public {
+        // 10 tokens, base price 10 EURe/token (100 EURe total)
+        // Exit: 300 USDC/token, 1 EURe = 5 USDC stored in exit
+        // received = 3000 USDC, basePayout = 500 USDC (100 EURe × 5)
+        // carry = 2500 USDC (= 500 EURe equiv); investor A (10%) → 250 USDC (= 50 EURe)
+        CoinvestedPosition coinvestedPositionEure = _deployCoinvestedPosition(
+            bytes32("xv"),
+            10e18,
+            eure,
+            _defaultLeadInvestors()
+        );
+        vm.prank(admin);
+        token.mint(address(coinvestedPositionEure), 10e18);
+
+        // trustedNonEuro (6 dec) serves as USDC stand-in; rate = 5e6 USDC bits per 10^18 EURe bits
+        Exit exitContract = _deployExitWithReferenceRate(
+            bytes32("xv_exit"),
+            trustedNonEuro,
+            300e6,
+            10e18,
+            IERC20(address(eure)),
+            5e6
+        );
+
+        uint256 beforeA = trustedNonEuro.balanceOf(leadA);
+        uint256 beforeB = trustedNonEuro.balanceOf(leadB);
+        uint256 beforeR = trustedNonEuro.balanceOf(receiver);
+
+        vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(token, IExit(address(exitContract)));
+        vm.prank(owner);
+        coinvestedPositionEure.claimExit(1, 0); // _basePrice=0: rate is auto-looked up from exit
+
+        // 3000e6 received − 500e6 basePayout
+        // carry = 2500e6
+        uint256 aGot = trustedNonEuro.balanceOf(leadA) - beforeA;
+        uint256 bGot = trustedNonEuro.balanceOf(leadB) - beforeB;
+        uint256 rGot = trustedNonEuro.balanceOf(receiver) - beforeR;
+
+        assertEq(aGot, 250e6 - 1, "XV: wrong investor A payout");
+        assertEq(bGot, 125e6 - 1, "XV: wrong investor B payout");
+        assertEq(rGot, 2625e6 + 2, "wrong coinvestor payout");
+        uint256[] memory payouts = new uint256[](2);
+        payouts[0] = aGot;
+        payouts[1] = bGot;
+        _assertInvariant(3000e6, rGot, payouts, address(coinvestedPositionEure));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1285,7 +1371,9 @@ contract CoinvestedPositionExitTest is Test {
         eure.mint(currencyProvider, totalCurrency);
         vm.prank(currencyProvider);
         eure.approve(cloneAddr, totalCurrency);
-        Exit exitContract = Exit(exitFactory.createExitClone(bytes32("xivc"), trustedForwarder, currencyProvider, args, totalCurrency));
+        Exit exitContract = Exit(
+            exitFactory.createExitClone(bytes32("xivc"), trustedForwarder, currencyProvider, args, totalCurrency)
+        );
 
         // Verify both rates are stored
         assertEq(exitContract.referenceToExitRate(IERC20(address(eurc))), 1e18, "XIVC: EURc rate");

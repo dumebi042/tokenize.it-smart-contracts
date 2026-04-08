@@ -866,4 +866,107 @@ contract ExitTest is Test {
         vm.expectRevert("ReentrancyGuard: reentrant call");
         exitWithMaliciousCurrency.drain(owner, IERC20(address(maliciousCurrency)));
     }
+
+    // ========== E9. referenceToExitRate initialization ==========
+
+    /// Reverts when referenceCurrencies and referenceToExitRates arrays have different lengths.
+    function testReferenceRateArrayLengthMismatchReverts() public {
+        FakePaymentToken otherCurrency = new FakePaymentToken(0, 18);
+        vm.prank(admin);
+        allowList.set(address(otherCurrency), TRUSTED_CURRENCY);
+
+        IERC20[] memory referenceCurrencies = new IERC20[](1);
+        referenceCurrencies[0] = IERC20(address(otherCurrency));
+        uint256[] memory rates = new uint256[](0);
+
+        ExitInitializerArguments memory args = ExitInitializerArguments({
+            owner: owner,
+            token: token,
+            currency: IERC20(address(currency)),
+            pricePerToken: PRICE_PER_TOKEN,
+            claimStart: claimStart,
+            drainStart: drainStart,
+            referenceCurrencies: referenceCurrencies,
+            referenceToExitRates: rates
+        });
+        vm.expectRevert("referenceCurrencies and referenceToExitRates must have the same length");
+        factory.createExitClone(bytes32("mismatch"), trustedForwarder, currencyProvider, args, 0);
+    }
+
+    /// Reverts when a referenceToExitRate entry is zero.
+    function testReferenceRateZeroReverts() public {
+        FakePaymentToken otherCurrency = new FakePaymentToken(0, 18);
+        vm.prank(admin);
+        allowList.set(address(otherCurrency), TRUSTED_CURRENCY);
+
+        IERC20[] memory referenceCurrencies = new IERC20[](1);
+        referenceCurrencies[0] = IERC20(address(otherCurrency));
+        uint256[] memory rates = new uint256[](1);
+        rates[0] = 0;
+
+        ExitInitializerArguments memory args = ExitInitializerArguments({
+            owner: owner,
+            token: token,
+            currency: IERC20(address(currency)),
+            pricePerToken: PRICE_PER_TOKEN,
+            claimStart: claimStart,
+            drainStart: drainStart,
+            referenceCurrencies: referenceCurrencies,
+            referenceToExitRates: rates
+        });
+        vm.expectRevert("referenceToExitRate must be positive");
+        factory.createExitClone(bytes32("zerorate"), trustedForwarder, currencyProvider, args, 0);
+    }
+
+    /// Reverts when a referenceCurrency equals the exit currency.
+    function testReferenceCurrencyEqualToExitCurrencyReverts() public {
+        IERC20[] memory referenceCurrencies = new IERC20[](1);
+        referenceCurrencies[0] = IERC20(address(currency)); // same as exit currency
+        uint256[] memory rates = new uint256[](1);
+        rates[0] = 1e6;
+
+        ExitInitializerArguments memory args = ExitInitializerArguments({
+            owner: owner,
+            token: token,
+            currency: IERC20(address(currency)),
+            pricePerToken: PRICE_PER_TOKEN,
+            claimStart: claimStart,
+            drainStart: drainStart,
+            referenceCurrencies: referenceCurrencies,
+            referenceToExitRates: rates
+        });
+        vm.expectRevert("referenceCurrency can not be the exit currency");
+        factory.createExitClone(bytes32("selfref"), trustedForwarder, currencyProvider, args, 0);
+    }
+
+    /// referenceToExitRate values are stored correctly and retrievable.
+    function testReferenceRatesStoredCorrectly() public {
+        FakePaymentToken refCurrency = new FakePaymentToken(0, 18);
+        vm.prank(admin);
+        allowList.set(address(refCurrency), TRUSTED_CURRENCY);
+
+        IERC20[] memory referenceCurrencies = new IERC20[](1);
+        referenceCurrencies[0] = IERC20(address(refCurrency));
+        uint256[] memory rates = new uint256[](1);
+        rates[0] = 1e6; // 10^18 refCurrency bits = 1e6 currency bits
+
+        ExitInitializerArguments memory args = ExitInitializerArguments({
+            owner: owner,
+            token: token,
+            currency: IERC20(address(currency)),
+            pricePerToken: PRICE_PER_TOKEN,
+            claimStart: claimStart,
+            drainStart: drainStart,
+            referenceCurrencies: referenceCurrencies,
+            referenceToExitRates: rates
+        });
+        address cloneAddr = factory.predictCloneAddress(bytes32("stored"), trustedForwarder, args);
+        currency.mint(currencyProvider, TOTAL_CURRENCY);
+        vm.prank(currencyProvider);
+        currency.approve(cloneAddr, TOTAL_CURRENCY);
+        Exit exitWithRate = Exit(factory.createExitClone(bytes32("stored"), trustedForwarder, currencyProvider, args, TOTAL_CURRENCY));
+
+        assertEq(exitWithRate.referenceToExitRate(IERC20(address(refCurrency))), 1e6, "rate not stored correctly");
+        assertEq(exitWithRate.referenceToExitRate(IERC20(address(currency))), 0, "exit currency should have no rate");
+    }
 }
