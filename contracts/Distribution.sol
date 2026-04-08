@@ -101,15 +101,12 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable {
     }
 
     function _feeInfo(uint256 _amount, bytes32 _feeType) internal view returns (uint256 fee, address feeCollector) {
-        IFeeSettingsV2 feeSettingsV2 = token.feeSettings();
-        if (feeSettingsV2.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
-            IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(feeSettingsV2));
+        IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(token.feeSettings()));
+        if (feeSettings.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
             fee = feeSettings.fee(_feeType, _amount, address(token));
             feeCollector = feeSettings.feeCollector(_feeType, address(token));
-        } else {
-            fee = feeSettingsV2.privateOfferFee(_amount, address(token));
-            feeCollector = feeSettingsV2.privateOfferFeeCollector(address(token));
         }
+        // if v3 is not supported, fee stays 0 and feeCollector stays address(0)
     }
 
     function eligible(address _holder) public view returns (uint256) {

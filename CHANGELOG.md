@@ -63,13 +63,13 @@ The lockup mechanism has been replaced: `deployPrivateOfferWithTimeLock` previou
 - **Dynamic fee types:** New fee types can be registered post-deployment via `registerFeeType(bytes32, uint32, uint32, address)` without a contract upgrade. Each type carries its own `maxNumerator`, `defaultNumerator`, and default collector. Querying an unregistered fee type returns a zero fee (no revert), so new contracts can safely use a fee type that an older `FeeSettings` deployment does not yet know about.
 - **Generic accessors (`IFeeSettingsV3`):** `fee(bytes32 feeType, uint256 amount, address token)` and `feeCollector(bytes32 feeType, address token)` work for any registered type.
 - **Backwards compatible:** All `IFeeSettingsV1` and `IFeeSettingsV2` named accessors (`tokenFee`, `crowdinvestingFee`, `privateOfferFee`, etc.) are preserved as thin wrappers over the V3 generics.
-- **Consumer-side backwards compatibility:** `Distribution`, `Exit`, `TokenSwap`, and `CoinvestedPosition` each detect V3 support via `supportsInterface` at runtime. If V3 is not available they fall back to `privateOfferFee` / `privateOfferFeeCollector` from `IFeeSettingsV2`. The V3 fee types used are `FeeTypes.DISTRIBUTION`, `FeeTypes.EXIT`, and `FeeTypes.SECONDARY_MARKET` (the last covering both swap contracts).
+- **Consumer-side backwards compatibility:** `TokenSwap`, and `CoinvestedPosition` each detect V3 support via `supportsInterface` at runtime. If V3 is not available they fall back to `privateOfferFee` / `privateOfferFeeCollector` from `IFeeSettingsV2`. The V3 fee type is `FeeTypes.SECONDARY_MARKET`.
 
 # Reviewer questions
 
-### Is the V2 fallback in `Distribution` and `Exit` worth the added complexity?
+### Is the V2 fallback in `TokenSwap` and `CoinvestedPosition` worth the added complexity?
 
-`Distribution` and `Exit` are new contracts, maybe they will only ever be deployed after a FeeSettings upgrade on that token. Additionally, for the first uses, we will likely offer 0 fees. So alternatively we could just **charge no fee** when the `FeeSettings` contract does not support V3 — simpler code, no silent mis-pricing risk, and old deployments simply waive the fee rather than approximating it with a V2 type that may not match the intended fee category.
+They use private offer fee if v3 is not supported.
 
 ### Should we integrate ExitRegistry into a new TokenVersion?
 
@@ -92,6 +92,6 @@ Should an exit Signal through TokenExitRegistry generally unlock all Timelocks, 
 
 Stuff that still needs to be done (after this PR is merged):
 
-- docstrings for new contracts
+- natspec where it is missing
 - update specifications in docs
 - update docs
