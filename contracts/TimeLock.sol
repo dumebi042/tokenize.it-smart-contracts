@@ -27,7 +27,7 @@ contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeabl
     GlobalTokenExitRegistry public tokenExitRegistry;
 
     event Drained(IERC20 indexed token, address indexed recipient, uint256 amount);
-    event DividendsDistributed(IDistribution indexed distribution, IERC20 indexed currency, address indexed recipient);
+    event DividendsDistributed(IDistribution indexed distribution, address indexed recipient);
     event ExitDistributed(IExit indexed exit, address indexed recipient, uint256 tokenAmount);
 
     /**
@@ -67,16 +67,12 @@ contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeabl
      */
     function claimDistribution(
         IDistribution _dist,
-        IERC20 _dividendCurrency,
         address _recipient,
         uint256 _minPayout
     ) external onlyOwner nonReentrant {
         require(_recipient != address(0), "recipient can not be zero address");
-        uint256 before = _dividendCurrency.balanceOf(_recipient);
         _dist.claim(_recipient, _minPayout);
-        uint256 received = _dividendCurrency.balanceOf(_recipient) - before;
-        require(received >= _minPayout, "received less than _minPayout");
-        emit DividendsDistributed(_dist, _dividendCurrency, _recipient);
+        emit DividendsDistributed(_dist, _recipient);
     }
 
     /**
@@ -88,7 +84,6 @@ contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeabl
      */
     function claimExit(
         Token _token,
-        IERC20 _exitCurrency,
         address _recipient,
         uint256 _minPayout
     ) external onlyOwner nonReentrant {
@@ -98,10 +93,7 @@ contract TimeLock is Initializable, OwnableUpgradeable, ERC2771ContextUpgradeabl
         uint256 tokenBalance = _token.balanceOf(address(this));
         require(tokenBalance > 0, "no tokens to exit");
         IERC20(address(_token)).approve(address(exit), tokenBalance);
-        uint256 before = _exitCurrency.balanceOf(_recipient);
         exit.claim(tokenBalance, _recipient, _minPayout);
-        uint256 received = _exitCurrency.balanceOf(_recipient) - before;
-        require(received >= _minPayout, "received less than _minPayout");
         emit ExitDistributed(exit, _recipient, tokenBalance);
     }
 

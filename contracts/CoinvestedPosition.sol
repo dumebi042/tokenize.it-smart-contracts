@@ -187,23 +187,21 @@ contract CoinvestedPosition is TokenSwapBase {
      * @dev The full received amount is treated as carry and split among lead investors by carryFraction;
      *      remainder goes to receiver. Any trusted currency may be used.
      * @param _dist the Distribution (dividend) contract to claim from
-     * @param _dividendCurrency the currency paid out by the distribution; must be trusted
+     * @param _minPayout minimum currency the call must receive; passed through to the distribution
      */
     function claimDistribution(
         IDistribution _dist,
-        IERC20 _dividendCurrency,
         uint256 _minPayout
     ) external onlyOwner nonReentrant {
+        IERC20 dividendCurrency = _dist.currency();
         require(
-            token.allowList().map(address(_dividendCurrency)) == TRUSTED_CURRENCY,
+            token.allowList().map(address(dividendCurrency)) == TRUSTED_CURRENCY,
             "dividend currency must be a trusted currency"
         );
-        uint256 before = _dividendCurrency.balanceOf(address(this));
+        uint256 before = dividendCurrency.balanceOf(address(this));
         _dist.claim(address(this), _minPayout);
-        uint256 received = _dividendCurrency.balanceOf(address(this)) - before;
-        require(received > 0, "didn't receive expected currency from distribution");
-        require(received >= _minPayout, "received less than _minPayout");
-        _settle(received, _dividendCurrency);
+        uint256 received = dividendCurrency.balanceOf(address(this)) - before;
+        _settle(received, dividendCurrency);
     }
 
     /**
@@ -211,15 +209,12 @@ contract CoinvestedPosition is TokenSwapBase {
      * @dev Requires tokenExitRegistry.exit() to be set; that also acts as the unlock signal.
      *      If proceeds < base, receiver gets everything.
      *      Carry is split among lead investors by carryFraction; remainder goes to receiver.
-     *      Any currency may be used. When _exitCurrency differs from the stored currency, provide
+     *      Any currency may be used. When the exit currency differs from the stored currency, provide
      *      _basePrice expressing the base price in the exit currency's units.
-     * @param _exitCurrency the token paid out by the exit
-     * @param _minCurrencyAmount minimum currency the call must receive; reverts if proceeds fall short.
-     *      This guards against faulty or malicious exit contracts.
-     * @param _basePrice base price in _exitCurrency's units; ignored when _exitCurrency == currency
+     * @param _minCurrencyAmount minimum currency the call must receive; passed through to the exit contract.
+     * @param _basePrice base price in exit currency's units; ignored when exit currency matches stored currency
      */
     function claimExit(
-        IERC20 _exitCurrency,
         uint256 _minCurrencyAmount,
         uint256 _basePrice
     ) external onlyOwner nonReentrant {
@@ -228,8 +223,9 @@ contract CoinvestedPosition is TokenSwapBase {
         uint256 tokenBalance = token.balanceOf(address(this));
         require(tokenBalance > 0, "no tokens to claim");
 
+        IERC20 exitCurrency = _exit.currency();
         uint256 effectiveBasePrice;
-        if (_exitCurrency == currency) {
+        if (exitCurrency == currency) {
             effectiveBasePrice = basePrice;
         } else {
             require(_basePrice > 0, "altBasePrice must be > 0");
@@ -239,12 +235,11 @@ contract CoinvestedPosition is TokenSwapBase {
         uint256 basePayout = (effectiveBasePrice * tokenBalance) / 10 ** token.decimals();
 
         IERC20(address(token)).approve(address(_exit), tokenBalance);
-        uint256 before = _exitCurrency.balanceOf(address(this));
+        uint256 before = exitCurrency.balanceOf(address(this));
         _exit.claim(tokenBalance, address(this), _minCurrencyAmount);
-        uint256 received = _exitCurrency.balanceOf(address(this)) - before;
-        require(received >= _minCurrencyAmount, "received less than _minCurrencyAmount");
+        uint256 received = exitCurrency.balanceOf(address(this)) - before;
         uint256 carry = basePayout < received ? received - basePayout : 0;
-        _settle(carry, _exitCurrency);
+        _settle(carry, exitCurrency);
     }
 
     /**
