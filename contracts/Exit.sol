@@ -24,6 +24,10 @@ struct ExitInitializerArguments {
     uint64 claimStart;
     /// @notice Timestamp after which claims expire
     uint64 drainStart;
+    /// @notice Currencies that positions may have been denominated in (parallel array with referenceToExitRates)
+    IERC20[] referenceCurrencies;
+    /// @notice Exit currency units per 10**referenceCurrency.decimals() for each reference currency (parallel array with referenceCurrencies)
+    uint256[] referenceToExitRates;
 }
 
 /**
@@ -43,6 +47,9 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, ReentrancyG
     uint256 public pricePerToken;
     uint64 public claimStart;
     uint64 public drainStart;
+    /// @notice Exit currency units per 10**referenceCurrency.decimals() for each reference currency.
+    ///         Used by CoinvestedPosition to auto-convert carry when exit currency differs from position currency.
+    mapping(IERC20 => uint256) public referenceToExitRate;
 
     /**
      * This constructor creates a logic contract that is used to clone new exit contracts.
@@ -74,6 +81,22 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, ReentrancyG
         pricePerToken = _arguments.pricePerToken;
         claimStart = _arguments.claimStart;
         drainStart = _arguments.drainStart;
+        require(
+            _arguments.referenceCurrencies.length == _arguments.referenceToExitRates.length,
+            "referenceCurrencies and referenceToExitRates must have the same length"
+        );
+        for (uint256 i = 0; i < _arguments.referenceCurrencies.length; i++) {
+            require(
+                address(_arguments.referenceCurrencies[i]) != address(0),
+                "referenceCurrency can not be zero address"
+            );
+            require(
+                _arguments.referenceCurrencies[i] != _arguments.currency,
+                "referenceCurrency can not be the exit currency"
+            );
+            require(_arguments.referenceToExitRates[i] > 0, "referenceToExitRate must be positive");
+            referenceToExitRate[_arguments.referenceCurrencies[i]] = _arguments.referenceToExitRates[i];
+        }
         _arguments.currency.safeTransferFrom(_currencyProvider, address(this), _totalCurrencyAmount);
     }
 

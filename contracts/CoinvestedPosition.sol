@@ -2,6 +2,7 @@
 pragma solidity 0.8.23;
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import "./GlobalTokenExitRegistry.sol";
 import "./common/TokenSwapBase.sol";
@@ -112,6 +113,7 @@ contract CoinvestedPosition is TokenSwapBase {
      * @param _basePrice base price expressed in the new currency's units; must be > 0
      */
     function setCurrency(IERC20 _currency, uint256 _basePrice) external onlyOwner {
+        require(block.timestamp >= lockedUntil, "timelock has not expired");
         require(address(_currency) != address(0), "zero address");
         require(address(_currency) != address(token), "currency cannot be the held token");
         require(_basePrice > 0, "altBasePrice must be > 0");
@@ -228,8 +230,15 @@ contract CoinvestedPosition is TokenSwapBase {
         if (exitCurrency == currency) {
             effectiveBasePrice = basePrice;
         } else {
-            require(_basePrice > 0, "altBasePrice must be > 0");
-            effectiveBasePrice = _basePrice;
+            uint256 rate = _exit.referenceToExitRate(currency);
+            if (rate > 0) {
+                effectiveBasePrice =
+                    (basePrice * rate) /
+                    10 ** IERC20Metadata(address(currency)).decimals();
+            } else {
+                require(_basePrice > 0, "altBasePrice must be > 0");
+                effectiveBasePrice = _basePrice;
+            }
         }
 
         uint256 basePayout = (effectiveBasePrice * tokenBalance) / 10 ** token.decimals();

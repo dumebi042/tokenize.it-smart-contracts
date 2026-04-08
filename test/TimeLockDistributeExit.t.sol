@@ -108,7 +108,9 @@ contract TimeLockDistributeExitTest is Test {
             currency: IERC20(address(eurc)),
             pricePerToken: pricePerToken,
             claimStart: claimStart,
-            drainStart: drainStart
+            drainStart: drainStart,
+            referenceCurrencies: new IERC20[](0),
+            referenceToExitRates: new uint256[](0)
         });
         address cloneAddr = exitFactory.predictCloneAddress(bytes32("exit"), trustedForwarder, args);
         eurc.mint(currencyProvider, totalCurrency);

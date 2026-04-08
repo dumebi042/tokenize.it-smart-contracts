@@ -80,7 +80,9 @@ contract ExitSafeTest is Test {
             currency: IERC20(address(currency)),
             pricePerToken: PRICE_PER_TOKEN,
             claimStart: claimStart,
-            drainStart: drainStart
+            drainStart: drainStart,
+            referenceCurrencies: new IERC20[](0),
+            referenceToExitRates: new uint256[](0)
         });
         address cloneAddr = exitFactory.predictCloneAddress(bytes32(0), trustedForwarder, args);
         currency.mint(currencyProvider, TOTAL_CURRENCY);

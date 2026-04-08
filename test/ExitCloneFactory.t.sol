@@ -57,7 +57,9 @@ contract ExitCloneFactoryTest is Test {
                 currency: IERC20(address(currency)),
                 pricePerToken: EXAMPLE_PRICE,
                 claimStart: EXAMPLE_CLAIM_START,
-                drainStart: EXAMPLE_DRAIN_START
+                drainStart: EXAMPLE_DRAIN_START,
+                referenceCurrencies: new IERC20[](0),
+                referenceToExitRates: new uint256[](0)
             });
     }
 

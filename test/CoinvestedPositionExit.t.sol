@@ -27,6 +27,10 @@ contract NoOpExit {
     function currency() external view returns (IERC20) {
         return _currency;
     }
+
+    function referenceToExitRate(IERC20) external pure returns (uint256) {
+        return 0;
+    }
 }
 
 /**
@@ -182,7 +186,9 @@ contract CoinvestedPositionExitTest is Test {
             currency: IERC20(address(exitCurrency)),
             pricePerToken: pricePerToken,
             claimStart: claimStart,
-            drainStart: drainStart
+            drainStart: drainStart,
+            referenceCurrencies: new IERC20[](0),
+            referenceToExitRates: new uint256[](0)
         });
         address cloneAddr = exitFactory.predictCloneAddress(salt, trustedForwarder, args);
         exitCurrency.mint(currencyProvider, totalCurrency);
@@ -204,7 +210,9 @@ contract CoinvestedPositionExitTest is Test {
             currency: IERC20(address(exitCurrency)),
             pricePerToken: pricePerToken,
             claimStart: claimStart,
-            drainStart: drainStart
+            drainStart: drainStart,
+            referenceCurrencies: new IERC20[](0),
+            referenceToExitRates: new uint256[](0)
         });
         address cloneAddr = exitFactory.predictCloneAddress(salt, trustedForwarder, args);
         exitCurrency.mint(currencyProvider, totalCurrencyAmount);
@@ -655,7 +663,9 @@ contract CoinvestedPositionExitTest is Test {
             currency: IERC20(address(eurc)),
             pricePerToken: 200e6,
             claimStart: claimStart,
-            drainStart: drainStart
+            drainStart: drainStart,
+            referenceCurrencies: new IERC20[](0),
+            referenceToExitRates: new uint256[](0)
         });
         address cloneAddr = exitFactory.predictCloneAddress(bytes32("v_exit"), trustedForwarder, exitArgs);
         eurc.mint(currencyProvider, totalCurrency);
@@ -860,7 +870,9 @@ contract CoinvestedPositionExitTest is Test {
             currency: IERC20(address(eurc)),
             pricePerToken: uint256(pricePerToken),
             claimStart: claimStart,
-            drainStart: drainStart
+            drainStart: drainStart,
+            referenceCurrencies: new IERC20[](0),
+            referenceToExitRates: new uint256[](0)
         });
         address cloneAddr = exitFactory.predictCloneAddress(bytes32("fuzz_a_exit"), trustedForwarder, exitArgs);
         eurc.mint(currencyProvider, totalCurrency);
@@ -971,7 +983,9 @@ contract CoinvestedPositionExitTest is Test {
             currency: IERC20(address(eurc)),
             pricePerToken: pricePerToken,
             claimStart: claimStart,
-            drainStart: drainStart
+            drainStart: drainStart,
+            referenceCurrencies: new IERC20[](0),
+            referenceToExitRates: new uint256[](0)
         });
         address cloneAddr = exitFactory.predictCloneAddress(bytes32("x_exit"), trustedForwarder, exitArgs);
         eurc.mint(currencyProvider, totalCurrency);
@@ -1135,5 +1149,249 @@ contract CoinvestedPositionExitTest is Test {
         vm.prank(owner);
         coinvestedPosition.claimExit(minCurrencyAmount, 0);
         assertEq(eurc.balanceOf(address(coinvestedPosition)), 0, "cp should hold no eurc after settle");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ── XIV. Reference Currency Rate Auto-Lookup ─────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// @dev Deploy an Exit with a single reference currency rate set
+    function _deployExitWithReferenceRate(
+        bytes32 salt,
+        FakePaymentToken exitCurrency,
+        uint256 pricePerToken,
+        uint256 tokenAmount,
+        IERC20 referenceCurrency,
+        uint256 referenceRate
+    ) internal returns (Exit) {
+        uint256 totalCurrency = (tokenAmount * pricePerToken) / (10 ** token.decimals());
+        IERC20[] memory referenceCurrencies = new IERC20[](1);
+        referenceCurrencies[0] = referenceCurrency;
+        uint256[] memory rates = new uint256[](1);
+        rates[0] = referenceRate;
+        ExitInitializerArguments memory args = ExitInitializerArguments({
+            owner: owner,
+            token: token,
+            currency: IERC20(address(exitCurrency)),
+            pricePerToken: pricePerToken,
+            claimStart: claimStart,
+            drainStart: drainStart,
+            referenceCurrencies: referenceCurrencies,
+            referenceToExitRates: rates
+        });
+        address cloneAddr = exitFactory.predictCloneAddress(salt, trustedForwarder, args);
+        exitCurrency.mint(currencyProvider, totalCurrency);
+        vm.prank(currencyProvider);
+        exitCurrency.approve(cloneAddr, totalCurrency);
+        return Exit(exitFactory.createExitClone(salt, trustedForwarder, currencyProvider, args, totalCurrency));
+    }
+
+    /// XIV-A: Auto-lookup upscaling — CP in EURc (6 dec), exit in EURe (18 dec), 1:1 rate stored in Exit
+    ///        Carry matches IIIA but _basePrice parameter is not needed (caller passes 0)
+    function testXIVA_AutoLookupUpscalingEURcToEURe() public {
+        // referenceToExitRate[EURc] = 1e18: 10^6 EURc bits (1 EURc) = 1e18 EURe bits (1 EURe)
+        uint256 rate = 1e18; // EURe bits per 10^6 EURc bits, 1:1 value
+        Exit exitContract = _deployExitWithReferenceRate(
+            bytes32("xiva"),
+            eure,
+            200e18,
+            CP_TOKEN_AMOUNT,
+            IERC20(address(eurc)),
+            rate
+        );
+
+        uint256 beforeA = eure.balanceOf(leadA);
+        uint256 beforeB = eure.balanceOf(leadB);
+        uint256 beforeR = eure.balanceOf(receiver);
+
+        vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(token, IExit(address(exitContract)));
+        vm.prank(owner);
+        // _basePrice=0: auto-lookup from exit because EURc rate is set
+        coinvestedPosition.claimExit(1, 0);
+
+        // received = 200 tokens * 200e18 / 1e18 = 40,000e18 EURe
+        // effectiveBasePrice = 100e6 * 1e18 / 1e6 = 100e18 EURe per token
+        // basePayout = 100e18 * 200e18 / 1e18 = 20,000e18 EURe; carry = 20,000e18
+        uint256 received = 40_000e18;
+        uint256 carry = 20_000e18;
+        uint256 aGot = eure.balanceOf(leadA) - beforeA;
+        uint256 bGot = eure.balanceOf(leadB) - beforeB;
+        uint256 rGot = eure.balanceOf(receiver) - beforeR;
+
+        uint256 expectedA = (uint256(CARRY_10PCT) * carry) / type(uint64).max;
+        uint256 expectedB = (uint256(CARRY_5PCT) * carry) / type(uint64).max;
+        assertEq(aGot, expectedA, "XIVA: wrong A payout");
+        assertEq(bGot, expectedB, "XIVA: wrong B payout");
+        assertEq(rGot, received - expectedA - expectedB, "XIVA: wrong receiver payout");
+        uint256[] memory payouts = new uint256[](2);
+        payouts[0] = aGot;
+        payouts[1] = bGot;
+        _assertInvariant(received, rGot, payouts, address(coinvestedPosition));
+    }
+
+    /// XIV-B: Auto-lookup downscaling — CP in EURe (18 dec), exit in EURc (6 dec), 1:1 rate stored in Exit
+    function testXIVB_AutoLookupDownscalingEUReToEURc() public {
+        CoinvestedPosition coinvestedPositionEure = _deployEureCp();
+        // referenceToExitRate[EURe] = 1e6: 10^18 EURe bits (1 EURe) = 1e6 EURc bits (1 EURc)
+        uint256 rate = 1e6; // EURc bits per 10^18 EURe bits, 1:1 value
+        Exit exitContract = _deployExitWithReferenceRate(
+            bytes32("xivb"),
+            eurc,
+            200e6,
+            CP_TOKEN_AMOUNT,
+            IERC20(address(eure)),
+            rate
+        );
+
+        uint256 beforeA = eurc.balanceOf(leadA);
+        uint256 beforeB = eurc.balanceOf(leadB);
+        uint256 beforeR = eurc.balanceOf(receiver);
+
+        vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(token, IExit(address(exitContract)));
+        vm.prank(owner);
+        // _basePrice=0: auto-lookup from exit because EURe rate is set
+        coinvestedPositionEure.claimExit(1, 0);
+
+        // effectiveBasePrice = 100e18 * 1e6 / 1e18 = 100e6 EURc per token; carry = 20,000e6
+        _checkIIIB(beforeA, beforeB, beforeR, address(coinvestedPositionEure));
+    }
+
+    /// XIV-C: Multiple reference currencies — two CPs with different base currencies both auto-resolve
+    function testXIVC_MultipleReferenceCurrencies() public {
+        // Deploy an exit with rates for both EURc and EURe
+        IERC20[] memory referenceCurrencies = new IERC20[](2);
+        referenceCurrencies[0] = IERC20(address(eurc)); // EURc (6 dec) → EURe (18 dec)
+        referenceCurrencies[1] = IERC20(address(trustedNonEuro)); // trustedNonEuro (6 dec) → EURe (18 dec)
+        uint256[] memory rates = new uint256[](2);
+        rates[0] = 1e18; // 1 EURc = 1 EURe
+        rates[1] = 2e18; // 1 trustedNonEuro = 2 EURe (hypothetical)
+
+        uint256 totalCurrency = (CP_TOKEN_AMOUNT * 200e18) / (10 ** token.decimals());
+        ExitInitializerArguments memory args = ExitInitializerArguments({
+            owner: owner,
+            token: token,
+            currency: IERC20(address(eure)),
+            pricePerToken: 200e18,
+            claimStart: claimStart,
+            drainStart: drainStart,
+            referenceCurrencies: referenceCurrencies,
+            referenceToExitRates: rates
+        });
+        address cloneAddr = exitFactory.predictCloneAddress(bytes32("xivc"), trustedForwarder, args);
+        eure.mint(currencyProvider, totalCurrency);
+        vm.prank(currencyProvider);
+        eure.approve(cloneAddr, totalCurrency);
+        Exit exitContract = Exit(exitFactory.createExitClone(bytes32("xivc"), trustedForwarder, currencyProvider, args, totalCurrency));
+
+        // Verify both rates are stored
+        assertEq(exitContract.referenceToExitRate(IERC20(address(eurc))), 1e18, "XIVC: EURc rate");
+        assertEq(exitContract.referenceToExitRate(IERC20(address(trustedNonEuro))), 2e18, "XIVC: trustedNonEuro rate");
+
+        // CP in EURc auto-resolves using rate[EURc]
+        vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(token, IExit(address(exitContract)));
+        vm.prank(owner);
+        coinvestedPosition.claimExit(1, 0); // _basePrice=0, auto-lookup used
+    }
+
+    /// XIV-D: No rate for CP's currency → fallback to caller-provided _basePrice
+    function testXIVD_NoRateFallsBackToCallerBasePrice() public {
+        // Exit in EURe with no reference rate for EURc
+        Exit exitContract = _deployExit(bytes32("xivd"), eure, 200e18, CP_TOKEN_AMOUNT);
+
+        vm.warp(claimStart);
+        vm.prank(admin);
+        tokenExitRegistry.setExit(token, IExit(address(exitContract)));
+
+        // _basePrice=0 and no rate in exit → must revert
+        vm.expectRevert("altBasePrice must be > 0");
+        vm.prank(owner);
+        coinvestedPosition.claimExit(1, 0);
+
+        // Providing _basePrice explicitly still works
+        vm.prank(owner);
+        coinvestedPosition.claimExit(1, 100e18);
+    }
+
+    /// XIV-E: Exit initialization reverts when reference currency arrays have mismatched lengths
+    function testXIVE_MismatchedArrayLengthsReverts() public {
+        IERC20[] memory referenceCurrencies = new IERC20[](1);
+        referenceCurrencies[0] = IERC20(address(eurc));
+        uint256[] memory rates = new uint256[](0); // length mismatch
+
+        ExitInitializerArguments memory args = ExitInitializerArguments({
+            owner: owner,
+            token: token,
+            currency: IERC20(address(eure)),
+            pricePerToken: 200e18,
+            claimStart: claimStart,
+            drainStart: drainStart,
+            referenceCurrencies: referenceCurrencies,
+            referenceToExitRates: rates
+        });
+        vm.expectRevert("referenceCurrencies and referenceToExitRates must have the same length");
+        exitFactory.createExitClone(bytes32("xive"), trustedForwarder, currencyProvider, args, 0);
+    }
+
+    /// XIV-F: Exit initialization reverts when a referenceToExitRate is zero
+    function testXIVF_ZeroRateReverts() public {
+        IERC20[] memory referenceCurrencies = new IERC20[](1);
+        referenceCurrencies[0] = IERC20(address(eurc));
+        uint256[] memory rates = new uint256[](1);
+        rates[0] = 0; // invalid
+
+        uint256 totalCurrency = (CP_TOKEN_AMOUNT * 200e18) / (10 ** token.decimals());
+        ExitInitializerArguments memory args = ExitInitializerArguments({
+            owner: owner,
+            token: token,
+            currency: IERC20(address(eure)),
+            pricePerToken: 200e18,
+            claimStart: claimStart,
+            drainStart: drainStart,
+            referenceCurrencies: referenceCurrencies,
+            referenceToExitRates: rates
+        });
+        address cloneAddr = exitFactory.predictCloneAddress(bytes32("xivf"), trustedForwarder, args);
+        eure.mint(currencyProvider, totalCurrency);
+        vm.prank(currencyProvider);
+        eure.approve(cloneAddr, totalCurrency);
+        vm.expectRevert("referenceToExitRate must be positive");
+        exitFactory.createExitClone(bytes32("xivf"), trustedForwarder, currencyProvider, args, totalCurrency);
+    }
+
+    /// XIV-G: setCurrency is blocked before lockedUntil expires
+    function testXIVG_SetCurrencyBlockedDuringLocktime() public {
+        uint64 lockUntil = uint64(block.timestamp + 7 days);
+        LeadInvestor[] memory leadInvestors = _defaultLeadInvestors();
+        CoinvestedPositionInitializerArguments memory args = CoinvestedPositionInitializerArguments({
+            owner: owner,
+            receiver: receiver,
+            leadInvestors: leadInvestors,
+            basePrice: BASE_PRICE_EURC,
+            baseCurrency: IERC20(address(eurc)),
+            token: token,
+            lockedUntil: lockUntil,
+            tokenExitRegistry: tokenExitRegistry
+        });
+        CoinvestedPosition lockedCp = CoinvestedPosition(
+            coinvestedPositionFactory.createCoinvestedPositionClone(bytes32("xivg"), trustedForwarder, args)
+        );
+
+        // Before lock expires: setCurrency must revert
+        vm.expectRevert("timelock has not expired");
+        vm.prank(owner);
+        lockedCp.setCurrency(IERC20(address(eure)), 100e18);
+
+        // After lock expires: setCurrency succeeds
+        vm.warp(lockUntil);
+        vm.prank(owner);
+        lockedCp.setCurrency(IERC20(address(eure)), 100e18);
+        assertEq(address(lockedCp.currency()), address(eure), "XIVG: currency not updated");
+        assertEq(lockedCp.basePrice(), 100e18, "XIVG: basePrice not updated");
     }
 }

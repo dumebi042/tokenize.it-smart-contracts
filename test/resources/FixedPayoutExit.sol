@@ -17,4 +17,8 @@ contract FixedPayoutExit {
     function claim(uint256, address _recipient, uint256) external {
         if (payout > 0) currency.transfer(_recipient, payout);
     }
+
+    function referenceToExitRate(IERC20) external pure returns (uint256) {
+        return 0;
+    }
 }
