@@ -7,6 +7,7 @@ import "../contracts/factories/ExitCloneFactory.sol";
 import "../contracts/Exit.sol";
 import "./resources/FakePaymentToken.sol";
 import "./resources/CloneCreators.sol";
+import "./resources/MaliciousExitCurrency.sol";
 
 contract ExitTest is Test {
     address public constant admin = 0x0109709eCFa91a80626FF3989D68f67f5b1dD120;
@@ -795,5 +796,58 @@ contract ExitTest is Test {
         assertEq(currency.balanceOf(owner), expected, "owner should receive remaining currency after drain");
         assertEq(currency.balanceOf(address(feeExit)), 0, "feeExit should be empty after drain");
         assertEq(currency.balanceOf(feeCollector), fee, "feeCollector should not receive additional currency on drain");
+    }
+
+    // ========== E_Reentrancy. Reentrancy protection ==========
+
+    /// @dev Deploy an exit whose currency is a MaliciousExitCurrency.
+    function _deployExitWithMaliciousCurrency(
+        MaliciousExitCurrency maliciousCurrency,
+        uint256 funding
+    ) internal returns (Exit) {
+        vm.prank(admin);
+        allowList.set(address(maliciousCurrency), TRUSTED_CURRENCY);
+
+        ExitInitializerArguments memory args = ExitInitializerArguments({
+            owner: owner,
+            token: token,
+            currency: IERC20(address(maliciousCurrency)),
+            pricePerToken: PRICE_PER_TOKEN,
+            claimStart: claimStart,
+            drainStart: drainStart
+        });
+        address cloneAddr = factory.predictCloneAddress(bytes32("malicious"), trustedForwarder, args);
+        maliciousCurrency.mint(currencyProvider, funding);
+        vm.prank(currencyProvider);
+        maliciousCurrency.approve(cloneAddr, funding);
+        return Exit(
+            factory.createExitClone(bytes32("malicious"), trustedForwarder, currencyProvider, args, funding)
+        );
+    }
+
+    /// claim() reverts when the currency reenters claim() during the payout transfer
+    function testReentrancyOnClaim() public {
+        MaliciousExitCurrency maliciousCurrency = new MaliciousExitCurrency();
+        Exit exitWithMaliciousCurrency = _deployExitWithMaliciousCurrency(maliciousCurrency, TOTAL_CURRENCY);
+        maliciousCurrency.setExploitTarget(address(exitWithMaliciousCurrency), recipient);
+
+        vm.warp(claimStart);
+        vm.prank(holder);
+        token.approve(address(exitWithMaliciousCurrency), TOKEN_SUPPLY);
+        vm.prank(holder);
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        exitWithMaliciousCurrency.claim(TOKEN_SUPPLY, recipient, 0);
+    }
+
+    /// drain() reverts when the currency reenters claim() during the drain transfer
+    function testReentrancyOnDrain() public {
+        MaliciousExitCurrency maliciousCurrency = new MaliciousExitCurrency();
+        Exit exitWithMaliciousCurrency = _deployExitWithMaliciousCurrency(maliciousCurrency, TOTAL_CURRENCY);
+        maliciousCurrency.setExploitTarget(address(exitWithMaliciousCurrency), recipient);
+
+        vm.warp(drainStart + 1);
+        vm.prank(owner);
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        exitWithMaliciousCurrency.drain(owner);
     }
 }

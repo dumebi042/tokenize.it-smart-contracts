@@ -7,6 +7,7 @@ import "../contracts/factories/DistributionCloneFactory.sol";
 import "../contracts/Distribution.sol";
 import "./resources/FakePaymentToken.sol";
 import "./resources/CloneCreators.sol";
+import "./resources/MaliciousDistributionCurrency.sol";
 
 contract DistributionTest is Test {
     address public constant admin = 0x0109709eCFa91a80626FF3989D68f67f5b1dD120;
@@ -965,5 +966,56 @@ contract DistributionTest is Test {
         }
         assertEq(currency.balanceOf(holderB), expectedBalanceB, "holderB balance wrong");
         assertEq(currency.balanceOf(holderC), expectedBalanceC, "holderC balance wrong");
+    }
+
+    // ========== D_Reentrancy. Reentrancy protection ==========
+
+    /// @dev Deploy a distribution whose currency is a MaliciousDistributionCurrency.
+    function _deployDistWithMaliciousCurrency(
+        MaliciousDistributionCurrency maliciousCurrency,
+        uint256 funding
+    ) internal returns (Distribution) {
+        vm.prank(admin);
+        allowList.set(address(maliciousCurrency), TRUSTED_CURRENCY);
+
+        DistributionInitializerArguments memory args = DistributionInitializerArguments({
+            owner: owner,
+            token: token,
+            snapshotId: snapshotId,
+            currency: IERC20(address(maliciousCurrency)),
+            pricePerToken: PRICE_PER_TOKEN,
+            reassignOrDrainAfter: reassignOrDrainAfter,
+            initialReassignments: new Reassignment[](0)
+        });
+        address cloneAddr = factory.predictCloneAddress(bytes32("malicious"), trustedForwarder, args);
+        maliciousCurrency.mint(currencyProvider, funding);
+        vm.prank(currencyProvider);
+        maliciousCurrency.approve(cloneAddr, funding);
+        return Distribution(
+            factory.createDistributionClone(bytes32("malicious"), trustedForwarder, currencyProvider, args, funding)
+        );
+    }
+
+    /// claim() reverts when the currency reenters claim() during the payout transfer
+    function testReentrancyOnClaim() public {
+        MaliciousDistributionCurrency maliciousCurrency = new MaliciousDistributionCurrency();
+        Distribution distribution = _deployDistWithMaliciousCurrency(maliciousCurrency, TOTAL_CURRENCY);
+        maliciousCurrency.setExploitTarget(address(distribution), recipient);
+
+        vm.prank(holderA);
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        distribution.claim(recipient, 0);
+    }
+
+    /// drain() reverts when the currency reenters claim() during the drain transfer
+    function testReentrancyOnDrain() public {
+        MaliciousDistributionCurrency maliciousCurrency = new MaliciousDistributionCurrency();
+        Distribution distribution = _deployDistWithMaliciousCurrency(maliciousCurrency, TOTAL_CURRENCY);
+        maliciousCurrency.setExploitTarget(address(distribution), recipient);
+
+        vm.warp(reassignOrDrainAfter);
+        vm.prank(owner);
+        vm.expectRevert("ReentrancyGuard: reentrant call");
+        distribution.drain(owner);
     }
 }
