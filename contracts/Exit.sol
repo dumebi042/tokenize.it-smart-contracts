@@ -33,10 +33,12 @@ struct ExitInitializerArguments {
 /**
  * @title tokenize.it Exit
  * @author malteish, cjentzsch
- * @notice This contract implements the automated exit: token holders transfer their tokens here
- *  and receive exit proceeds in return. The price is fixed at deployment.
+ * @notice This contract implements the automated exit: token holders call the claim function,
+ *  thus transferring their tokens to the contract and receiving exit proceeds in return.
+ *  The price is fixed at deployment.
  *  Claims are only valid within the exit window set at initialization.
- *  Received tokens are held in this contract (not burned).
+ *  Received tokens are held in this contract and can either be burned or extracted by the
+ *  owner after the exit window closes.
  */
 contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
@@ -60,6 +62,12 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, ReentrancyG
         _disableInitializers();
     }
 
+    /**
+     * @notice Initializes the exit contract with the given parameters and funds it with currency.
+     * @param _arguments Struct containing all initialization parameters
+     * @param _currencyProvider Address from which the initial currency amount is transferred
+     * @param _totalCurrencyAmount Amount of currency to transfer from _currencyProvider to this contract
+     */
     function initialize(
         ExitInitializerArguments memory _arguments,
         address _currencyProvider,
@@ -100,23 +108,49 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, ReentrancyG
         _arguments.currency.safeTransferFrom(_currencyProvider, address(this), _totalCurrencyAmount);
     }
 
-    function _feeInfo(uint256 _amount, bytes32 _feeType) internal view returns (uint256 fee, address feeCollector) {
+    /**
+     * @notice Returns the fee amount and fee collector address for the given amount.
+     * @param _amount Gross amount to compute the fee on
+     * @return fee Fee amount
+     * @return feeCollector Address that receives the fee
+     */
+    function _feeInfo(uint256 _amount) internal view returns (uint256 fee, address feeCollector) {
         IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(token.feeSettings()));
         if (feeSettings.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
-            fee = feeSettings.fee(_feeType, _amount, address(token));
-            feeCollector = feeSettings.feeCollector(_feeType, address(token));
+            fee = feeSettings.fee(FeeTypes.EXIT, _amount, address(token));
+            feeCollector = feeSettings.feeCollector(FeeTypes.EXIT, address(token));
         }
         // if v3 is not supported, fee stays 0 and feeCollector stays address(0)
     }
 
+    /**
+     * @notice Returns the net currency payout a holder would receive if they claimed their entire balance now.
+     * @param _holder Address of the token holder
+     * @return Net currency amount after fees
+     */
     function eligible(address _holder) public view returns (uint256) {
         uint256 gross = (token.balanceOf(_holder) * pricePerToken) / 10 ** token.decimals();
-        (uint256 fee, ) = _feeInfo(gross, FeeTypes.EXIT);
+        (uint256 fee, ) = _feeInfo(gross);
         return gross - fee;
     }
 
+    /**
+     * @notice Exchanges tokens for exit proceeds. Transfers _tokenAmount tokens from the caller to this
+     *  contract and sends the corresponding currency payout to _recipient.
+     * @param _tokenAmount Amount of tokens to exchange for exit proceeds
+     * @param _recipient Address that receives the currency payout
+     * @param _minPayout Minimum net payout required; reverts if not met
+     */
     function claim(uint256 _tokenAmount, address _recipient, uint256 _minPayout) external nonReentrant {
-        _claim(_msgSender(), _tokenAmount, _recipient, _minPayout);
+        require(block.timestamp >= claimStart, "exit not yet started");
+        IERC20(address(token)).safeTransferFrom(_msgSender(), address(this), _tokenAmount);
+        uint256 currencyAmount = (_tokenAmount * pricePerToken) / 10 ** token.decimals();
+        (uint256 fee, address feeCollector) = _feeInfo(currencyAmount);
+        require(currencyAmount - fee >= _minPayout, "payout below minimum");
+        if (fee != 0) {
+            currency.safeTransfer(feeCollector, fee);
+        }
+        currency.safeTransfer(_recipient, currencyAmount - fee);
     }
 
     /**
@@ -129,18 +163,6 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, ReentrancyG
     function drain(address _recipient, IERC20 _token) external onlyOwner nonReentrant {
         require(block.timestamp > drainStart, "exit window not yet closed");
         _token.safeTransfer(_recipient, _token.balanceOf(address(this)));
-    }
-
-    function _claim(address _holder, uint256 _tokenAmount, address _recipient, uint256 _minPayout) internal {
-        require(block.timestamp >= claimStart, "exit not yet started");
-        IERC20(address(token)).safeTransferFrom(_holder, address(this), _tokenAmount);
-        uint256 currencyAmount = (_tokenAmount * pricePerToken) / 10 ** token.decimals();
-        (uint256 fee, address feeCollector) = _feeInfo(currencyAmount, FeeTypes.EXIT);
-        require(currencyAmount - fee >= _minPayout, "payout below minimum");
-        if (fee != 0) {
-            currency.safeTransfer(feeCollector, fee);
-        }
-        currency.safeTransfer(_recipient, currencyAmount - fee);
     }
 
     function _msgSender() internal view override(ContextUpgradeable, ERC2771ContextUpgradeable) returns (address) {

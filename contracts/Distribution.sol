@@ -53,6 +53,7 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, Ree
     mapping(address => uint256) public extraCredit;
     uint64 public reassignOrDrainAfter;
 
+    /// @notice Emitted when the owner reassigns unclaimed distribution funds from one address to another
     event Reassigned(address indexed from, address indexed to, uint256 amount);
 
     /**
@@ -64,6 +65,12 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, Ree
         _disableInitializers();
     }
 
+    /**
+     * @notice Initializes the distribution contract with the given parameters and optionally funds it.
+     * @param _arguments Struct containing all initialization parameters
+     * @param _currencyProvider Address from which the initial funding amount is transferred
+     * @param _initialFundingAmount Amount of currency to transfer from _currencyProvider; may be zero
+     */
     function initialize(
         DistributionInitializerArguments memory _arguments,
         address _currencyProvider,
@@ -94,6 +101,12 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, Ree
         }
     }
 
+    /**
+     * @notice Returns the gross eligible amount for a holder before fees, accounting for prior payouts
+     *  and any extra credit assigned via reassign().
+     * @param _holder Address of the token holder
+     * @return Gross currency amount eligible for payout
+     */
     function _grossEligible(address _holder) internal view returns (uint256) {
         return
             (token.balanceOfAt(_holder, snapshotId) * pricePerToken) /
@@ -102,18 +115,29 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, Ree
             paidOut[_holder];
     }
 
-    function _feeInfo(uint256 _amount, bytes32 _feeType) internal view returns (uint256 fee, address feeCollector) {
+    /**
+     * @notice Returns the fee amount and fee collector address for the given amount.
+     * @param _amount Amount to compute the fee on
+     * @return fee Fee amount
+     * @return feeCollector Address that receives the fee
+     */
+    function _feeInfo(uint256 _amount) internal view returns (uint256 fee, address feeCollector) {
         IFeeSettingsV3 feeSettings = IFeeSettingsV3(address(token.feeSettings()));
         if (feeSettings.supportsInterface(type(IFeeSettingsV3).interfaceId)) {
-            fee = feeSettings.fee(_feeType, _amount, address(token));
-            feeCollector = feeSettings.feeCollector(_feeType, address(token));
+            fee = feeSettings.fee(FeeTypes.DISTRIBUTION, _amount, address(token));
+            feeCollector = feeSettings.feeCollector(FeeTypes.DISTRIBUTION, address(token));
         }
         // if v3 is not supported, fee stays 0 and feeCollector stays address(0)
     }
 
+    /**
+     * @notice Returns the net currency payout a holder would receive if they claimed now.
+     * @param _holder Address of the token holder
+     * @return Net currency amount after fees
+     */
     function eligible(address _holder) public view returns (uint256) {
         uint256 gross = _grossEligible(_holder);
-        (uint256 fee, ) = _feeInfo(gross, FeeTypes.DISTRIBUTION);
+        (uint256 fee, ) = _feeInfo(gross);
         return gross - fee;
     }
 
@@ -122,11 +146,11 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, Ree
      *  holders in the snapshot not being able to claim their funds. It can be audited because the
      *  reassignment is emitted on-chain. Some cases that could lead to this being needed:
      *      - holder losing their key and only noticing after the snapshot
-     *      - a smart contract holder that cannot execute the claim for any reason
-     *      - a Vesting contract holding tokens for multiple beneficiaries: the owner can reassign
-     *        each beneficiary's proportional share individually
+     *      - a smart contract holder that cannot execute the claim for any reason, e.g. a Vesting contract
      * @dev onlyOwner, matching the requirements of calling Token.burn+mint to fix an issue with
      *  current token holders.
+     * @param _from address that will receive less
+     * @param _to address that will receive more
      * @param _amount amount of currency to reassign; must not exceed eligible(_from)
      */
     function reassign(address _from, address _to, uint256 _amount) external onlyOwner {
@@ -134,6 +158,12 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, Ree
         _reassign(_from, _to, _amount);
     }
 
+    /**
+     * @dev Internal implementation of reassign(); does not check the time restriction.
+     * @param _from Address whose gross eligibility is reduced
+     * @param _to Address that receives extra credit
+     * @param _amount Amount of currency to reassign
+     */
     function _reassign(address _from, address _to, uint256 _amount) internal {
         require(_to != address(0), "to can not be zero address");
         require(_amount > 0, "amount must be positive");
@@ -143,15 +173,16 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, Ree
         emit Reassigned(_from, _to, _amount);
     }
 
+    /**
+     * @notice Claims the caller's full distribution share and sends it to _recipient.
+     * @param _recipient Address that receives the currency payout
+     * @param _minPayout Minimum net payout required; reverts if not met
+     */
     function claim(address _recipient, uint256 _minPayout) external nonReentrant {
-        _claim(_msgSender(), _recipient, _minPayout); // works for direct calls and meta-transactions via ERC2771
-    }
-
-    function _claim(address _holder, address _recipient, uint256 _minPayout) internal {
-        uint256 gross = _grossEligible(_holder);
+        uint256 gross = _grossEligible(_msgSender());
         require(gross > 0, "nothing to claim");
-        paidOut[_holder] += gross;
-        (uint256 fee, address feeCollector) = _feeInfo(gross, FeeTypes.DISTRIBUTION);
+        paidOut[_msgSender()] += gross;
+        (uint256 fee, address feeCollector) = _feeInfo(gross);
         uint256 net = gross - fee;
         require(net >= _minPayout, "payout below minimum");
         if (fee != 0) {
