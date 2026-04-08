@@ -24,11 +24,13 @@ Distributes a fixed currency amount among token holders proportional to their ba
 
 Allows token holders to redeem tokens for a fixed currency payout within a configurable duration after the exit date. Deployed via an atomic clone-and-fund factory.
 
-## `TokenExitRegistry`
+## `GlobalTokenExitRegistry`
 
-Links a token to its authorized `Exit` contract. `TimeLock` and `CoinvestedPosition` contracts query this registry to determine whether an exit has been set and which contract to claim proceeds from.
+A single shared registry that maps any token to its authorized `Exit` contract, replacing per-deployment `TokenExitRegistry` instances.
 
-- **One-time registration:** `setExit()` can be called exactly once and only by a `DEFAULT_ADMIN_ROLE` address of the associated token. The exit contract address cannot be changed after it is set.
+- **One-time registration:** `setExit()` can be called exactly once per token. The exit contract address cannot be changed after it is set.
+- **Dual access-control support:** The caller must be either a `DEFAULT_ADMIN_ROLE` holder or the `owner()` of the token. Both checks use try/catch so the registry works with tokens that implement only one of the two access-control models.
+- **Shared deployment:** One registry instance serves all tokens, reducing deployment overhead.
 - **Signal semantics:** A non-zero `exit` value signals to connected `TimeLock` and `CoinvestedPosition` contracts that the time-lock bypass for exit claims is active — they call `claimExit()` without checking `lockedUntil`.
 
 ## `TimeLock`
@@ -65,29 +67,6 @@ The lockup mechanism has been replaced: `deployPrivateOfferWithTimeLock` previou
 - **Backwards compatible:** All `IFeeSettingsV1` and `IFeeSettingsV2` named accessors (`tokenFee`, `crowdinvestingFee`, `privateOfferFee`, etc.) are preserved as thin wrappers over the V3 generics.
 - **Consumer-side backwards compatibility:** `TokenSwap`, and `CoinvestedPosition` each detect V3 support via `supportsInterface` at runtime. If V3 is not available they fall back to `privateOfferFee` / `privateOfferFeeCollector` from `IFeeSettingsV2`. The V3 fee type is `FeeTypes.SECONDARY_MARKET`.
 
-# Reviewer questions
-
-### Is the V2 fallback in `TokenSwap` and `CoinvestedPosition` worth the added complexity?
-
-They use private offer fee if v3 is not supported.
-
-### Should we integrate ExitRegistry into a new TokenVersion?
-
-We could keep the ExitRegistry as a separate contract, to support legacy tokens, but integrate it into the Token for new deployments. Just a thought.
-
-### Fees in Exit and Distribution
-
-What should be true:
-
-1. payout = tokenAmount \* price - fee
-2. payout = tokenAmount \* price, and fee is charged extra but doesn't affect the price?
-
-Note that with option 1, a fee change during an exit or distribution would mean different investors effectively get different prices.
-
-### Meaning of ExitSignal
-
-Should an exit Signal through TokenExitRegistry generally unlock all Timelocks, or just allow them to claim this one Exit?
-
 # Todo
 
 Stuff that still needs to be done (after this PR is merged):
@@ -95,3 +74,4 @@ Stuff that still needs to be done (after this PR is merged):
 - natspec where it is missing
 - update specifications in docs
 - update docs
+- ERC1400 mentions some kind of controllers, which I have to look into (to decide if and how to support this in GlobalTokenExitRegistry)
