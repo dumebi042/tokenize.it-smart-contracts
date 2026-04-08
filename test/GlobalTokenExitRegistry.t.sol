@@ -156,4 +156,50 @@ contract GlobalTokenExitRegistryTest is Test {
         assertEq(address(registry.exits(token)), address(fakeExit1), "token1 exit wrong");
         assertEq(address(registry.exits(token2)), address(fakeExit2), "token2 exit wrong");
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ── Fuzz: only token admin can setExit ────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// Any address that does not hold DEFAULT_ADMIN_ROLE on the token must be rejected.
+    function testFuzz_SetExitRevertsForNonAdmin(address caller) public {
+        vm.assume(!token.hasRole(token.DEFAULT_ADMIN_ROLE(), caller));
+        FakeExit fakeExit = new FakeExit();
+        vm.prank(caller);
+        vm.expectRevert("caller is not token admin");
+        registry.setExit(token, IExit(address(fakeExit)));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ── ERC2771 ───────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// Admin calling setExit through the trusted forwarder (admin address appended to calldata)
+    /// must succeed: _msgSender() resolves to admin, not the forwarder.
+    function testSetExitViaERC2771TrustedForwarder() public {
+        FakeExit fakeExit = new FakeExit();
+        bytes memory callData = abi.encodePacked(
+            abi.encodeWithSelector(GlobalTokenExitRegistry.setExit.selector, token, IExit(address(fakeExit))),
+            admin
+        );
+        vm.prank(trustedForwarder);
+        (bool success, ) = address(registry).call(callData);
+        assertTrue(success, "setExit via trusted forwarder failed");
+        assertEq(address(registry.exits(token)), address(fakeExit), "exit not set via ERC2771");
+    }
+
+    /// An untrusted forwarder appending admin's address must NOT be treated as admin:
+    /// _msgSender() returns msg.sender (the untrusted address), so the call reverts.
+    function testSetExitUntrustedForwarderCannotSpoofAdmin() public {
+        FakeExit fakeExit = new FakeExit();
+        address untrusted = address(0xDEAD);
+        bytes memory callData = abi.encodePacked(
+            abi.encodeWithSelector(GlobalTokenExitRegistry.setExit.selector, token, IExit(address(fakeExit))),
+            admin
+        );
+        vm.prank(untrusted);
+        (bool success, ) = address(registry).call(callData);
+        assertFalse(success, "untrusted forwarder should not be able to spoof admin");
+        assertEq(address(registry.exits(token)), address(0), "exit must not be set");
+    }
 }
