@@ -82,7 +82,7 @@ abstract contract TokenSwapBase is
         require(address(_currency) != address(0), "currency can not be zero address");
         require(address(_token) != address(0), "token can not be zero address");
         require(
-            _token.allowList().map(address(_currency)) & TRUSTED_CURRENCY == TRUSTED_CURRENCY,
+            _token.allowList().map(address(_currency)) == TRUSTED_CURRENCY,
             "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
         );
         require(_receiver != address(0), "receiver can not be zero address");

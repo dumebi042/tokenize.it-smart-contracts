@@ -87,7 +87,7 @@ contract Distribution is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, Ree
         currency = _arguments.currency;
         require(address(_arguments.currency) != address(_arguments.token), "currency and token must be different");
         require(
-            token.allowList().map(address(_arguments.currency)) & TRUSTED_CURRENCY == TRUSTED_CURRENCY,
+            token.allowList().map(address(_arguments.currency)) == TRUSTED_CURRENCY,
             "currency needs to be on the allowlist with TRUSTED_CURRENCY attribute"
         );
         pricePerToken = _arguments.pricePerToken;

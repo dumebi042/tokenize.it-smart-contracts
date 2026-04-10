@@ -1246,7 +1246,7 @@ contract CrowdinvestingTest is Test {
 
     function testSettingInvalidCurrencyReverts(address someCurrency, uint256 currencyAttributes) public {
         vm.assume(someCurrency != address(0));
-        vm.assume(currencyAttributes & TRUSTED_CURRENCY != TRUSTED_CURRENCY);
+        vm.assume(currencyAttributes != TRUSTED_CURRENCY);
         vm.prank(owner);
         list.set(someCurrency, currencyAttributes);
 
