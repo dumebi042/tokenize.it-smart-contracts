@@ -12,14 +12,17 @@ Token holders can receive dividend payouts proportional to their token balance a
 
    - `token` and `snapshotId`
    - `currency`: the ERC-20 token used for payouts (must have `TRUSTED_CURRENCY` on the AllowList)
-   - `totalCurrencyAmount`: gross amount to distribute
-   - `reassignAfter`: timestamp from which unclaimed funds can be redirected
+   - `pricePerToken`: currency payout in smallest currency units per full token unit (same unit convention as `tokenPrice` in TokenSwap)
+   - `reassignOrDrainAfter`: timestamp from which unclaimed funds can be redirected or drained
+   - `initialReassignments` (optional): reassignments applied immediately at initialization, bypassing the time restriction
 
-   At initialization, the platform fee (`privateOfferFee`) is deducted from `totalCurrencyAmount` and sent to the fee collector. Only the net remainder is available for claims.
+   Optionally, the contract can be funded at initialization by providing a `_currencyProvider` and `_initialFundingAmount`.
 
-3. **Holders claim**: Any holder at snapshot time calls `Distribution.claim(recipient)`. Their share is `netAmount * balanceAtSnapshot / totalSupplyAtSnapshot`. Smart contract holders (e.g. CoinvestedPosition) can call `claim()` directly or have the owner use `reassign()` to redirect their share.
+3. **Holders claim**: Any holder at snapshot time calls `Distribution.claim(recipient, minPayout)`. Their gross share is `balanceAtSnapshot * pricePerToken / 10**token.decimals()`. The platform fee (`distributionFee`) is deducted per claim, and the net remainder is sent to `recipient`. Smart contract holders (e.g. CoinvestedPosition) can call `claim()` directly or have the owner use `reassign()` to redirect their share.
 
-4. **Reassignment** (recovery): If a holder cannot claim (lost key, broken smart contract), the owner can call `reassign(from, to, amount)` after `reassignAfter` to redirect that share. Every reassignment is recorded on-chain via the `Reassigned` event.
+4. **Reassignment** (recovery): If a holder cannot claim (lost key, broken smart contract), the owner can call `reassign(from, to, amount)` after `reassignOrDrainAfter` to redirect that share. Every reassignment is recorded on-chain via the `Reassigned` event.
+
+5. **Drain**: After `reassignOrDrainAfter`, the owner can call `drain(recipient, token)` to recover any ERC-20 tokens held by the contract (including unclaimed currency).
 
 ### CoinvestedPosition integration
 
@@ -36,23 +39,21 @@ When a company is acquired or wound down, it can set up an automated exit contra
 1. **Deploy Exit**: The company clones an Exit contract via `ExitCloneFactory`, providing:
 
    - `token`: the token to be redeemed
-   - `currency`: the payout currency (must have both `TRUSTED_CURRENCY` and `EURO_CURRENCY` on the AllowList — typically USDC, EURe, EUROC)
+   - `currency`: the payout currency (must have `TRUSTED_CURRENCY` on the AllowList — typically EURe)
    - `pricePerToken`: currency payout in smallest currency units per full token unit (same unit convention as `tokenPrice` in TokenSwap)
    - `claimStart` / `drainStart`: the exit window
-   - `totalCurrencyAmount`: amount to pre-fund the contract with
+   - `referenceCurrencies` / `referenceToExitRates` (optional): exchange rates from reference currencies to the exit currency, used by CoinvestedPosition to convert carry when the position currency differs from the exit currency
 
-   The full `totalCurrencyAmount` is transferred from the funder to the Exit contract at initialization (no fee is taken here).
+   The full `_totalCurrencyAmount` is transferred from the funder to the Exit contract at initialization (no fee is taken here).
 
-2. **Holders claim**: From `claimStart` onwards, any holder calls `claim(tokenAmount, recipient)`. The contract:
+2. **Holders claim**: From `claimStart` onwards, any holder calls `claim(tokenAmount, recipient, minPayout)`. The contract:
 
    - Transfers `tokenAmount` tokens from the caller to itself (tokens are held, not burned)
    - Calculates gross payout: `tokenAmount * pricePerToken / 10**token.decimals()`
-   - Deducts `privateOfferFee` and sends it to the fee collector
-   - Sends net payout to `recipient`
+   - Deducts `exitFee` and sends it to the fee collector
+   - Sends net payout to `recipient`; reverts if net payout is below `minPayout`
 
-   Claims are rejected before `claimStart` or at/after `drainStart`.
-
-3. **Drain**: After `drainStart`, the company can call `drain(recipient)` to recover any unclaimed currency.
+3. **Drain**: After `drainStart`, the company can call `drain(recipient, token)` to recover any ERC-20 tokens held by the contract (unclaimed currency, accumulated exit tokens, etc.).
 
 ### Security considerations
 
@@ -66,11 +67,11 @@ A `CoinvestedPosition` can participate in an exit via `distributeExit(exit, curr
 
 ## Summary
 
-| Feature              | Distribution                      | Exit                                 |
-| -------------------- | --------------------------------- | ------------------------------------ |
-| Price determination  | Proportional to snapshot balance  | Fixed price per token                |
-| Snapshot required    | Yes                               | No                                   |
-| Token fate           | Held by token holder throughout   | Transferred to Exit contract         |
-| Fee timing           | Once at initialization            | Per claim                            |
-| Recovery mechanism   | `reassign()` by owner after delay | `drain()` by owner after window      |
-| Currency requirement | `TRUSTED_CURRENCY`                | `TRUSTED_CURRENCY` + `EURO_CURRENCY` |
+| Feature              | Distribution                      | Exit                            |
+| -------------------- | --------------------------------- | ------------------------------- |
+| Price determination  | Fixed price per token             | Fixed price per token           |
+| Snapshot required    | Yes                               | No                              |
+| Token fate           | Held by token holder throughout   | Transferred to Exit contract    |
+| Fee timing           | Per claim                         | Per claim                       |
+| Recovery mechanism   | `reassign()` by owner after delay | `drain()` by owner after window |
+| Currency requirement | `TRUSTED_CURRENCY`                | `TRUSTED_CURRENCY`              |

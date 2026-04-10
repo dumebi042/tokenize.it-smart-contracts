@@ -93,10 +93,10 @@ The CoinvestedPosition contract handles the case where a group of investors co-i
 **Three payout paths:**
 
 1. **Token sale (`buy()`)**: A buyer purchases tokens from the contract at `tokenPrice`. After fees, the co-investor receives the base price portion and lead investors split any surplus (carry). Starts paused; owner unpauses when ready to sell.
-2. **Dividends (`distributeDividends()`)**: The contract owner claims a dividend Distribution on behalf of the contract, then settles the received currency among lead investors (all dividend proceeds treated as carry) with remainder to the co-investor receiver.
-3. **Exit (`distributeExit()`)**: The contract owner participates in an Exit contract by redeeming the full token balance, then splits proceeds: lead investors receive carry above the base price, co-investor receives everything else.
+2. **Dividends (`claimDistribution()`)**: The contract owner claims a dividend Distribution on behalf of the contract, then settles the received currency among lead investors (all dividend proceeds treated as carry) with remainder to the co-investor receiver.
+3. **Exit (`claimExit()`)**: The contract owner participates in an Exit contract by redeeming the full token balance, then splits proceeds: lead investors receive carry above the base price, co-investor receives everything else.
 
-**Currency flexibility**: `basePrice` is fixed in EURO bits at initialization. The actual trade currency can be any trusted EURO ERC-20 token and can be changed by the owner; the contract scales `basePrice` automatically to match the current currency's decimals.
+**Currency flexibility**: `basePrice` is fixed in the base currency's bits at initialization. After the timelock has expired, the owner can switch to a different trusted ERC-20 currency by calling `setCurrency(currency, basePrice)`, supplying the base price re-expressed in the new currency's units.
 
 ## Distributions
 

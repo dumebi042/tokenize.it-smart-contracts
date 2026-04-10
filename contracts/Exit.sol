@@ -24,9 +24,17 @@ struct ExitInitializerArguments {
     uint64 claimStart;
     /// @notice Timestamp after which claims expire
     uint64 drainStart;
-    /// @notice Currencies that positions may have been denominated in (parallel array with referenceToExitRates)
+    /// @notice Currencies that CoinvestedPositions may have been denominated in (parallel array with referenceToExitRates).
+    ///         See referenceToExitRates for the rate convention.
     IERC20[] referenceCurrencies;
-    /// @notice Exit currency units per 10**referenceCurrency.decimals() for each reference currency (parallel array with referenceCurrencies)
+    /// @notice Exchange rates from each reference currency to the exit currency, expressed using the same
+    ///         convention as tokenPrice (see docs/price.md):
+    ///             exitCurrencyBits = referenceCurrencyBits * rate / 10**referenceCurrency.decimals()
+    ///         Example: exit currency is USDC (6 decimals), reference currency is EURe (18 decimals),
+    ///         1 EURe = 5 USDC. Then rate = 5e6, because:
+    ///             5e6 USDC bits = 1e18 EURe bits * 5e6 / 10**18
+    ///         This rate is used by CoinvestedPosition to convert a carry amount denominated in the
+    ///         reference currency into the exit currency so carry splits can be calculated correctly.
     uint256[] referenceToExitRates;
 }
 
@@ -49,8 +57,14 @@ contract Exit is ERC2771ContextUpgradeable, Ownable2StepUpgradeable, ReentrancyG
     uint256 public pricePerToken;
     uint64 public claimStart;
     uint64 public drainStart;
-    /// @notice Exit currency units per 10**referenceCurrency.decimals() for each reference currency.
-    ///         Used by CoinvestedPosition to auto-convert carry when exit currency differs from position currency.
+    /// @notice Exchange rate from a reference currency to the exit currency.
+    ///         Expressed as exit-currency bits per 10**referenceCurrency.decimals() reference-currency bits —
+    ///         the same convention as tokenPrice (see docs/price.md):
+    ///             exitCurrencyBits = referenceCurrencyBits * referenceToExitRate[ref] / 10**ref.decimals()
+    ///         Example: exit currency is USDC (6 decimals), reference currency is EURe (18 decimals),
+    ///         1 EURe = 5 USDC → referenceToExitRate[EURe] = 5e6
+    ///         Used by CoinvestedPosition to convert a carry threshold denominated in the position's
+    ///         base currency into the exit currency when the two differ.
     mapping(IERC20 => uint256) public referenceToExitRate;
 
     /**
