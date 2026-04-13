@@ -31,8 +31,11 @@ contract tokenTest is Test {
     function setUp() public {
         allowList = createAllowList(trustedForwarder, admin);
         vm.prank(feeSettingsOwner);
-        Fees memory fees = Fees(100, 100, 100, 0);
-        feeSettings = createFeeSettings(trustedForwarder, address(this), fees, admin, admin, admin);
+        feeSettings = createFeeSettings(
+            trustedForwarder,
+            address(this),
+            buildFeeTypes(100, 100, 100, admin, admin, admin)
+        );
         token = Token(
             tokenCloneFactory.createTokenProxy(
                 0,
@@ -178,6 +181,7 @@ contract tokenTest is Test {
     function testXCanNotSetRequirements(address X) public {
         // x is missing the Requirements role
         vm.assume(X != requirer);
+        vm.assume(X != trustedForwarder);
         vm.prank(X);
         vm.expectRevert();
         token.setRequirements(3);
@@ -522,6 +526,7 @@ contract tokenTest is Test {
     function testTransferTo0(address _address) public {
         vm.assume(token.balanceOf(_address) == 0);
         vm.assume(_address != address(0));
+        vm.assume(_address != trustedForwarder);
         vm.assume(_address != FeeSettings(address(token.feeSettings())).feeCollector());
 
         uint _amount = 100;

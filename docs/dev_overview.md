@@ -47,6 +47,19 @@ Furthermore, this contract can be paused by the owner to change the parameters. 
 
 ## Secondary Market Trading
 
+### TokenSwapBase (TokenSwapBase.sol)
+
+`TokenSwapBase` is an abstract base contract that provides shared state, fee handling, price management, and pause controls. It is not deployed directly; both `TokenSwap` and `CoinvestedPosition` extend it.
+
+**Shared state:**
+
+- `tokenPrice`: amount of currency bits per main token unit
+- `currency`: ERC-20 payment token
+- `token`: the Token being traded
+- `receiver`: destination for currency (sell) or tokens (buy)
+
+**Shared capabilities:** owner-controlled price updates, pause/unpause, ERC-2771 meta-transaction support, reentrancy protection, and a unified fee-lookup helper (`_getFeeAndFeeReceiver`).
+
 ### TokenSwap (TokenSwap.sol)
 
 The TokenSwap contract enables secondary market trading where investors can buy or sell existing tokens between each other. Unlike the primary market contracts (PrivateOffer and Crowdinvesting) which mint new tokens, TokenSwap facilitates peer-to-peer transfers of already-issued tokens.
@@ -81,6 +94,65 @@ The TokenSwap contract enables secondary market trading where investors can buy 
 3. Tokens flow from seller to receiver, currency flows from holder to seller
 
 The contract validates that the currency is trusted (via AllowList) and collects fees according to FeeSettings.
+
+## Dividends, Distributions and Exit
+
+### Distribution (Distribution.sol)
+
+Distributes a fixed pot of currency to token holders proportional to a prior snapshot of the Token contract.
+
+**Key details:**
+
+- At initialization, the contract pulls `totalCurrencyAmount` from `_currencyProvider` and deducts a platform fee using `privateOfferFee`. Only the net amount after fees is actually available for claims.
+- `eligible(address)` returns a holder's unclaimed amount: `totalCurrencyAmount * balanceOfAt(snapshotId) / totalSupplyAt(snapshotId) + extraCredit - paidOut`.
+- `claim(address recipient)` transfers the caller's eligible amount, marked via `paidOut`.
+- `reassign(from, to, amount)` lets the owner redirect unclaimed funds (e.g. for a holder who lost their key, or a non-mintable vesting contract or similar), available only after `reassignAfter`. Emits `Reassigned` for on-chain auditability.
+- Currency must have `TRUSTED_CURRENCY` attribute on the token's AllowList.
+
+### Exit (Exit.sol)
+
+Automated exit redemption: holders send tokens and receive a fixed currency payout.
+
+**Key details:**
+
+- At initialization, the contract is funded with the full payout amount in currency (no fee deducted at init; per-claim fee is deducted at `claim()` time using `privateOfferFee`).
+- Currency must have both `TRUSTED_CURRENCY` and `EURO_CURRENCY` attributes on the token's AllowList.
+- `claim(tokenAmount, recipient)` is valid only between `claimStart` and `drainStart`. It transfers tokens from the caller to the Exit contract (tokens are held, not burned) and sends `tokenAmount * pricePerToken / 10**token.decimals() - fee` currency to the recipient.
+- `drain(recipient)` can be called by the owner after `drainStart` to recover unclaimed currency.
+
+### CoinvestedPosition (CoinvestedPosition.sol)
+
+Extends `TokenSwapBase`. Holds tokens for a co-investor and manages carry distributions to lead investors.
+
+**Key details:**
+
+- Initialized paused; the owner unpauses when ready to sell (allowing `buy()` price to be set first).
+- `basePrice` is set in the smallest units of `baseCurrency` at initialization.
+- `leadInvestors`: array of `{account, carryFraction}`. `carryFraction` documents who is eligible to how much of the carry. The fractions are scaled with uint64max, so uint64max == 1 == 100% of carry.
+- `setCurrency(currency, basePrice)` lets the owner switch the reference currency after the timelock has expired; the caller must supply the new `basePrice` expressed in the new currency's units.
+
+**Effective base price in `claimExit()`**
+
+Two distinct base price values appear here:
+
+- `basePrice` — the storage variable, refers to `baseCurrency`. Can only be updated after timelock has expired.
+- `_basePrice` — the `claimExit()` parameter, expressed in bits of the **exit** currency. Only used as a fallback (see below); pass `0` when auto-conversion applies.
+
+`claimExit()` derives the effective base price in priority order:
+
+1. **Same currency**: if the exit currency matches the stored `currency`, `basePrice` is used directly.
+2. **Auto-conversion via `referenceToExitRate`**: if the Exit contract has a rate set for the stored `currency` (see `referenceToExitRate` in [Exit.sol](../contracts/Exit.sol)), `basePrice` is converted to exit-currency units automatically:
+   ```
+   effectiveBasePrice = basePrice * rate / 10**baseCurrency.decimals()
+   ```
+   The rate convention is the same as `tokenPrice` (see [price.md](price.md)): exit-currency bits per `10**referenceCurrency.decimals()` reference-currency bits.
+3. **Caller-supplied fallback**: if neither of the above applies, `claimExit()` requires a non-zero `_basePrice` parameter, which the caller must express in exit-currency units.
+
+- Three payout paths all funnel into `_settle(carry, currency)`:
+  1. `buy()`: buyer purchases tokens; fee deducted; co-investor gets base price portion; lead investors split carry.
+  2. `claimDistribution(dist, minPayout)`: claims from a `Distribution` contract; all received currency treated as carry.
+  3. `claimExit(minCurrencyAmount, basePrice)`: redeems full token balance via an `Exit` contract, carry is calculated from proceeds, tokenAmount and basePrice.
+- `_settle()` sweeps the contract's full balance of `_currency` to `receiver` after lead investor shares are distributed, covering both the base price portion and any rounding dust, as well currency the contract may have held before settlement.
 
 ## Employee participation
 

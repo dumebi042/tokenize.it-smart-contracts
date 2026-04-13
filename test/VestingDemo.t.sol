@@ -48,10 +48,7 @@ contract VestingDemoTest is Test {
         FeeSettings feeSettings = createFeeSettings(
             trustedForwarder,
             platformAdmin,
-            Fees(100, 500, 200, 0),
-            platformAdmin,
-            platformAdmin,
-            platformAdmin
+            buildFeeTypes(100, 500, 200, platformAdmin, platformAdmin, platformAdmin)
         );
         AllowList allowList = createAllowList(trustedForwarder, owner);
         Token localCompanyToken = Token(

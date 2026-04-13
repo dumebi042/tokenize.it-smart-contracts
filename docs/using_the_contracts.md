@@ -56,39 +56,35 @@ factory.createTokenProxy(
 
 In order to create a personal investment invite this [contract](../contracts/PrivateOffer.sol) needs to be used. It is created through the private offer factory.
 
-Constructor:
-
 ```solidity
-factory.deploy(
-        bytes32 _salt,
-        address _currencyPayer,
-        address _tokenReceiver,
-        address _currencyReceiver,
-        uint256 _tokenAmount,
-        uint256 _tokenPrice,
-        uint256 _expiration,
-        IERC20 _currency,
-        IERC20 _token
-    )
+factory.deployPrivateOffer(
+    bytes32 _rawSalt,
+    PrivateOfferArguments calldata _arguments
+)
 ```
 
-- `_salt`: a random number that influences the future contract address
-- `_currencyPayer`: address of the investor that has granted the allowance in the currency contract
-- `_tokenReceiver`: address of the investor that shall receive the tokens
-- `_currencyReceiver`: address of the recipient of the payment
-- `_tokenAmount`: amount of tokens the investor can to buy, in [bits](https://docs.openzeppelin.com/contracts/2.x/crowdsales#crowdsale-rate) (smallest subunit of the token, e.g. the equivalent of WEI for Ether)
-- `_tokenPrice`: price per token denoted in the currency defined in the next field, and denominated in [bits](https://docs.openzeppelin.com/contracts/2.x/crowdsales#crowdsale-rate). Please refer to the [price explanation](price.md) for more details.
-- `_expiration`: Unix timestamp at which the offer expires
-- `_currency` : ERC20 token used for the payment. The `_buyer` must first give this contract the allowance to spend the amount he wants to invest.
-- `_token` : address of the token deployed when creating the new company
+Where `PrivateOfferArguments` contains:
 
-The investment is executed during deployment of the contract. Therefore, three steps are necessary BEFORE deployment, or the deployment transaction will revert:
+- `currencyPayer`: address of the investor that has granted the allowance in the currency contract
+- `tokenReceiver`: address of the investor that shall receive the tokens
+- `currencyReceiver`: address of the recipient of the payment
+- `tokenAmount`: amount of tokens to buy, in [bits](price.md#terms-used) (smallest subunit of the token, e.g. the equivalent of WEI for Ether)
+- `tokenPrice`: price per token denoted in the currency defined below, and denominated in [bits](price.md#terms-used). Please refer to the [price explanation](price.md) for more details.
+- `expiration`: Unix timestamp at which the offer expires
+- `currency`: ERC20 token used for the payment
+- `token`: address of the token deployed when creating the new company
+- `tokenHolder`: if set, tokens are transferred from this address instead of being minted; if zero address, tokens are minted from the token contract
 
-- All constructor arguments must be agreed upon to calculate the future address of the contract.
-- The future contract address needs to be given a minting right in the company token contract by calling `increaseMintingAllowance` from an address which has the role of the Minter Admin. In that call, an allowance needs to be given which matches or exceeds the `_tokenAmount`. This step signals the offering company's invitation.
-- The investor needs to give a a sufficient allowance in the currency contract to the future address of the contract. This step signals the investors commitment to the offer.
+The investment is executed during deployment of the contract. Therefore, the following steps are necessary BEFORE deployment, or the deployment transaction will revert:
 
-Once these steps have been completed, the Private Offer contract can be deployed by anyone (either of the two parties or a third party) with [CREATE2](https://docs.openzeppelin.com/cli/2.8/deploying-with-create2), through the Private Offer Factory's deploy() function.
+- All arguments must be agreed upon to calculate the future address of the contract.
+- If `tokenHolder` is zero (minting): the future contract address needs to be given a minting right in the company token contract by calling `increaseMintingAllowance` from an address with the Minter Admin role. This step signals the offering company's invitation.
+- If `tokenHolder` is set (transfer): the `tokenHolder` must give a sufficient token allowance to the future contract address.
+- The investor needs to give a sufficient allowance in the currency contract to the future address of the contract. The required currency amount is `ceil(tokenAmount * tokenPrice / 10**token.decimals())`. This step signals the investor's commitment to the offer.
+
+Once these steps have been completed, the Private Offer contract can be deployed by anyone (either of the two parties or a third party) with [CREATE2](https://docs.openzeppelin.com/cli/2.8/deploying-with-create2), through the Private Offer Factory's `deployPrivateOffer()` function.
+
+The factory also provides `deployPrivateOfferWithTimeLock()`, which deploys both a PrivateOffer and a TimeLock in one transaction — tokens are minted directly into the TimeLock and can only be withdrawn after a specified unlock timestamp.
 
 ## Crowdinvesting / Starting an open round
 
@@ -96,46 +92,35 @@ Deploy the [contract](../contracts/Crowdinvesting.sol) using the factory.
 
 ```solidity
 factory.createCrowdinvestingClone(
-        bytes32 _rawSalt,
-        address _trustedForwarder,
-        address _owner,
-        address _currencyReceiver,
-        uint256 _minAmountPerBuyer,
-        uint256 _maxAmountPerBuyer,
-        uint256 _tokenPrice,
-        uint256 _maxAmountOfTokenToBeSold,
-        IERC20 _currency,
-        Token _token,
-        uint256 _lastBuyDate,
-        address _priceOracle
-    )
+    bytes32 _rawSalt,
+    address _trustedForwarder,
+    CrowdinvestingInitializerArguments memory _arguments
+)
 ```
 
-- `_rawSalt`: a random number that influences the future contract address
-- `_trustedForwarder`: contract that performs on-chain signature verification for [EIP-2771 meta transactions](../README.md#eip-2771)
-- `_owner`: address of the owner of the fundraising contract. This address can change the parameters of the fundraising contract, and can pause it.
-- `_currencyReceiver`: address of the recipient of the payment
-- `_minAmountPerBuyer`: Minimum amount of tokens an investor needs to buy, in [bits](https://docs.openzeppelin.com/contracts/2.x/crowdsales#crowdsale-rate)
+Where `CrowdinvestingInitializerArguments` contains:
 
-- `_maxAmountPerBuyer`: Maximum amount of tokens an investor can buy (can be the same as `_minAmountPerBuyer`), in [bits](https://docs.openzeppelin.com/contracts/2.x/crowdsales#crowdsale-rate)
-- `_tokenPrice`: price per token denoted in `_currency`, and denominated in [bits](https://docs.openzeppelin.com/contracts/2.x/crowdsales#crowdsale-rate). Please refer to the [price explanation](price.md) for more details.
+- `owner`: address of the owner of the fundraising contract. This address can change the parameters of the fundraising contract, and can pause it.
+- `currencyReceiver`: address of the recipient of the payment
+- `minAmountPerBuyer`: minimum amount of tokens an investor needs to buy, in [bits](price.md#terms-used)
+- `maxAmountPerBuyer`: maximum amount of tokens an investor can buy in total (can be the same as `minAmountPerBuyer`), in [bits](price.md#terms-used)
+- `tokenPrice`: price per token denoted in `currency`, and denominated in [bits](price.md#terms-used). Please refer to the [price explanation](price.md) for more details.
+- `priceMin`: minimum price accepted from a dynamic pricing oracle (unused if no oracle is set)
+- `priceMax`: maximum price accepted from a dynamic pricing oracle (unused if no oracle is set)
+- `maxAmountOfTokenToBeSold`: the maximum amount of tokens to be sold in this round, denominated in [bits](price.md#terms-used)
+- `currency`: ERC20 token used for the payment
+- `token`: address of the token deployed when creating the new company
+- `lastBuyDate`: Unix timestamp at which the fundraising will stop selling tokens automatically. Set to 0 to disable. Ensures the fundraising cannot be forgotten to be stopped when regulations require it.
+- `priceOracle`: address of the price oracle contract for dynamic pricing. Set to zero address to disable.
+- `tokenHolder`: if set, tokens are transferred from this address instead of being minted; if zero address, tokens are minted from the token contract
 
-- `_maxAmountOfTokenToBeSold` : the maximum amount of token to be sold in this round, denominated in [bits](https://docs.openzeppelin.com/contracts/2.x/crowdsales#crowdsale-rate)
+If `tokenHolder` is zero (minting), the contract needs to be given a minting allowance in the company token contract by calling `increaseMintingAllowance` from an address with the MintAllower role. The allowance should be set to `maxAmountOfTokenToBeSold` tokens.
 
-- `_currency` : ERC20 token used for the payment.
-
-- `_token` : address of the token deployed when creating the new company
-- `_lastBuyDate` : Unix timestamp at which the fundraising will stop selling tokens automatically. This is to ensure the fundraising can not be forgotten to be stopped when regulations require it.
-- `_priceOracle` : address of the price oracle contract. The price oracle can influence the price of the token. It is used to implement dynamic pricing. If no dynamic pricing is used, this can be set to 0x0.
-
-The contract needs to be given a minting allowance in the company token contract by calling `increaseMintingAllowance` from an address which has the role of the MintAllower. The allowance should be set to `_maxAmountOfTokenToBeSold` tokens.
-
-An investor can buy tokens by calling the `buy(uint256 _tokenAmount, uint256 _maxCurrencyAmount,address _tokenReceiver)` function.
-`_amount` ist the amount of tokens they are buying, in [bits](https://docs.openzeppelin.com/contracts/2.x/crowdsales#crowdsale-rate).
+An investor can buy tokens by calling the `buy(uint256 _tokenAmount, uint256 _maxCurrencyAmount, address _tokenReceiver)` function. `_tokenAmount` is the amount of tokens they are buying, in [bits](price.md#terms-used).
 
 The investor needs to give a sufficient allowance in the currency contract to the Crowdinvesting contract for the deal to be successful.
 
-The owner of the Crowdinvesting contract can pause the contract by calling `pause()`, which stops further buys. When paused, parameters of the fundraising can be changed. Each parameter change (re-)starts a cool down period of 24 hours. Only after this cool down period has passed can the fundraising be unpaused by calling `unpause()`. This is to ensure an investor can know the conditions that currently apply before investing (e.g. frontrunning a buy with a price increase is not possible).
+The owner of the Crowdinvesting contract can pause the contract by calling `pause()`, which stops further buys. When paused, parameters of the fundraising can be changed. Each parameter change (re-)starts a cool down period of 1 hour. Only after this cool down period has passed can the fundraising be unpaused by calling `unpause()`. This is to ensure an investor can know the conditions that currently apply before investing (e.g. frontrunning a buy with a price increase is not possible).
 
 ## Secondary Market Trading
 
@@ -158,7 +143,7 @@ Where `TokenSwapInitializerArguments` contains:
 - `owner`: Address that can pause/unpause and update contract parameters
 - `receiver`: Address that receives currency (sell orders) or tokens (buy orders)
 - `holder`: Address holding tokens (sell orders) or currency (buy orders)
-- `tokenPrice`: Price per token in currency, denominated in [bits](https://docs.openzeppelin.com/contracts/2.x/crowdsales#crowdsale-rate). See [price explanation](price.md)
+- `tokenPrice`: Price per token in currency, denominated in [bits](price.md#terms-used). See [price explanation](price.md)
 - `currency`: ERC20 token used for payment (must be on allowlist with TRUSTED_CURRENCY attribute)
 - `token`: The company token being traded
 
@@ -192,7 +177,7 @@ The owner can pause the contract using `pause()` to disable swaps, and unpause i
 
 **Fees:**
 
-TokenSwap charges crowdinvesting fees according to the FeeSettings contract, similar to primary market offerings. Fees are only deducted from the currency transferred, not the token.
+TokenSwap charges secondary market fees according to the FeeSettings contract. Fees are only deducted from the currency transferred, not the token.
 
 **Expiration:**
 

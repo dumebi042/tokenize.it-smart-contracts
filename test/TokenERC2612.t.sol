@@ -65,14 +65,17 @@ contract TokenERC2612Test is Test {
         allowList = createAllowList(trustedForwarder, platformAdmin);
 
         // deploy fee settings
-        Fees memory fees = Fees(tokenFeeNumerator, crowdinvestingFeeNumerator, privateOfferFeeNumerator, 0);
         feeSettings = createFeeSettings(
             trustedForwarder,
             platformAdmin,
-            fees,
-            feeCollector,
-            feeCollector,
-            feeCollector
+            buildFeeTypes(
+                tokenFeeNumerator,
+                crowdinvestingFeeNumerator,
+                privateOfferFeeNumerator,
+                feeCollector,
+                feeCollector,
+                feeCollector
+            )
         );
 
         // deploy forwarder

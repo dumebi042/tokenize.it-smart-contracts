@@ -10,6 +10,9 @@ jobs:
       - uses: actions/setup-node@v1
         with:
           node-version: 16.x
-      - run: test "$(grep msg.sender contracts/Token.sol contracts/Crowdinvesting.sol contracts/FeeSettings.sol contracts/AllowList.sol |wc -l)" -eq 0 && test "$(grep msg.data contracts/Token.sol contracts/Crowdinvesting.sol contracts/FeeSettings.sol contracts/AllowList.sol |wc -l)" -eq 0
-
-      # these contracts inherit from ERC2771Context and may not contain msg.sender or msg.data. Instead, they must use _msgSender() and _msgData()
+      # Contracts that inherit ERC2771Context(Upgradeable) must use _msgSender()/_msgData() instead of msg.sender/msg.data.
+      # The list is derived dynamically so newly added ERC2771 contracts are automatically covered.
+      - run: |
+          files=$(grep -rl 'ERC2771Context' contracts/)
+          test "$(echo "$files" | xargs grep 'msg\.sender' | wc -l)" -eq 0
+          test "$(echo "$files" | xargs grep 'msg\.data' | wc -l)" -eq 0

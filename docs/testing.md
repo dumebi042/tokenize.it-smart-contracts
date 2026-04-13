@@ -30,6 +30,34 @@ More information can be found here:
 - https://mirror.xyz/susheen.eth/bRCzT2QLdNINMVk8251udkfjHW_T9ascCQ1DV9hURz0
 - https://www.paradigm.xyz/2021/12/introducing-the-foundry-ethereum-development-toolbox#you-should-be-able-to-run-your-tests-against-a-live-networks-state
 
+## Backwards-compatibility tests
+
+Old deployed contracts must continue to work after a FeeSettings upgrade. The backwards-compatibility test suite verifies this by deploying old contract versions against the current FeeSettings.
+
+Run with:
+
+```bash
+yarn test-backwards-compatibility
+# or directly:
+make test-backwards-compatibility
+```
+
+### How it works
+
+Old contract bytecode is taken from published npm packages (`@tokenize.it/contracts@<version>`) and deployed at test runtime via Foundry's `deployCode` cheatcode. No legacy source files are compiled — this avoids OZ version conflicts and context-specific remappings. Only the current FeeSettings and FeeSettingsCloneFactory are compiled from source and deployed normally.
+
+The npm packages are installed into `test/legacy/` by the Makefile before running `forge test`. That directory is gitignored; packages are fetched fresh on every run.
+
+### Covered versions
+
+Check `Makefile` and `testing/backwards-compatibility` to see which inter-version tests have been created so far.
+
+### How to add a new version
+
+1. Add an `install-legacy-v<VERSION>` target to the `Makefile` (copy an existing one as template).
+2. Add it as a dependency of `test-backwards-compatibility`.
+3. Add a `test/backwards-compatibility/BackwardsCompatibilityV<VERSION>.t.sol` test file.
+
 ## Measuring coverage
 
 Run `forge coverage` to measure coverage. Unfortunately, forge measures coverage of contracts in test/resources, too, which spoils the total results.

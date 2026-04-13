@@ -5,15 +5,20 @@ import "../lib/forge-std/src/Test.sol";
 import "../lib/forge-std/src/console.sol";
 import "../contracts/Token.sol";
 import "../contracts/factories/FeeSettingsCloneFactory.sol";
+import "../contracts/common/IFeeSettings.sol";
 import "../contracts/factories/CrowdinvestingCloneFactory.sol";
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/factories/PrivateOfferFactory.sol";
+import "../contracts/factories/TimeLockCloneFactory.sol";
 import "./resources/FakePaymentToken.sol";
 import "./resources/CloneCreators.sol";
 
 contract FeeSettingsIntegrationTest is Test {
     FeeSettings feeSettings;
-    Fees customFees;
+    uint32 customTokenFeeNumerator;
+    uint32 customCrowdinvestingFeeNumerator;
+    uint32 customPrivateOfferFeeNumerator;
+    uint64 customFeeValidity;
     Token token;
     FakePaymentToken currency;
     PrivateOfferFactory privateOfferFactory;
@@ -40,19 +45,18 @@ contract FeeSettingsIntegrationTest is Test {
     function setUp() public {
         FeeSettings feeSettingsLogic = new FeeSettings(trustedForwarder);
         FeeSettingsCloneFactory feeSettingsCloneFactory = new FeeSettingsCloneFactory(address(feeSettingsLogic));
-        customFees = Fees(10, 20, 30, 101 * 365 days);
-        Fees memory fees = Fees(101, 102, 103, 0);
+        customTokenFeeNumerator = 10;
+        customCrowdinvestingFeeNumerator = 20;
+        customPrivateOfferFeeNumerator = 30;
+        customFeeValidity = uint64(101 * 365 days);
+        FeeSettings.FeeTypeInit[] memory feeTypes = new FeeSettings.FeeTypeInit[](4);
+        feeTypes[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN, 500, 101, platformAdmin);
+        feeTypes[1] = FeeSettings.FeeTypeInit(FeeTypes.CROWDINVESTING, 1000, 102, platformAdmin);
+        feeTypes[2] = FeeSettings.FeeTypeInit(FeeTypes.PRIVATE_OFFER, 500, 103, platformAdmin);
+        feeTypes[3] = FeeSettings.FeeTypeInit(FeeTypes.SECONDARY_MARKET, 500, 0, platformAdmin);
         vm.prank(platformAdmin);
         feeSettings = FeeSettings(
-            feeSettingsCloneFactory.createFeeSettingsClone(
-                "salt",
-                trustedForwarder,
-                platformAdmin,
-                fees,
-                platformAdmin,
-                platformAdmin,
-                platformAdmin
-            )
+            feeSettingsCloneFactory.createFeeSettingsClone("salt", trustedForwarder, platformAdmin, feeTypes)
         );
 
         vm.startPrank(paymentTokenProvider);
@@ -83,7 +87,7 @@ contract FeeSettingsIntegrationTest is Test {
         crowdinvestingCloneFactory = new CrowdinvestingCloneFactory(address(crowdinvestingLogic));
 
         // using a fake vesting clone factory here because we don't need this functionality for this test
-        privateOfferFactory = new PrivateOfferFactory(VestingCloneFactory(address(294)));
+        privateOfferFactory = new PrivateOfferFactory(TimeLockCloneFactory(address(294)));
     }
 
     function testMintUsesCustomFeeAndCollector(address _customFeeCollector) public {
@@ -98,8 +102,8 @@ contract FeeSettingsIntegrationTest is Test {
         assertEq(token.balanceOf(_customFeeCollector), 0, "token.balanceOf(customFeeCollector) != 0 before");
 
         vm.startPrank(platformAdmin);
-        feeSettings.setCustomFee(address(token), customFees);
-        feeSettings.setCustomTokenFeeCollector(address(token), _customFeeCollector);
+        feeSettings.setCustomFee(FeeTypes.TOKEN, address(token), customTokenFeeNumerator, customFeeValidity);
+        feeSettings.setCustomFeeCollector(FeeTypes.TOKEN, address(token), _customFeeCollector);
         vm.stopPrank();
         vm.prank(companyAdmin);
         token.mint(investor, tokenAmount);
@@ -120,8 +124,14 @@ contract FeeSettingsIntegrationTest is Test {
         vm.warp(100 * 365 days);
 
         vm.startPrank(platformAdmin);
-        feeSettings.setCustomFee(address(token), customFees);
-        feeSettings.setCustomPrivateOfferFeeCollector(address(token), _customFeeCollector);
+        feeSettings.setCustomFee(FeeTypes.TOKEN, address(token), customTokenFeeNumerator, customFeeValidity);
+        feeSettings.setCustomFee(
+            FeeTypes.PRIVATE_OFFER,
+            address(token),
+            customPrivateOfferFeeNumerator,
+            customFeeValidity
+        );
+        feeSettings.setCustomFeeCollector(FeeTypes.PRIVATE_OFFER, address(token), _customFeeCollector);
         vm.stopPrank();
 
         assertEq(token.balanceOf(investor), 0, "token.balanceOf(investor) != 0 before");
@@ -196,8 +206,14 @@ contract FeeSettingsIntegrationTest is Test {
         vm.warp(100 * 365 days);
 
         vm.startPrank(platformAdmin);
-        feeSettings.setCustomFee(address(token), customFees);
-        feeSettings.setCustomCrowdinvestingFeeCollector(address(token), _customFeeCollector);
+        feeSettings.setCustomFee(FeeTypes.TOKEN, address(token), customTokenFeeNumerator, customFeeValidity);
+        feeSettings.setCustomFee(
+            FeeTypes.CROWDINVESTING,
+            address(token),
+            customCrowdinvestingFeeNumerator,
+            customFeeValidity
+        );
+        feeSettings.setCustomFeeCollector(FeeTypes.CROWDINVESTING, address(token), _customFeeCollector);
         vm.stopPrank();
 
         assertEq(token.balanceOf(investor), 0, "token.balanceOf(investor) != 0 before");

@@ -1,13 +1,30 @@
 # Price
 
-The price definition used in PrivateOffer.sol and Crowdinvesting.sol is not very intuitive. Therefore, it is explained here for reference whenever needed.
+The price definition used throughout the codebase is not very intuitive. It was derived from the necessity to achieve sufficient precision using integer math. Therefore, it is explained here for reference whenever needed.
 
 ## Terms used
 
-- bit: smallest subunit of token A is called A**bit**, in accordance with [openzeppelin](https://docs.openzeppelin.com/contracts/2.x/crowdsales#crowdsale-rate)
+### bit
 
-- tokenPrice: "amount of subunits of currency per main unit token (e.g.: 2 USDC (6 decimals) per TOK (18 decimals) => price = 2\*10^6 )"
-- token: will be abbreviated T for full tokens and Tbit for bits of the token
+A bit is the smallest subunit of a token, in accordance with [OpenZeppelin's original definition](https://web.archive.org/web/20191212000648/docs.openzeppelin.com/contracts/2.x/crowdsales):
+
+> In Ether, the smallest unit of the currency is wei, and 1 ETH === 10^18 wei. In tokens, the process is very similar: 1 TKN === 10^(decimals) TKNbits.
+>
+> - The smallest unit of a token is "bits" or TKNbits.
+> - The display value of a token is TKN, which is TKNbits \* 10^(decimals)
+>
+> What people usually call "one token" is actually a bunch of TKNbits, displayed to look like 1 TKN. This is the same relationship that Ether and wei have. And what you're always doing calculations in is TKNbits and wei.
+
+### tokenPrice
+
+The tokenPrice is the "amount of subunits of currency per main unit token (e.g.: 2 USDC (6 decimals) per TOK (18 decimals) => price = 2\*10^6 )"
+
+### token
+
+Token will be abbreviated:
+
+- T for full tokens (as in `10^decimals` bits)
+- Tbit for bits of the token
 
 ## Definition
 
@@ -41,7 +58,7 @@ The error introduced by rounding is less than or equal to one currency bit. For 
 
 - [currency] = USDC
 - USDC has 6 decimals (https://etherscan.io/token/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48)
-- so 2.7 USDC = 2.7 \* 10\*\*6 USDCbit = 2600000 USDCbit
+- so 2.7 USDC = 2.7 \* 10\*\*6 USDCbit = 2700000 USDCbit
 - assume 3 token (which is 3 \* 10\*\*18 token bits) should be sold for 600 USDC
 - so 1 token costs 200 USDC
 - then tokenPrice is:
@@ -54,11 +71,35 @@ The error introduced by rounding is less than or equal to one currency bit. For 
   The unit is omitted, so the price will be 2\*10^8
 - investor wants to buy 150 tokens
 - they call Crowdinvesting.buy(150 \* 10\*\*18, 150 \* 200 \* 10\*\*6, tokenReceiver)
-- so \_amount is 150 \* 10\*\*18
+- so \_tokenAmount is 150 \* 10\*\*18
 - 150 \* 10^18 \* 2 \* 10^8 = 300 \* 10^26 = 3 \* 10^28
 - calculate amount due in USDC bits: 3 \* 10^28/10^18 = 3 \* 10^10
 - amount due in USDC: 3 \* 10^10 / 10^6 = 3 \* 10^4 = 30000 USDC
 - 30000 USDC / (200 USDC/T) = 150T -> this worked well
+
+## Exchange rates
+
+The same formula is used in [Exit.sol](../contracts/Exit.sol) to express the exchange rate between two currencies (`referenceToExitRate`). The meaning is slightly different — it converts a currency amount rather than a token amount into another currency — but the math is identical:
+
+```
+exitCurrencyBits = referenceCurrencyBits * rate / 10**referenceCurrency.decimals()
+```
+
+Because both `tokenPrice` and `referenceToExitRate` follow the same convention, they compose directly. Given a token price in currency B and a rate from currency B to currency C, the equivalent token price in currency C is:
+
+```
+price_tokenInCurrencyC = price_tokenInCurrencyB * rate_CurrencyBinCurrencyC / 10**decimalsB
+```
+
+The denominator is always the decimals of the **source** (intermediate) currency B, because the rate is defined as "currency C bits per 10^decimalsB currency B bits".
+
+Example: token price is 10 EURe/token (`price = 10e18`, EURe has 18 decimals), rate is 5 USDC/EURe (`rate = 5e6`, USDC has 6 decimals):
+
+```
+price_tokenInUSDC = 10e18 * 5e6 / 10**18 = 50e6  →  50 USDC/token  ✓
+```
+
+This composition is what `CoinvestedPosition.claimExit()` performs to determine the `effectiveBasePrice` in `exitCurrency` when the exit currency differs from the stored base currency and `referenceToExitRate` is set on the Exit contract.
 
 ## Comparing prices
 

@@ -6,10 +6,11 @@ import "../lib/forge-std/src/console.sol";
 import "../contracts/factories/CrowdinvestingCloneFactory.sol";
 import "../contracts/factories/TokenProxyFactory.sol";
 import "../contracts/factories/FeeSettingsCloneFactory.sol";
+import "../contracts/common/IFeeSettings.sol";
 import "./resources/ERC2771Helper.sol";
 import "./resources/CloneCreators.sol";
 
-contract tokenTest is Test {
+contract CrowdinvestingCloneFactoryTest is Test {
     using ECDSA for bytes32;
 
     AllowList allowList;
@@ -52,22 +53,25 @@ contract tokenTest is Test {
         vm.startPrank(feeSettingsAndAllowListOwner);
         allowList = createAllowList(trustedForwarder, feeSettingsAndAllowListOwner);
 
-        Fees memory fees = Fees(100, 100, 100, 0);
         FeeSettings feeSettingsLogicContract = new FeeSettings(trustedForwarder);
         FeeSettingsCloneFactory feeSettingsCloneFactory = new FeeSettingsCloneFactory(
             address(feeSettingsLogicContract)
         );
-        feeSettings = FeeSettings(
-            feeSettingsCloneFactory.createFeeSettingsClone(
-                0,
-                trustedForwarder,
-                feeSettingsAndAllowListOwner,
-                fees,
-                feeSettingsAndAllowListOwner,
-                feeSettingsAndAllowListOwner,
-                feeSettingsAndAllowListOwner
-            )
-        );
+        {
+            FeeSettings.FeeTypeInit[] memory feeTypes = new FeeSettings.FeeTypeInit[](4);
+            feeTypes[0] = FeeSettings.FeeTypeInit(FeeTypes.TOKEN, 500, 100, feeSettingsAndAllowListOwner);
+            feeTypes[1] = FeeSettings.FeeTypeInit(FeeTypes.CROWDINVESTING, 1000, 100, feeSettingsAndAllowListOwner);
+            feeTypes[2] = FeeSettings.FeeTypeInit(FeeTypes.PRIVATE_OFFER, 500, 100, feeSettingsAndAllowListOwner);
+            feeTypes[3] = FeeSettings.FeeTypeInit(FeeTypes.SECONDARY_MARKET, 500, 0, feeSettingsAndAllowListOwner);
+            feeSettings = FeeSettings(
+                feeSettingsCloneFactory.createFeeSettingsClone(
+                    0,
+                    trustedForwarder,
+                    feeSettingsAndAllowListOwner,
+                    feeTypes
+                )
+            );
+        }
         vm.stopPrank();
 
         vm.prank(feeSettingsAndAllowListOwner);
